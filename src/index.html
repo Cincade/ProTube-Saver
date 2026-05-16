@@ -18153,7 +18153,13 @@
             window.addEventListener('resize', _hideMusicCtx);
         }
 
-        // Bulk download (album / playlist / artist) — replaces the old "open externally" path
+        // Bulk download (album / playlist / artist) — replaces the old "open externally" path.
+        // Adds the same .downloading visual the per-track + button uses, so the user
+        // gets immediate feedback on the row itself (not just a toast). For albums,
+        // updateMusicAlbumProgress drives the ring + flips to in-library on complete.
+        // Playlists/artists don't have a collection entity yet (only albums do), so
+        // their rows stay in the downloading visual until the search re-renders or
+        // the user navigates — see the TODO at the end.
         function _bulkDownloadFromRow(row) {
             const id = row.dataset.trackId;
             const kind = row.dataset.trackKind;
@@ -18162,10 +18168,18 @@
                 showToast(`Can't resolve this ${label}`, null, null);
                 return;
             }
+            if (row.classList.contains('downloading')) return;   // already in flight, no-op
+            row.classList.add('downloading');
+            _setRowProgress(row, 0);
             showToast(`Queuing ${label}…`, null, null);
             try { pywebview.api.add_music_collection(id, kind); } catch (e) {
                 showToast(`Bulk download failed: ${e?.message || e}`, null, null);
+                row.classList.remove('downloading');
             }
+            // TODO(v1.4): extend music_albums to cover playlists + artists so
+            // updateMusicAlbumProgress drives all three. Today only albums get the
+            // aggregate-progress event; playlist/artist rows show "downloading" but
+            // don't visibly progress past 0%.
         }
 
         function _renderMusicResults(list) {
@@ -18342,20 +18356,48 @@
         // flips the card out of the downloading state.
         window.updateMusicAlbumProgress = function(albumId, done, total) {
             if (!albumId) return;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const safe = (window.CSS && CSS.escape) ? CSS.escape(albumId) : albumId.replace(/"/g, '\\"');
+
+            // (1) Search-view rows: same album_id matches the row's data-track-id
+            //     (the backend uses the browseId we passed). Paint the ring +
+            //     flip to in-library on complete so the user sees feedback in
+            //     the surface where they clicked +.
+            document.querySelectorAll(`.music-track-row[data-track-id="${safe}"]`).forEach(row => {
+                if (!row.classList.contains('downloading') && !row.classList.contains('in-library')) {
+                    row.classList.add('downloading');
+                }
+                _setRowProgress(row, pct);
+                if (total > 0 && done >= total) {
+                    row.classList.remove('downloading');
+                    row.classList.add('in-library');
+                    const btn = row.querySelector('.mtr-add');
+                    if (btn) {
+                        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                        btn.title = 'Album in library';
+                    }
+                }
+            });
+
+            // (2) Library: if we don't yet know about this album in local state
+            //     (first event for a freshly-started album download), pull from
+            //     backend and re-render so the album card appears immediately
+            //     instead of after the user manually navigates away and back.
+            const album = (_musicState.albums || []).find(a => a.id === albumId);
+            if (!album) {
+                _refreshMusicLibrary();
+                return;
+            }
             // Update local state copy so subsequent re-renders pick up the new
             // counts without a full backend reload.
-            const album = (_musicState.albums || []).find(a => a.id === albumId);
-            if (album) {
-                album.downloaded_count = done;
-                album.total_tracks = total || album.total_tracks;
-                if (total && done >= total) album.status = 'complete';
-            }
+            album.downloaded_count = done;
+            album.total_tracks = total || album.total_tracks;
+            if (total && done >= total) album.status = 'complete';
+
             // Update the library album card ring in place (no full re-render
             // needed — re-rendering would scroll-reset the grid).
-            const safe = (window.CSS && CSS.escape) ? CSS.escape(albumId) : albumId.replace(/"/g, '\\"');
             const card = document.querySelector(`.music-card[data-album-id="${safe}"]`);
             if (card) {
-                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
                 const dashOffset = 289.03 * (1 - pct / 100);
                 const ringFg = card.querySelector('.mcd-ring-wrap .ring-fg');
                 const ringPct = card.querySelector('.mcd-ring-pct');
@@ -18364,6 +18406,11 @@
                 if (total > 0 && done >= total) {
                     card.classList.remove('album-downloading');
                 }
+            } else {
+                // We know about the album but it's not in the DOM (e.g. user is
+                // on the search sub-tab, or the grid hasn't rendered yet). The
+                // next time the library renders, the updated state is already
+                // there. No re-render needed.
             }
             // Update the detail view if it's currently showing this album.
             if (_musicState.currentAlbumId === albumId && app.currentView === 'music-album-detail') {
