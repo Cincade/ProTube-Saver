@@ -51,6 +51,12 @@ __version__ = '1.2.0'
 # rebuilding the exe.
 LANDING_VERSION_URL_DEFAULT = 'https://protubesaver.netlify.app/version.json'
 
+# Alternative update source: GitHub Releases. When settings['update_source']
+# is 'github', check_for_updates() polls this endpoint instead. The response
+# shape is GitHub's own — we adapt it to the same {latest, downloadUrl,
+# releaseNotes, releasedAt} contract the frontend already consumes.
+GITHUB_RELEASES_URL_DEFAULT = 'https://api.github.com/repos/Cincade/ProTube-Saver/releases/latest'
+
 
 def _resolve_ffmpeg_location():
     """
@@ -3691,6 +3697,64 @@ class API:
             'data_dir': data_dir_path,
         }
 
+    def _fetch_update_manifest_landing(self):
+        """Hit the landing site's version.json. Returns (error_str, data_dict) —
+        exactly one of the two is set. data_dict already matches the contract
+        check_for_updates() consumes (latest, downloadUrl, downloadSizeMB,
+        releaseNotes, releasedAt)."""
+        url = self.settings.get('update_check_url') or LANDING_VERSION_URL_DEFAULT
+        try:
+            resp = requests.get(url, timeout=6, headers={'Cache-Control': 'no-cache'})
+            if resp.status_code != 200:
+                return f'HTTP {resp.status_code}', None
+            return None, resp.json()
+        except Exception as e:
+            return str(e), None
+
+    def _fetch_update_manifest_github(self):
+        """Hit GitHub's Releases API and adapt the response to the same shape
+        the landing-site fetcher returns. Picks the first asset whose name ends
+        in .exe as the download. Public repo → no auth needed; GitHub's
+        anonymous quota (60 req/IP/hour) is plenty since we throttle to once
+        per 24h via the on-disk cache anyway.
+
+        Returns (error_str, data_dict) — exactly one of the two is set."""
+        url = self.settings.get('github_releases_url') or GITHUB_RELEASES_URL_DEFAULT
+        try:
+            resp = requests.get(url, timeout=6, headers={
+                'Accept': 'application/vnd.github+json',
+                'Cache-Control': 'no-cache',
+            })
+            if resp.status_code != 200:
+                return f'GitHub HTTP {resp.status_code}', None
+            gh = resp.json()
+        except Exception as e:
+            return f'GitHub: {e}', None
+
+        # GitHub tag convention is 'v1.2.0' — strip the v so the comparator
+        # sees the same shape it gets from version.json's bare '1.2.0'.
+        tag = str(gh.get('tag_name') or '').strip()
+        latest = tag[1:] if tag.lower().startswith('v') else tag
+
+        download_url = ''
+        download_size_mb = None
+        for asset in (gh.get('assets') or []):
+            name = (asset.get('name') or '').lower()
+            if name.endswith('.exe'):
+                download_url = asset.get('browser_download_url') or ''
+                size_bytes = asset.get('size') or 0
+                if size_bytes:
+                    download_size_mb = round(size_bytes / (1024 * 1024), 1)
+                break
+
+        return None, {
+            'latest': latest or '0.0.0',
+            'downloadUrl': download_url,
+            'downloadSizeMB': download_size_mb,
+            'releaseNotes': gh.get('body') or '',
+            'releasedAt': gh.get('published_at') or '',
+        }
+
     def check_for_updates(self, force=False):
         """Compare local __version__ against the landing site's version.json
         and report whether a newer release is available.
@@ -3737,15 +3801,13 @@ class API:
             except Exception:
                 pass  # corrupt cache file, just re-fetch
 
-        url = self.settings.get('update_check_url') or LANDING_VERSION_URL_DEFAULT
-        try:
-            resp = requests.get(url, timeout=6, headers={'Cache-Control': 'no-cache'})
-            if resp.status_code != 200:
-                return {'has_update': False, 'current': __version__,
-                        'error': f'HTTP {resp.status_code}'}
-            data = resp.json()
-        except Exception as e:
-            return {'has_update': False, 'current': __version__, 'error': str(e)}
+        source = (self.settings.get('update_source') or 'landing').lower()
+        if source == 'github':
+            fetch_err, data = self._fetch_update_manifest_github()
+        else:
+            fetch_err, data = self._fetch_update_manifest_landing()
+        if fetch_err:
+            return {'has_update': False, 'current': __version__, 'error': fetch_err}
 
         latest = str(data.get('latest', '0.0.0')).strip()
         try:
@@ -3762,6 +3824,7 @@ class API:
             'downloadSizeMB': data.get('downloadSizeMB'),
             'releaseNotes': data.get('releaseNotes', ''),
             'releasedAt': data.get('releasedAt', ''),
+            'source': source,
         }
 
         # Persist the result so the next 24 launches don't re-fetch
