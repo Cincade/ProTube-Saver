@@ -3176,6 +3176,118 @@
         .music-pane { display: none; flex-direction: column; flex: 1; min-height: 0; }
         .music-pane.active { display: flex; }
 
+        /* Music subtab badge — small blue pill on the Downloads tab when items
+           are queued or downloading. Hidden when empty. */
+        .music-subtab-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 6px; margin-left: 8px;
+            background: #3b82f6; color: #fff; border-radius: 9px;
+            font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+            line-height: 1; vertical-align: middle;
+        }
+        .music-subtab-badge[hidden] { display: none; }
+
+        /* Downloads pane (mdl- = music downloads list) */
+        .mdl-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-shrink: 0; }
+        .mdl-meta { color: #6e6e6e; font-size: 12px; }
+        .mdl-clear-done {
+            margin-left: auto;
+            background: transparent; border: 1px solid #2a2a2a;
+            color: #c0c0c0; font-family: inherit; font-size: 12px; font-weight: 500;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            transition: border-color 0.12s, color 0.12s;
+        }
+        .mdl-clear-done:hover { border-color: #3b82f6; color: #3b82f6; }
+        .mdl-list { flex: 1; overflow-y: auto; padding-bottom: 24px; display: flex; flex-direction: column; gap: 4px; }
+        .mdl-list:empty { display: none; }
+        .mdl-empty {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            color: #6e6e6e; font-size: 14px; padding: 60px 20px; text-align: center;
+        }
+        /* Hide empty state when the list has rows */
+        #music-pane-downloads:has(.mdl-list:not(:empty)) #mdl-empty { display: none; }
+
+        /* Album group: collapsible header + nested rows. */
+        .mdl-album-group { background: #0f0f0f; border: 1px solid #1a1a1a; border-radius: 8px; overflow: hidden; }
+        .mdl-album-header {
+            display: grid; grid-template-columns: 40px 1fr auto auto; gap: 12px;
+            align-items: center; padding: 10px 12px; cursor: pointer;
+            background: transparent; border: none; width: 100%; text-align: left;
+            color: inherit; font-family: inherit;
+        }
+        .mdl-album-header:hover { background: #141414; }
+        .mdl-album-art {
+            width: 40px; height: 40px; border-radius: 5px; background: #1a1a1a;
+            overflow: hidden; position: relative;
+        }
+        .mdl-album-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mdl-album-meta { min-width: 0; }
+        .mdl-album-title { color: #fff; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mdl-album-sub { color: #8a8a8a; font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mdl-album-progress { color: #c0c0c0; font-size: 12px; font-family: 'JetBrains Mono', monospace; min-width: 70px; text-align: right; }
+        .mdl-album-actions { display: flex; align-items: center; gap: 6px; }
+        .mdl-album-chev {
+            background: transparent; border: none; color: #8a8a8a; cursor: pointer;
+            padding: 4px; display: flex; align-items: center; justify-content: center;
+            border-radius: 50%; transition: color 0.12s, background 0.12s, transform 0.18s;
+        }
+        .mdl-album-chev:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .mdl-album-chev svg { width: 14px; height: 14px; }
+        .mdl-album-group.expanded .mdl-album-chev { transform: rotate(180deg); }
+        .mdl-album-body { display: none; padding: 0 4px 4px 4px; }
+        .mdl-album-group.expanded .mdl-album-body { display: block; }
+
+        /* Queue row */
+        .mdl-row {
+            display: grid; grid-template-columns: 40px 1fr auto auto; gap: 12px;
+            align-items: center; padding: 8px 12px; border-radius: 6px;
+            position: relative;
+        }
+        .mdl-row:hover { background: #141414; }
+        .mdl-art {
+            width: 40px; height: 40px; border-radius: 5px; background: #1a1a1a;
+            overflow: hidden; flex-shrink: 0;
+        }
+        .mdl-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mdl-meta { min-width: 0; }
+        .mdl-title { color: #f5f5f5; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mdl-sub { color: #8a8a8a; font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mdl-status-pill {
+            font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+            font-family: inherit; white-space: nowrap;
+        }
+        .mdl-status-pill.queued { background: #1a1a1a; color: #8a8a8a; }
+        .mdl-status-pill.downloading { background: rgba(59,130,246,0.14); color: #3b82f6; }
+        .mdl-status-pill.done { background: rgba(16,185,129,0.14); color: #10b981; }
+        .mdl-status-pill.failed { background: rgba(220,38,38,0.14); color: #ef4444; }
+        .mdl-status-pill.cancelled { background: #1a1a1a; color: #6e6e6e; }
+        .mdl-action {
+            background: transparent; border: none; color: #c0c0c0; cursor: pointer;
+            padding: 6px; display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: color 0.12s, background 0.12s;
+        }
+        .mdl-action:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .mdl-action svg { width: 14px; height: 14px; display: block; }
+        .mdl-action.retry {
+            width: 28px; height: 28px;
+            border: 1px solid #2a2a2a;
+            border-radius: 50%;
+        }
+        .mdl-action.retry:hover { border-color: #3b82f6; color: #3b82f6; background: transparent; }
+        .mdl-progress {
+            grid-column: 1 / -1;
+            height: 3px; background: #1a1a1a; border-radius: 2px; overflow: hidden;
+            margin-top: 8px;
+        }
+        .mdl-progress-bar {
+            height: 100%; background: #3b82f6;
+            transition: width 0.18s ease;
+            width: 0%;
+        }
+        /* Fade-out for completed rows */
+        .mdl-row.fading { opacity: 0; transition: opacity 0.4s ease; }
+
         /* Library pane */
         .music-lib-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-shrink: 0; }
         .music-lib-sort {
@@ -8292,6 +8404,7 @@
                 <div class="music-subtabs">
                     <button class="music-subtab active" data-music-tab="library" id="music-tab-library">Your Library</button>
                     <button class="music-subtab" data-music-tab="search" id="music-tab-search">Search YouTube Music</button>
+                    <button class="music-subtab" data-music-tab="downloads" id="music-tab-downloads">Downloads<span class="music-subtab-badge" id="music-tab-downloads-badge" hidden>0</span></button>
                 </div>
 
                 <!-- Library sub-pane: album-art grid + sort/meta toolbar -->
@@ -8381,6 +8494,19 @@
                             Open in YouTube Music
                         </button>
                     </div>
+                </div>
+
+                <!-- Downloads sub-pane: real queue of music downloads. Items
+                     auto-drain up to max_concurrent_music_downloads. Each row
+                     shows art + meta + status pill + cancel/retry. Album-grouped
+                     when multiple queued tracks share an album_id. -->
+                <div class="music-pane" id="music-pane-downloads">
+                    <div class="mdl-toolbar">
+                        <span class="mdl-meta" id="mdl-meta"></span>
+                        <button class="mdl-clear-done" id="mdl-clear-done" type="button" hidden>Clear completed</button>
+                    </div>
+                    <div class="mdl-list" id="mdl-list"></div>
+                    <div class="mdl-empty" id="mdl-empty">Your download queue is empty.</div>
                 </div>
             </div>
 
@@ -17346,11 +17472,14 @@
                     document.querySelectorAll('.music-subtab').forEach(b => b.classList.toggle('active', b === btn));
                     document.getElementById('music-pane-library')?.classList.toggle('active', tab === 'library');
                     document.getElementById('music-pane-search')?.classList.toggle('active', tab === 'search');
+                    document.getElementById('music-pane-downloads')?.classList.toggle('active', tab === 'downloads');
                     if (tab === 'search') {
                         setTimeout(() => document.getElementById('music-search-input')?.focus(), 50);
                         // If no active query, paint the For-You landing
                         const inp = document.getElementById('music-search-input');
                         if (!inp || !inp.value.trim()) _renderMusicForYou();
+                    } else if (tab === 'downloads') {
+                        _refreshMusicQueue();
                     }
                 });
             });
@@ -18181,7 +18310,8 @@
             if (row.classList.contains('downloading')) return;   // already in flight, no-op
             row.classList.add('downloading');
             _setRowProgress(row, 0);
-            showToast(`Queuing ${label}…`, null, null);
+            // No immediate toast — the backend resolves the collection async
+            // and emits "Added N tracks to download queue." once it knows N.
             try { pywebview.api.add_music_collection(id, kind); } catch (e) {
                 showToast(`Bulk download failed: ${e?.message || e}`, null, null);
                 row.classList.remove('downloading');
@@ -18328,15 +18458,30 @@
             if (!id) return;
             _musicState.downloading.add(id);
             row.classList.add('downloading');
-            // Reset ring to 0
+            // Reset ring to 0 — the search-row ring still tracks per-track
+            // progress via updateMusicDownload events. The queue ALSO tracks
+            // it via updateMusicQueue; both surfaces stay in sync.
             _setRowProgress(row, 0);
-            try {
-                pywebview.api.add_music_track(id);
-            } catch (e) {
-                showToast('Music download failed: ' + (e?.message || e), null, null);
-                _musicState.downloading.delete(id);
-                row.classList.remove('downloading');
-            }
+            (async () => {
+                try {
+                    const res = await pywebview.api.add_music_track(id);
+                    if (res && res.queued) {
+                        showToast('Added to download queue.', null, null);
+                    } else if (res && res.already_queued) {
+                        showToast('Already in download queue.', null, null);
+                    } else if (res && res.already_in_library) {
+                        showToast('Already in your music library.', null, null);
+                        _musicState.downloading.delete(id);
+                        row.classList.remove('downloading');
+                    } else if (res && res.error) {
+                        throw new Error(res.error);
+                    }
+                } catch (e) {
+                    showToast('Music download failed: ' + (e?.message || e), null, null);
+                    _musicState.downloading.delete(id);
+                    row.classList.remove('downloading');
+                }
+            })();
         }
 
         function _setRowProgress(row, pct) {
@@ -18447,7 +18592,296 @@
                 }
             });
             showToast(`Added: ${entry.title}`, null, null);
+            // Queue side also needs to re-render (entry just flipped to 'done').
+            _refreshMusicQueue();
         };
+
+        // ----- Music download queue (Downloads sub-tab) -----
+        // Cached local copy of the queue. Re-fetched from backend on every
+        // `updateMusicQueue` event. The backend keeps the persistent state;
+        // this is just a render cache.
+        let _musicQueueCache = [];
+
+        function _refreshMusicQueue() {
+            try {
+                Promise.resolve(pywebview.api.get_music_queue())
+                    .then(q => {
+                        _musicQueueCache = Array.isArray(q) ? q : [];
+                        _syncMusicDownloadingFromQueue();
+                        _renderMusicQueue();
+                        _paintMusicQueueBadge();
+                    })
+                    .catch(() => {});
+            } catch (_) {}
+        }
+
+        // Keep `_musicState.downloading` (drives the search-row ring + spinner)
+        // in sync with the backend queue. Cancellations/failures from the
+        // Downloads tab need to flip search rows back to the idle '+' state.
+        function _syncMusicDownloadingFromQueue() {
+            try {
+                const liveIds = new Set();
+                for (const e of _musicQueueCache) {
+                    if (e.status === 'queued' || e.status === 'downloading') liveIds.add(e.id);
+                }
+                if (!_musicState || !_musicState.downloading) return;
+                // Remove anyone no longer live
+                const toRemove = [];
+                _musicState.downloading.forEach(id => {
+                    if (!liveIds.has(id)) toRemove.push(id);
+                });
+                for (const id of toRemove) {
+                    _musicState.downloading.delete(id);
+                    _musicDownloadProgress.delete(id);
+                    const safe = (window.CSS && CSS.escape) ? CSS.escape(id) : id.replace(/"/g, '\\"');
+                    document.querySelectorAll(`.music-track-row[data-track-id="${safe}"]`).forEach(row => {
+                        // Only clear if not in library (musicDownloadDone owns the in-library flip)
+                        if (!row.classList.contains('in-library')) {
+                            row.classList.remove('downloading');
+                            _setRowProgress(row, 0);
+                        }
+                    });
+                }
+                // Add anyone newly live
+                liveIds.forEach(id => _musicState.downloading.add(id));
+            } catch (_) {}
+        }
+
+        // Push event from backend on every queue mutation. Just re-fetch.
+        window.updateMusicQueue = function() {
+            _refreshMusicQueue();
+        };
+
+        function _paintMusicQueueBadge() {
+            const badge = document.getElementById('music-tab-downloads-badge');
+            if (!badge) return;
+            const n = _musicQueueCache.filter(e => e.status === 'queued' || e.status === 'downloading').length;
+            if (n > 0) {
+                badge.textContent = String(n);
+                badge.removeAttribute('hidden');
+            } else {
+                badge.setAttribute('hidden', '');
+            }
+        }
+
+        function _renderMusicQueue() {
+            const list = document.getElementById('mdl-list');
+            const clearBtn = document.getElementById('mdl-clear-done');
+            const meta = document.getElementById('mdl-meta');
+            if (!list) return;
+            const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            const q = _musicQueueCache;
+            // Group by album_id (only when 2+ tracks share one); singletons stay flat.
+            const groups = new Map();   // album_id → [entries]
+            const singles = [];
+            for (const e of q) {
+                const aid = e.album_id || '';
+                if (!aid) { singles.push(e); continue; }
+                if (!groups.has(aid)) groups.set(aid, []);
+                groups.get(aid).push(e);
+            }
+            const albumGroups = [];
+            for (const [aid, entries] of groups) {
+                if (entries.length >= 2) {
+                    albumGroups.push({ album_id: aid, entries });
+                } else {
+                    // Single track that happens to have an album_id — render flat.
+                    singles.push(...entries);
+                }
+            }
+
+            // Sort: in-progress + queued first (preserve queue order), then done/cancelled/failed
+            const orderRank = (e) => {
+                if (e.status === 'downloading') return 0;
+                if (e.status === 'queued') return 1;
+                if (e.status === 'failed') return 2;
+                if (e.status === 'cancelled') return 3;
+                return 4; // done
+            };
+            const sortFn = (a, b) => {
+                const ra = orderRank(a), rb = orderRank(b);
+                if (ra !== rb) return ra - rb;
+                return (a.queued_at || 0) - (b.queued_at || 0);
+            };
+            singles.sort(sortFn);
+
+            const rowHtml = (e) => {
+                const status = e.status || 'queued';
+                const pct = Math.max(0, Math.min(100, Math.round(e.progress || 0)));
+                let pillText;
+                if (status === 'downloading') pillText = `Downloading ${pct}%`;
+                else if (status === 'queued') pillText = 'Queued';
+                else if (status === 'done') pillText = 'Done';
+                else if (status === 'failed') pillText = 'Failed';
+                else if (status === 'cancelled') pillText = 'Cancelled';
+                else pillText = status;
+
+                const cancelSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+                const retrySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+
+                let action = '';
+                if (status === 'queued' || status === 'downloading') {
+                    action = `<button class="mdl-action mdl-cancel" data-mdl-cancel="${esc(e.id)}" title="Cancel">${cancelSvg}</button>`;
+                } else if (status === 'failed') {
+                    action = `<button class="mdl-action retry mdl-retry" data-mdl-retry="${esc(e.id)}" title="Retry">${retrySvg}</button>`;
+                } else if (status === 'cancelled') {
+                    action = `<button class="mdl-action retry mdl-retry" data-mdl-retry="${esc(e.id)}" title="Retry">${retrySvg}</button>`;
+                }
+                const progressStrip = status === 'downloading'
+                    ? `<div class="mdl-progress"><div class="mdl-progress-bar" style="width:${pct}%"></div></div>`
+                    : '';
+                const art = e.thumbnail
+                    ? `<img src="${esc(e.thumbnail)}" loading="lazy" />`
+                    : '';
+                const sub = e.album
+                    ? `${esc(e.artist || 'Unknown')} · ${esc(e.album)}`
+                    : esc(e.artist || '');
+                return `
+                    <div class="mdl-row mdl-row-${status}" data-mdl-id="${esc(e.id)}">
+                        <div class="mdl-art">${art}</div>
+                        <div class="mdl-meta">
+                            <div class="mdl-title">${esc(e.title || 'Loading…')}</div>
+                            <div class="mdl-sub">${sub}</div>
+                        </div>
+                        <span class="mdl-status-pill ${status}">${esc(pillText)}</span>
+                        ${action || '<span></span>'}
+                        ${progressStrip}
+                    </div>`;
+            };
+
+            const groupHtml = (g) => {
+                const entries = g.entries.slice().sort(sortFn);
+                const total = entries.length;
+                const done = entries.filter(e => e.status === 'done').length;
+                const dlInFlight = entries.filter(e => e.status === 'downloading').length;
+                const failed = entries.filter(e => e.status === 'failed').length;
+                const totalProgress = entries.reduce((acc, e) => acc + (e.status === 'done' ? 100 : (e.progress || 0)), 0);
+                const aggPct = total ? Math.round(totalProgress / total) : 0;
+                const albumTitle = entries[0].album || 'Album';
+                const albumArtist = entries[0].artist || '';
+                const cover = entries.find(e => e.thumbnail)?.thumbnail || '';
+                const allDone = done === total;
+                const cancelSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+                const chevSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+                const cancelAllBtn = (dlInFlight + (total - done - failed - dlInFlight)) > 0
+                    ? `<button class="mdl-action mdl-cancel-album" data-mdl-cancel-album="${esc(g.album_id)}" title="Cancel remaining">${cancelSvg}</button>`
+                    : '';
+                return `
+                    <div class="mdl-album-group" data-mdl-group="${esc(g.album_id)}">
+                        <button class="mdl-album-header" type="button" data-mdl-toggle-group="${esc(g.album_id)}">
+                            <div class="mdl-album-art">${cover ? `<img src="${esc(cover)}" loading="lazy" />` : ''}</div>
+                            <div class="mdl-album-meta">
+                                <div class="mdl-album-title">${esc(albumTitle)}</div>
+                                <div class="mdl-album-sub">${esc(albumArtist)} · ${done}/${total} downloaded${failed ? ' · ' + failed + ' failed' : ''}</div>
+                            </div>
+                            <span class="mdl-album-progress">${allDone ? 'Complete' : aggPct + '%'}</span>
+                            <div class="mdl-album-actions">
+                                ${cancelAllBtn}
+                                <span class="mdl-album-chev">${chevSvg}</span>
+                            </div>
+                        </button>
+                        <div class="mdl-album-body">
+                            ${entries.map(rowHtml).join('')}
+                        </div>
+                    </div>`;
+            };
+
+            // Persist which album groups are expanded across re-renders.
+            const expanded = new Set();
+            list.querySelectorAll('.mdl-album-group.expanded').forEach(el => {
+                expanded.add(el.getAttribute('data-mdl-group'));
+            });
+
+            list.innerHTML = albumGroups.map(groupHtml).join('') + singles.map(rowHtml).join('');
+
+            // Restore expanded state
+            list.querySelectorAll('.mdl-album-group').forEach(el => {
+                if (expanded.has(el.getAttribute('data-mdl-group'))) {
+                    el.classList.add('expanded');
+                }
+            });
+
+            // Meta line + clear-done visibility
+            const totalCount = q.length;
+            const activeCount = q.filter(e => e.status === 'queued' || e.status === 'downloading').length;
+            const finishedCount = q.filter(e => e.status === 'done' || e.status === 'cancelled').length;
+            if (meta) {
+                if (totalCount === 0) {
+                    meta.textContent = '';
+                } else if (activeCount > 0) {
+                    meta.textContent = `${activeCount} in queue · ${finishedCount} completed`;
+                } else {
+                    meta.textContent = `${totalCount} item${totalCount === 1 ? '' : 's'}`;
+                }
+            }
+            if (clearBtn) {
+                if (finishedCount > 0) clearBtn.removeAttribute('hidden');
+                else clearBtn.setAttribute('hidden', '');
+            }
+
+            // Wire row actions
+            list.querySelectorAll('[data-mdl-cancel]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const id = btn.getAttribute('data-mdl-cancel');
+                    if (!id) return;
+                    // Optimistic: remove from local list if queued (will re-render
+                    // from backend on the event); downloading stays until backend
+                    // confirms cancellation.
+                    try { pywebview.api.cancel_music_queue_item(id); } catch (_) {}
+                });
+            });
+            list.querySelectorAll('[data-mdl-retry]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const id = btn.getAttribute('data-mdl-retry');
+                    if (!id) return;
+                    try { pywebview.api.retry_music_queue_item(id); } catch (_) {}
+                });
+            });
+            list.querySelectorAll('[data-mdl-cancel-album]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const aid = btn.getAttribute('data-mdl-cancel-album');
+                    if (!aid) return;
+                    try { pywebview.api.cancel_music_album_queued(aid); } catch (_) {}
+                });
+            });
+            list.querySelectorAll('[data-mdl-toggle-group]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Don't toggle if user clicked an action button inside the header
+                    if (e.target.closest('.mdl-action')) return;
+                    const group = btn.closest('.mdl-album-group');
+                    if (group) group.classList.toggle('expanded');
+                });
+            });
+        }
+
+        // Wire "Clear completed" + prime the badge on app start. The script
+        // block evaluates after the HTML is parsed (script at end of body),
+        // so the elements exist now. Defer slightly so pywebview.api is up.
+        (function _mdlInit() {
+            const wire = () => {
+                const clearBtn = document.getElementById('mdl-clear-done');
+                if (clearBtn && !clearBtn._wired) {
+                    clearBtn._wired = true;
+                    clearBtn.addEventListener('click', () => {
+                        try { pywebview.api.clear_music_queue_done(); } catch (_) {}
+                    });
+                }
+                // Prime the badge on app start (might already have persisted queue items).
+                _refreshMusicQueue();
+            };
+            // pywebviewready fires when the JS bridge is live; fall back to a
+            // short timeout if it has already fired.
+            if (window.pywebview && window.pywebview.api) {
+                wire();
+            } else {
+                window.addEventListener('pywebviewready', wire, { once: true });
+                setTimeout(wire, 1000);
+            }
+        })();
 
         // ----- Dock + audio playback -----
         // --- Pointer-capture drag helper for any horizontal slider track ---

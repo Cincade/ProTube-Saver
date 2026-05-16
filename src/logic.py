@@ -72,6 +72,13 @@ def _resolve_ffmpeg_location():
     return None  # Dev mode — let yt-dlp use PATH
 
 
+class _MusicDownloadCancelled(Exception):
+    """Raised inside the music download progress hook when the user has clicked
+    cancel on a queue item. Caught by `_music_download_worker` so it can mark
+    the entry as 'cancelled' and clean up any partial file."""
+    pass
+
+
 def _richness(video):
     """Score how 'rich' a library entry is — more metadata = higher score. Used to pick
     the better of two duplicate entries when deduping."""
@@ -129,6 +136,24 @@ class API:
         self.max_concurrent_downloads = max(1, min(8, self.max_concurrent_downloads))
         self.download_semaphore = threading.Semaphore(self.max_concurrent_downloads)
         self.ffmpeg_location = _resolve_ffmpeg_location()
+
+        # --- Music download queue -------------------------------------------------
+        # `settings['music_queue']` holds the persistent list of queued/active/done
+        # tracks. The queue processor (a single daemon thread) promotes 'queued'
+        # entries up to `max_concurrent_music_downloads` at a time and spawns the
+        # actual worker thread. Wake the processor by setting `_music_queue_event`
+        # whenever the queue changes — avoids busy-polling. See
+        # `_music_queue_processor` for the drain loop.
+        self.max_concurrent_music_downloads = int(
+            self.settings.get('max_concurrent_music_downloads') or 3
+        )
+        self.max_concurrent_music_downloads = max(1, min(8, self.max_concurrent_music_downloads))
+        self._music_queue_lock = threading.Lock()
+        self._music_queue_event = threading.Event()
+        self._music_queue_active = 0   # in-flight worker count
+        self._music_queue_cancelled_ids = set()   # ids the user asked to cancel mid-flight
+        self._sanitize_music_queue_on_startup()
+        threading.Thread(target=self._music_queue_processor, daemon=True).start()
 
         # Auto-update yt-dlp in background. The runtime dir is now next to the
         # exe (was ~/Downloads/ProTube Saver/), so updates persist across
@@ -2903,25 +2928,59 @@ class API:
         return s or fallback
 
     def add_music_track(self, video_id_or_url):
-        """Download a single track as M4A with embedded metadata + cover art, and
-        add it to the music library. Fire-and-forget — runs in a background thread,
-        progress events flow through `_send_to_js('updateMusicDownload', ...)`."""
+        """Enqueue a single track for background download. The queue processor
+        promotes it to 'downloading' up to `max_concurrent_music_downloads` at a
+        time and runs `_music_download_worker`. Progress flows through both the
+        per-track `updateMusicDownload` event AND the queue-wide
+        `updateMusicQueue` event."""
         try:
             url = video_id_or_url
             if not url.startswith('http'):
                 url = f'https://music.youtube.com/watch?v={video_id_or_url}'
-            # Dedup — already in library?
+            # Cheap dedup — already in library? (only catches the bare-id case)
             lib_ids = self._build_music_library_id_set()
-            # We need to extract metadata before we know the YT video_id from a URL,
-            # so the cheap pre-check only catches the bare-id case here.
             if video_id_or_url in lib_ids:
                 return {'already_in_library': True}
-            threading.Thread(
-                target=self._music_download_worker,
-                args=(url,),
-                daemon=True,
-            ).start()
-            return {'ok': True, 'started': True}
+            # Resolve a stable id for the queue entry. If the caller passed an
+            # 11-char video id, use it; otherwise try to extract `v=<id>` from
+            # the URL. Falls back to '' if neither yields one (rare — the
+            # worker will still process the URL but cancel won't work).
+            if len(video_id_or_url) == 11 and not video_id_or_url.startswith('http'):
+                track_id = video_id_or_url
+            else:
+                import re as _re
+                m = _re.search(r'[?&]v=([A-Za-z0-9_-]{11})', url)
+                track_id = m.group(1) if m else ''
+            with self._music_queue_lock:
+                q = self.settings.get('music_queue', []) or []
+                for entry in q:
+                    if entry.get('id') == track_id and entry.get('status') in ('queued', 'downloading'):
+                        return {'already_queued': True, 'id': track_id}
+                # Quick partial entry — title/artist will be filled in by the worker
+                # after it does the metadata probe. We don't block to extract here
+                # because the user just clicked '+' and wants instant feedback.
+                entry = {
+                    'id': track_id,
+                    'title': '',
+                    'artist': '',
+                    'album': '',
+                    'album_id': '',
+                    'thumbnail': '',
+                    'url': url,
+                    'status': 'queued',
+                    'progress': 0,
+                    'queued_at': int(time.time()),
+                    'started_at': None,
+                    'completed_at': None,
+                    'error': None,
+                }
+                q.append(entry)
+                self.settings['music_queue'] = q
+                self._save_settings()
+                queue_len = sum(1 for e in q if e.get('status') in ('queued', 'downloading'))
+            self._music_queue_wake()
+            self._emit_music_queue()
+            return {'queued': True, 'id': track_id, 'queue_len': queue_len}
         except Exception as e:
             return {'error': str(e)}
 
@@ -3060,26 +3119,111 @@ class API:
                 )
 
             lib_ids = self._build_music_library_id_set()
+            # Build a quick lookup of already-queued tracks so we don't re-enqueue.
+            with self._music_queue_lock:
+                existing_q = self.settings.get('music_queue', []) or []
+                queued_ids = {
+                    e.get('id') for e in existing_q
+                    if e.get('status') in ('queued', 'downloading')
+                }
+            # Per-track metadata stamped on each queue entry up-front: artist/title
+            # come from the flat extraction (yt-dlp gives us 'title' which is
+            # usually "Artist - Track" on YT Music). Album metadata comes from the
+            # collection-level info dict.
+            album_title = info.get('title') or info.get('album') or ''
+            album_artist = (
+                info.get('uploader') or info.get('artist')
+                or info.get('creator') or info.get('channel') or ''
+            )
+            album_cover = ''
+            thumbs = info.get('thumbnails') or []
+            if thumbs and isinstance(thumbs, list):
+                try:
+                    best = max(
+                        (t for t in thumbs if isinstance(t, dict) and t.get('url')),
+                        key=lambda t: (t.get('width') or 0) * (t.get('height') or 0),
+                        default=None,
+                    )
+                    if best:
+                        album_cover = best.get('url') or ''
+                except Exception:
+                    pass
+            if not album_cover:
+                album_cover = info.get('thumbnail') or ''
+            flat_by_id = {e.get('id'): e for e in flat if isinstance(e, dict) and e.get('id')}
+
             queued = 0
             skipped = 0
+            now_ts = int(time.time())
+            with self._music_queue_lock:
+                q = self.settings.get('music_queue', []) or []
+                for vid in video_ids:
+                    if vid in lib_ids:
+                        skipped += 1
+                        continue
+                    if vid in queued_ids:
+                        skipped += 1
+                        continue
+                    src = flat_by_id.get(vid, {}) or {}
+                    raw_title = src.get('title') or ''
+                    # YT Music flat-extract titles often look like "Artist - Track".
+                    # Split on " - " if present, else fall back to album-level artist.
+                    track_artist = src.get('artist') or src.get('uploader') or ''
+                    track_title = raw_title
+                    if not track_artist and ' - ' in raw_title:
+                        parts = raw_title.split(' - ', 1)
+                        track_artist, track_title = parts[0].strip(), parts[1].strip()
+                    if not track_artist:
+                        track_artist = album_artist
+                    # Pick best thumb from per-track thumbnails, else fall back to album cover.
+                    track_thumb = ''
+                    t_thumbs = src.get('thumbnails') or []
+                    if t_thumbs and isinstance(t_thumbs, list):
+                        try:
+                            best = max(
+                                (t for t in t_thumbs if isinstance(t, dict) and t.get('url')),
+                                key=lambda t: (t.get('width') or 0) * (t.get('height') or 0),
+                                default=None,
+                            )
+                            if best:
+                                track_thumb = best.get('url') or ''
+                        except Exception:
+                            pass
+                    if not track_thumb:
+                        track_thumb = album_cover
+                    entry = {
+                        'id': vid,
+                        'title': track_title or 'Untitled',
+                        'artist': track_artist,
+                        'album': album_title if kind == 'album' else '',
+                        'album_id': album_id or '',
+                        'thumbnail': track_thumb,
+                        'url': f'https://music.youtube.com/watch?v={vid}',
+                        'status': 'queued',
+                        'progress': 0,
+                        'queued_at': now_ts,
+                        'started_at': None,
+                        'completed_at': None,
+                        'error': None,
+                    }
+                    q.append(entry)
+                    queued += 1
+                    queued_ids.add(vid)
+                self.settings['music_queue'] = q
+                self._save_settings()
+            # Initial 0% events so search-row rings paint immediately.
             for vid in video_ids:
-                if vid in lib_ids:
-                    skipped += 1
-                    continue
-                # Spawn one worker per track. They all share the same hook → progress flows.
-                track_url = f'https://music.youtube.com/watch?v={vid}'
-                threading.Thread(
-                    target=self._music_download_worker,
-                    args=(track_url, album_id or None),
-                    daemon=True,
-                ).start()
-                queued += 1
-                # Notify the frontend so it can show a download row for this track
-                self._send_to_js('updateMusicDownload', vid, 0)
-            msg_parts = []
-            if queued: msg_parts.append(f'Queued {queued} tracks')
-            if skipped: msg_parts.append(f'{skipped} already in library')
-            self._send_to_js('showToast', ' · '.join(msg_parts) or 'Nothing to download', None, None)
+                if vid not in lib_ids:
+                    self._send_to_js('updateMusicDownload', vid, 0)
+            if queued:
+                self._music_queue_wake()
+            self._emit_music_queue()
+            if queued:
+                self._send_to_js('showToast', f'Added {queued} tracks to download queue.', None, None)
+            elif skipped:
+                self._send_to_js('showToast', f'{skipped} already in library or queue', None, None)
+            else:
+                self._send_to_js('showToast', 'Nothing to download', None, None)
             # Edge case: album with zero new downloads (everything was already in
             # library). Flip status to complete immediately so the card doesn't
             # sit forever on 'downloading'.
@@ -3089,13 +3233,36 @@ class API:
             print(f'[ProTube/music] collection download failed: {e}')
             self._send_to_js('showToast', f'{kind.title()} download failed: {e}', None, None)
 
-    def _music_download_worker(self, url, album_id=None):
+    def _music_download_worker(self, url, album_id=None, queue_id=None):
         """Background worker: extract metadata, download audio, embed tags + art,
         stamp the library. If `album_id` is provided, the resulting track entry is
-        stamped with it AND the parent album's downloaded_count is incremented."""
+        stamped with it AND the parent album's downloaded_count is incremented.
+
+        `queue_id` is the music_queue entry id this worker is fulfilling — used to
+        update status/progress on that entry. Provided when the queue processor
+        spawns us; None for direct calls (legacy)."""
+
+        def _is_cancelled():
+            if not queue_id:
+                return False
+            with self._music_queue_lock:
+                return queue_id in self._music_queue_cancelled_ids
+
+        captured_filepath = {'path': None}
         try:
             from app_paths import music_dir
             base_dir = music_dir()
+
+            # Mark queue entry as 'downloading'.
+            if queue_id:
+                self._update_music_queue_entry(
+                    queue_id,
+                    {'status': 'downloading', 'started_at': int(time.time()), 'progress': 0},
+                )
+
+            if _is_cancelled():
+                self._finalize_cancelled(queue_id)
+                return
 
             # Phase 1: metadata probe (no download) so we know artist/album for
             # the final filename layout and library entry.
@@ -3107,11 +3274,21 @@ class API:
             vid = info.get('id') or ''
             if not vid:
                 self._send_to_js('showToast', 'Music download failed: no video id', None, None)
+                if queue_id:
+                    self._update_music_queue_entry(
+                        queue_id,
+                        {'status': 'failed', 'error': 'no video id', 'completed_at': int(time.time())},
+                    )
                 return
 
             # Re-check dedup with the actual extracted ID
             if vid in self._build_music_library_id_set():
                 self._send_to_js('showToast', 'Already in your music library', None, None)
+                if queue_id:
+                    self._update_music_queue_entry(
+                        queue_id,
+                        {'status': 'done', 'progress': 100, 'completed_at': int(time.time())},
+                    )
                 return
 
             # Metadata: YT Music gives us 'artist'/'album'/'track' directly; regular YT
@@ -3143,9 +3320,10 @@ class API:
                 'no_warnings': True,
             })
 
-            captured_filepath = {'path': None}
-
             def hook(d):
+                # Cancellation: raise to abort the ydl.download() call below.
+                if _is_cancelled():
+                    raise _MusicDownloadCancelled()
                 if d.get('status') == 'finished':
                     captured_filepath['path'] = d.get('filename')
                 if d.get('status') == 'downloading':
@@ -3153,7 +3331,10 @@ class API:
                     total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
                     if total:
                         pct = (d.get('downloaded_bytes') or 0) * 100 / total
-                    self._send_to_js('updateMusicDownload', vid, round(pct, 1))
+                    pct_r = round(pct, 1)
+                    self._send_to_js('updateMusicDownload', vid, pct_r)
+                    if queue_id:
+                        self._update_music_queue_entry(queue_id, {'progress': pct_r})
 
             def pp_hook(d):
                 if d.get('status') == 'finished':
@@ -3218,9 +3399,270 @@ class API:
             if album_id:
                 self._bump_album_progress(album_id)
             self._send_to_js('musicDownloadDone', entry)
+            if queue_id:
+                self._update_music_queue_entry(
+                    queue_id,
+                    {
+                        'status': 'done',
+                        'progress': 100,
+                        'completed_at': int(time.time()),
+                        'title': title,
+                        'artist': artist,
+                        'album': album,
+                        'thumbnail': info.get('thumbnail') or '',
+                    },
+                )
+        except _MusicDownloadCancelled:
+            # User cancelled while ydl.download() was running. Clean up any
+            # partial file the download left behind so a retry starts fresh.
+            try:
+                fp = captured_filepath.get('path')
+                if fp and os.path.exists(fp):
+                    os.remove(fp)
+                # yt-dlp's .part files also leak; clean those siblings too.
+                if fp:
+                    part = fp + '.part'
+                    if os.path.exists(part):
+                        os.remove(part)
+            except Exception:
+                pass
+            self._finalize_cancelled(queue_id)
         except Exception as e:
             print(f'[ProTube/music] download failed: {e}')
             self._send_to_js('showToast', f'Music download failed: {e}', None, None)
+            if queue_id:
+                self._update_music_queue_entry(
+                    queue_id,
+                    {'status': 'failed', 'error': str(e), 'completed_at': int(time.time())},
+                )
+
+    # ----------------------------- music queue ---------------------------------- #
+
+    def _music_queue_wake(self):
+        """Nudge the queue processor to take another pass. Cheap, idempotent."""
+        self._music_queue_event.set()
+
+    def _sanitize_music_queue_on_startup(self):
+        """Called once during __init__. Resets stuck 'downloading' entries (the
+        process was killed mid-download — partial file is incomplete, retry from
+        scratch) and drops 'done' / 'cancelled' entries older than 1 hour so the
+        queue doesn't grow unbounded across sessions."""
+        try:
+            q = self.settings.get('music_queue', []) or []
+            now = int(time.time())
+            cleaned = []
+            for e in q:
+                st = e.get('status')
+                if st == 'downloading':
+                    e['status'] = 'queued'
+                    e['progress'] = 0
+                    e['started_at'] = None
+                    cleaned.append(e)
+                elif st in ('done', 'cancelled'):
+                    age = now - int(e.get('completed_at') or e.get('queued_at') or now)
+                    if age < 3600:
+                        cleaned.append(e)
+                    # else: drop
+                else:
+                    cleaned.append(e)
+            if cleaned != q:
+                self.settings['music_queue'] = cleaned
+                self._save_settings()
+        except Exception as ex:
+            print(f'[ProTube/music] queue sanitize failed: {ex}')
+
+    def _emit_music_queue(self):
+        """Push the current queue to the frontend so the Downloads panel
+        re-renders. Called on every state change. The queue is small (<100 items
+        in practice), so re-rendering the whole list is cheap and avoids diffing."""
+        try:
+            self._send_to_js('updateMusicQueue')
+        except Exception:
+            pass
+
+    def _update_music_queue_entry(self, queue_id, patch):
+        """Patch fields on a queue entry (matched by id), persist, and emit."""
+        if not queue_id or not patch:
+            return
+        with self._music_queue_lock:
+            q = self.settings.get('music_queue', []) or []
+            changed = False
+            for e in q:
+                if e.get('id') == queue_id:
+                    e.update(patch)
+                    changed = True
+                    break
+            if changed:
+                self.settings['music_queue'] = q
+                self._save_settings()
+        if changed:
+            self._emit_music_queue()
+
+    def _finalize_cancelled(self, queue_id):
+        """Mark a queue entry as cancelled + clear the cancellation flag."""
+        if not queue_id:
+            return
+        with self._music_queue_lock:
+            self._music_queue_cancelled_ids.discard(queue_id)
+        self._update_music_queue_entry(
+            queue_id,
+            {'status': 'cancelled', 'completed_at': int(time.time())},
+        )
+
+    def _music_queue_processor(self):
+        """Background daemon: drains 'queued' entries up to
+        `max_concurrent_music_downloads` at a time. Waits on
+        `_music_queue_event` between drains — no busy-poll."""
+        while True:
+            try:
+                self._music_queue_event.wait()
+                # Clear immediately so wakes during this drain still trigger
+                # another pass after we finish.
+                self._music_queue_event.clear()
+                self._drain_music_queue()
+            except Exception as e:
+                print(f'[ProTube/music] queue processor error: {e}')
+                # Brief backoff so a persistent bug doesn't hot-loop.
+                time.sleep(0.5)
+
+    def _drain_music_queue(self):
+        """Promote 'queued' entries to 'downloading' and spawn workers until we
+        hit the concurrency cap. Each worker decrements the in-flight count + wakes
+        the processor when it finishes so we pick up the next item."""
+        while True:
+            with self._music_queue_lock:
+                if self._music_queue_active >= self.max_concurrent_music_downloads:
+                    return
+                q = self.settings.get('music_queue', []) or []
+                next_entry = next((e for e in q if e.get('status') == 'queued'), None)
+                if not next_entry:
+                    return
+                # Reserve a slot — flip its status here (the worker also sets it,
+                # but doing it inside the lock avoids racing the next iteration).
+                next_entry['status'] = 'downloading'
+                next_entry['started_at'] = int(time.time())
+                self.settings['music_queue'] = q
+                self._save_settings()
+                self._music_queue_active += 1
+            self._emit_music_queue()
+            queue_id = next_entry.get('id')
+            url = next_entry.get('url')
+            album_id = next_entry.get('album_id') or None
+            threading.Thread(
+                target=self._run_music_queue_worker,
+                args=(url, album_id, queue_id),
+                daemon=True,
+            ).start()
+
+    def _run_music_queue_worker(self, url, album_id, queue_id):
+        """Wrap _music_download_worker so we always decrement the in-flight
+        counter and re-wake the processor for the next item, even on exceptions."""
+        try:
+            self._music_download_worker(url, album_id=album_id, queue_id=queue_id)
+        finally:
+            with self._music_queue_lock:
+                self._music_queue_active = max(0, self._music_queue_active - 1)
+            self._music_queue_wake()
+
+    def get_music_queue(self):
+        """Frontend reads this on the Downloads tab mount and after every
+        `updateMusicQueue` event."""
+        return self.settings.get('music_queue', []) or []
+
+    def cancel_music_queue_item(self, track_id):
+        """If status is 'queued', drop from queue. If 'downloading', set the
+        cancellation flag so the worker bails at the next progress tick."""
+        if not track_id:
+            return {'ok': False, 'error': 'no track_id'}
+        with self._music_queue_lock:
+            q = self.settings.get('music_queue', []) or []
+            target = next((e for e in q if e.get('id') == track_id), None)
+            if not target:
+                return {'ok': False, 'error': 'not in queue'}
+            was = target.get('status')
+            if was == 'queued':
+                # Drop immediately — worker never started for this one.
+                self.settings['music_queue'] = [e for e in q if e.get('id') != track_id]
+                self._save_settings()
+            elif was == 'downloading':
+                # Worker is running — flag for cancellation. The hook checks
+                # this on every progress tick and raises to abort.
+                self._music_queue_cancelled_ids.add(track_id)
+            else:
+                # done / failed / cancelled — nothing to cancel
+                return {'ok': False, 'was_status': was}
+        self._emit_music_queue()
+        return {'ok': True, 'was_status': was}
+
+    def clear_music_queue_done(self):
+        """Drop all 'done' + 'cancelled' entries."""
+        with self._music_queue_lock:
+            q = self.settings.get('music_queue', []) or []
+            kept = [e for e in q if e.get('status') not in ('done', 'cancelled')]
+            cleared = len(q) - len(kept)
+            if cleared:
+                self.settings['music_queue'] = kept
+                self._save_settings()
+        if cleared:
+            self._emit_music_queue()
+        return {'cleared': cleared}
+
+    def retry_music_queue_item(self, track_id):
+        """Flip a 'failed' (or 'cancelled') item back to 'queued', clear error,
+        wake the processor."""
+        if not track_id:
+            return {'ok': False, 'error': 'no track_id'}
+        with self._music_queue_lock:
+            q = self.settings.get('music_queue', []) or []
+            target = next((e for e in q if e.get('id') == track_id), None)
+            if not target:
+                return {'ok': False, 'error': 'not in queue'}
+            if target.get('status') not in ('failed', 'cancelled'):
+                return {'ok': False, 'was_status': target.get('status')}
+            target['status'] = 'queued'
+            target['progress'] = 0
+            target['error'] = None
+            target['started_at'] = None
+            target['completed_at'] = None
+            self.settings['music_queue'] = q
+            self._save_settings()
+        self._music_queue_wake()
+        self._emit_music_queue()
+        return {'ok': True}
+
+    def cancel_music_album_queued(self, album_id):
+        """Drop all 'queued' entries that belong to this album. Lets any
+        currently-downloading tracks finish. Returns how many were cancelled."""
+        if not album_id:
+            return {'cancelled': 0}
+        with self._music_queue_lock:
+            q = self.settings.get('music_queue', []) or []
+            kept = []
+            cancelled = 0
+            for e in q:
+                if e.get('album_id') == album_id and e.get('status') == 'queued':
+                    cancelled += 1
+                    continue
+                kept.append(e)
+            if cancelled:
+                self.settings['music_queue'] = kept
+                self._save_settings()
+        if cancelled:
+            self._emit_music_queue()
+        return {'cancelled': cancelled}
+
+    def set_max_concurrent_music_downloads(self, n):
+        """Live-update the concurrency cap. Existing workers continue; new ones
+        are spawned/throttled against the new value on the next drain."""
+        try:
+            n = max(1, min(8, int(n)))
+        except Exception:
+            return {'ok': False, 'error': 'invalid value'}
+        self.max_concurrent_music_downloads = n
+        self.settings['max_concurrent_music_downloads'] = n
+        self._save_settings()
+        self._music_queue_wake()
+        return {'ok': True, 'value': n}
 
     def load_music_library(self):
         """Frontend reads this on the Music view's mount."""
