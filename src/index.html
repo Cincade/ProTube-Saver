@@ -3911,18 +3911,23 @@
             position: absolute; left: 0; top: 50%; transform: translateY(-50%);
             height: 5px; width: 0%; background: #fff; border-radius: 3px;
             pointer-events: none;
-            transition: background 0.12s, width 0.25s linear;
+            /* No transition on width — a requestAnimationFrame loop drives the
+               paint at ~60fps so the bar already moves smoothly. A CSS transition
+               here interfered with the rAF reads and caused visible stuttering
+               (next timeupdate jump arrives before the previous transition
+               finishes, easing curve restarts). */
+            transition: background 0.12s;
         }
         .mp-seek-thumb {
             position: absolute; top: 50%; left: 0%; transform: translate(-50%, -50%);
             width: 13px; height: 13px; background: #fff; border-radius: 50%;
             opacity: 0; pointer-events: none;
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            transition: opacity 0.15s, left 0.25s linear;
+            /* Same reasoning as .mp-seek-fill — rAF loop owns the position; no
+               CSS transition on `left`. Opacity transition is fine (only fires
+               on hover/drag state, not on every paint). */
+            transition: opacity 0.15s;
         }
-        /* During drag, no transition so the thumb tracks the cursor 1:1 */
-        .mp-seek.dragging .mp-seek-fill,
-        .mp-seek.dragging .mp-seek-thumb { transition: none; }
         /* Transport row — 3-column grid: shuffle/repeat left, prev/play/next center, volume right */
         .mp-controls {
             margin-top: 12px;
@@ -3994,7 +3999,12 @@
            Stage stays full-viewport; panel covers the bottom ~240px when open. */
         .mp-panel {
             position: absolute; bottom: 0; left: 0; right: 0;
-            height: 240px;
+            /* Sized as % of viewport so smaller laptops don't feel like the
+               panel eats half the screen. User-chosen target: 27–30% of vh.
+               Locked at 30vh — feels right at 600px (180px tall) up through
+               1080p (324px tall). Was a fixed 240px which read as ~40% on
+               small displays. */
+            height: 30vh;
             background: rgba(10, 10, 10, 0.92);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
@@ -4133,10 +4143,10 @@
             position: absolute; left: 0; top: 50%; transform: translateY(-50%);
             height: 4px; width: 0%; background: #fff; border-radius: 2px;
             pointer-events: none;
-            transition: background 0.12s, width 0.25s linear;
+            /* No width transition — rAF loop paints continuously. See the
+               equivalent .mp-seek-fill rule above for the why. */
+            transition: background 0.12s;
         }
-        .music-dock-seek.dragging .music-dock-seek-fill,
-        .music-dock-seek.dragging .music-dock-seek-thumb { transition: none; }
         .music-dock-seek:hover .music-dock-seek-fill,
         .music-dock-seek.dragging .music-dock-seek-fill { background: #3b82f6; }
         .music-dock-seek:hover .music-dock-seek-thumb,
@@ -4146,7 +4156,7 @@
             width: 11px; height: 11px; background: #fff; border-radius: 50%;
             opacity: 0; pointer-events: none;
             box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-            transition: opacity 0.15s, left 0.25s linear;
+            transition: opacity 0.15s;
         }
         .music-dock-volume { display: flex; align-items: center; gap: 6px; min-width: 130px; }
         .music-dock-vol-btn {
@@ -18553,11 +18563,20 @@
             const playBtn = document.getElementById('music-dock-play');
             if (playBtn) playBtn.addEventListener('click', (e) => { e.stopPropagation(); _musicTogglePlay(); });
 
-            audio.addEventListener('play', () => { _musicPlayer.playing = true; _paintAllPlayIcons(true); });
-            audio.addEventListener('pause', () => { _musicPlayer.playing = false; _paintAllPlayIcons(false); });
+            audio.addEventListener('play', () => {
+                _musicPlayer.playing = true;
+                _paintAllPlayIcons(true);
+                _startMusicProgressLoop();   // rAF takes over from timeupdate for smooth visuals
+            });
+            audio.addEventListener('pause', () => {
+                _musicPlayer.playing = false;
+                _paintAllPlayIcons(false);
+                _stopMusicProgressLoop();
+            });
             audio.addEventListener('ended', () => {
                 _musicPlayer.playing = false;
                 _paintAllPlayIcons(false);
+                _stopMusicProgressLoop();
                 // Repeat-one: replay current. Otherwise advance — but only loop the
                 // library if repeat=all (or shuffle is on, which infinite-loops by design).
                 if (_musicPlayer.repeat === 'one') {
@@ -18886,6 +18905,31 @@
             if (_musicPlayer.isSeeking) return;
             _paintDockProgress();
             _paintFullPlayerProgress();
+        }
+
+        // requestAnimationFrame loop driving the seek bars at ~60fps during
+        // playback. Replaces the previous timeupdate-only approach, which ran at
+        // ~4 fps and depended on CSS `transition: width 0.25s linear` to smooth
+        // the discrete jumps — that combination caused the visible stuttering
+        // (next jump arrived before transition finished → easing curve restart).
+        // rAF gives buttery-smooth motion; CSS transitions on width/left removed
+        // because the loop already paints continuously.
+        let _musicProgressRaf = null;
+        function _startMusicProgressLoop() {
+            if (_musicProgressRaf) return;
+            const tick = () => {
+                _paintAllProgress();
+                _musicProgressRaf = requestAnimationFrame(tick);
+            };
+            _musicProgressRaf = requestAnimationFrame(tick);
+        }
+        function _stopMusicProgressLoop() {
+            if (_musicProgressRaf) {
+                cancelAnimationFrame(_musicProgressRaf);
+                _musicProgressRaf = null;
+            }
+            // One last paint so the bar shows the final position when paused/ended.
+            _paintAllProgress();
         }
 
         function _paintFullPlayerProgress() {
