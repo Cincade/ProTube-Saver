@@ -1,0 +1,10 @@
+# ProTube Saver Dependencies
+
+# Core
+yt-dlp>=2024.1.0
+pywebview>=4.0.0
+requests>=2.31.0
+packaging>=23.0
+
+# Build
+pyinstaller>=6.0.0

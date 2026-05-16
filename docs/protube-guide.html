@@ -1,0 +1,1809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ProTube Saver — Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    /* ============================================================
+       PROTUBE SAVER — GUIDE
+       Editorial-style technical doc. Visual continuity with the app:
+       same near-black background, same fonts, same single-accent blue.
+       Layout: asymmetric. Big mono chapter numerals hang in the left
+       gutter as marginalia. Center column carries the content. Sticky
+       TOC on the right tracks reading position. Designed to look
+       intentional and quiet so screen recordings over it don't fight
+       the underlying surface for attention.
+       ============================================================ */
+
+    :root {
+        --bg: #0a0a0a;
+        --bg-elev: #141414;
+        --bg-card: #161616;
+        --bg-input: #0f0f0f;
+        --line: #262626;
+        --line-soft: #1c1c1c;
+        --text: #ededed;
+        --text-2: #a8a8a8;
+        --text-3: #6a6a6a;
+        --text-4: #3a3a3a;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.12);
+        --accent-line: rgba(59, 130, 246, 0.32);
+
+        /* Spacing rhythm — multiples of 4 */
+        --gutter: 88px;          /* left chapter-number gutter on desktop */
+        --col-content: 680px;    /* main reading column max width */
+        --col-toc: 220px;        /* sticky TOC width */
+        --pad-page: 64px;        /* page edge padding desktop */
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'DM Sans', -apple-system, 'Segoe UI', BlinkMacSystemFont, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Subtle vignette so the page has atmosphere without
+       becoming decorative. Only visible at the very top corners. */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 320px;
+        background: radial-gradient(
+            ellipse 80% 100% at 50% -20%,
+            rgba(59, 130, 246, 0.04) 0%,
+            transparent 70%
+        );
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /* ===========================
+       HEADER — sticky, minimal
+       =========================== */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(10, 10, 10, 0.86);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line-soft);
+    }
+
+    .topbar-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 14px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 500;
+        font-size: 14px;
+        letter-spacing: -0.005em;
+    }
+
+    .brand-mark {
+        width: 26px;
+        height: 26px;
+        background: var(--accent);
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+
+    .brand-mark svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .topbar-meta {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    /* ===========================
+       PAGE LAYOUT
+       Three-column on wide screens: gutter, content, toc
+       =========================== */
+    .page {
+        position: relative;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 80px var(--pad-page) 200px;
+        display: grid;
+        grid-template-columns: 1fr var(--col-toc);
+        gap: 64px;
+    }
+
+    .content {
+        position: relative;
+        max-width: var(--col-content);
+    }
+
+    /* ===========================
+       HERO
+       =========================== */
+    .hero {
+        margin-bottom: 96px;
+        position: relative;
+    }
+
+    .eyebrow {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 20px;
+    }
+
+    .hero-title {
+        font-family: 'DM Sans', sans-serif;
+        font-size: clamp(40px, 6vw, 64px);
+        font-weight: 600;
+        line-height: 1.04;
+        letter-spacing: -0.025em;
+        margin: 0 0 24px;
+        color: var(--text);
+    }
+
+    .hero-title em {
+        font-style: italic;
+        font-weight: 400;
+        color: var(--text-2);
+    }
+
+    .hero-lede {
+        font-size: 19px;
+        line-height: 1.55;
+        color: var(--text-2);
+        font-weight: 400;
+        max-width: 580px;
+        margin: 0 0 40px;
+    }
+
+    .hero-meta {
+        display: flex;
+        gap: 32px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding-top: 24px;
+        border-top: 1px solid var(--line-soft);
+    }
+
+    .hero-meta span strong {
+        color: var(--text);
+        font-weight: 500;
+    }
+
+    /* ===========================
+       SECTIONS
+       Big mono numeral hangs to the left of the content column.
+       On narrow screens it collapses inline above the heading.
+       =========================== */
+    .section {
+        position: relative;
+        margin-bottom: 96px;
+        scroll-margin-top: 80px;  /* offset for sticky topbar when jumping via TOC */
+    }
+
+    .section-num {
+        position: absolute;
+        left: calc(-1 * var(--gutter));
+        top: 6px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-4);
+        letter-spacing: 0.04em;
+    }
+
+    .section-num::before {
+        content: '';
+        display: inline-block;
+        width: 24px;
+        height: 1px;
+        background: var(--text-4);
+        vertical-align: middle;
+        margin-right: 12px;
+        transform: translateY(-1px);
+    }
+
+    .section-title {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 32px;
+        font-weight: 600;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 12px;
+        color: var(--text);
+    }
+
+    .section-kicker {
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--text-2);
+        margin: 0 0 36px;
+        max-width: 620px;
+    }
+
+    /* ===========================
+       PROSE
+       =========================== */
+    .content p {
+        font-size: 16px;
+        line-height: 1.65;
+        color: var(--text);
+        margin: 0 0 20px;
+    }
+
+    .content p.muted {
+        color: var(--text-2);
+    }
+
+    .content h3 {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+        margin: 40px 0 12px;
+        color: var(--text);
+    }
+
+    .content strong {
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    .content em {
+        font-style: italic;
+        color: var(--text-2);
+    }
+
+    .content a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid var(--accent-line);
+        transition: border-color 0.15s ease;
+    }
+
+    .content a:hover {
+        border-bottom-color: var(--accent);
+    }
+
+    /* Inline keyboard / code snippets — mono, soft surface */
+    .kbd, .content code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12.5px;
+        font-weight: 500;
+        background: var(--bg-elev);
+        border: 1px solid var(--line);
+        padding: 2px 7px;
+        border-radius: 5px;
+        color: var(--text);
+        white-space: nowrap;
+    }
+
+    /* Numbered step lists — replace bullets with mono indices */
+    .steps {
+        list-style: none;
+        counter-reset: step;
+        padding: 0;
+        margin: 24px 0 32px;
+    }
+
+    .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding: 0 0 0 44px;
+        margin-bottom: 16px;
+        line-height: 1.65;
+    }
+
+    .steps > li::before {
+        content: counter(step, decimal-leading-zero);
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.02em;
+    }
+
+    /* ===========================
+       SCREENSHOT PLACEHOLDERS
+       Rectangular areas with a faint border + label so they're
+       obvious but don't overpower the page during recording.
+       =========================== */
+    .shot {
+        position: relative;
+        margin: 28px 0 36px;
+        background: var(--bg-card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        aspect-ratio: 16 / 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .shot::before {
+        /* very faint diagonal hatch so it reads as "placeholder", not "broken" */
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 14px,
+            rgba(255, 255, 255, 0.012) 14px,
+            rgba(255, 255, 255, 0.012) 28px
+        );
+        pointer-events: none;
+    }
+
+    .shot-label {
+        position: relative;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .shot-label small {
+        display: block;
+        margin-top: 6px;
+        color: var(--text-4);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 11px;
+    }
+
+    /* Smaller variant for inline UI snippets */
+    .shot.shot-sm {
+        aspect-ratio: 16 / 6;
+    }
+
+    /* ===========================
+       CALLOUT — for tips & notes
+       =========================== */
+    .callout {
+        margin: 28px 0 32px;
+        padding: 18px 22px;
+        background: var(--accent-soft);
+        border-left: 2px solid var(--accent);
+        border-radius: 0 8px 8px 0;
+    }
+
+    .callout-label {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 10.5px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .callout p {
+        margin: 0;
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: var(--text);
+    }
+
+    .callout p + p {
+        margin-top: 8px;
+    }
+
+    /* ===========================
+       SHORTCUT TABLE
+       =========================== */
+    .shortcuts {
+        margin: 24px 0 32px;
+        border-top: 1px solid var(--line-soft);
+    }
+
+    .shortcut-row {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--line-soft);
+        align-items: center;
+    }
+
+    .shortcut-keys {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .shortcut-row .desc {
+        font-size: 14.5px;
+        color: var(--text-2);
+        line-height: 1.5;
+    }
+
+    /* ===========================
+       SIDEBAR TOC — sticky right column
+       =========================== */
+    .toc {
+        position: sticky;
+        top: 80px;
+        align-self: start;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+    }
+
+    .toc-label {
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 500;
+        margin-bottom: 16px;
+        font-size: 10.5px;
+    }
+
+    .toc ol {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        counter-reset: toc;
+    }
+
+    .toc li {
+        counter-increment: toc;
+        margin-bottom: 10px;
+    }
+
+    .toc a {
+        display: block;
+        color: var(--text-3);
+        text-decoration: none;
+        padding-left: 28px;
+        position: relative;
+        line-height: 1.4;
+        transition: color 0.15s ease;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .toc a::before {
+        content: counter(toc, decimal-leading-zero);
+        position: absolute;
+        left: 0;
+        top: 0;
+        color: var(--text-4);
+        font-size: 11px;
+    }
+
+    .toc a:hover { color: var(--text); }
+
+    .toc a.is-active {
+        color: var(--text);
+    }
+
+    .toc a.is-active::before {
+        color: var(--accent);
+    }
+
+    /* Outer scrollbar — subtle */
+    ::-webkit-scrollbar {
+        width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--line);
+        border-radius: 100px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-4);
+    }
+
+    /* ===========================
+       FOOTER — the sign-off
+       =========================== */
+    .footer {
+        max-width: var(--col-content);
+        padding: 64px 0 0;
+        margin-top: 64px;
+        border-top: 1px solid var(--line-soft);
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .footer-signoff {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 14px;
+        font-style: italic;
+        color: var(--text-2);
+        text-transform: none;
+        letter-spacing: -0.005em;
+        margin-bottom: 12px;
+    }
+
+    /* ===========================
+       RESPONSIVE
+       =========================== */
+    @media (max-width: 1100px) {
+        :root {
+            --gutter: 0px;
+            --pad-page: 32px;
+        }
+        .page {
+            grid-template-columns: 1fr;
+            gap: 0;
+            padding-top: 56px;
+        }
+        .toc {
+            display: none;
+        }
+        .section-num {
+            position: static;
+            display: block;
+            margin-bottom: 12px;
+        }
+        .section-num::before {
+            display: none;
+        }
+        .hero-title {
+            font-size: clamp(36px, 9vw, 56px);
+        }
+    }
+
+    @media (max-width: 600px) {
+        :root {
+            --pad-page: 22px;
+        }
+        .topbar-inner { padding: 12px 22px; }
+        .hero { margin-bottom: 64px; }
+        .section { margin-bottom: 72px; }
+        .section-title { font-size: 26px; }
+        .hero-meta { flex-wrap: wrap; gap: 16px 24px; }
+        .shortcut-row {
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+    }
+
+    /* Subtle one-time entrance — only animates the hero, not every section,
+       so scrolling stays calm. */
+    @keyframes hero-fade {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .hero { animation: hero-fade 0.6s ease both; }
+    .hero .eyebrow { animation: hero-fade 0.6s ease both; animation-delay: 0.05s; }
+    .hero-title { animation: hero-fade 0.7s ease both; animation-delay: 0.1s; }
+    .hero-lede { animation: hero-fade 0.7s ease both; animation-delay: 0.18s; }
+    .hero-meta { animation: hero-fade 0.7s ease both; animation-delay: 0.26s; }
+</style>
+</head>
+<body>
+
+<!-- Topbar — quiet brand presence -->
+<header class="topbar">
+    <div class="topbar-inner">
+        <div class="brand">
+            <div class="brand-mark">
+                <!-- Same downward-arrow icon used in the app rail -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </div>
+            <span>ProTube Saver</span>
+        </div>
+        <div class="topbar-meta">Guide · v1.0</div>
+    </div>
+</header>
+
+<!-- Main page -->
+<main class="page">
+    <div class="content">
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="eyebrow">User guide</div>
+            <h1 class="hero-title">A quiet way to <em>save</em> what you watch.</h1>
+            <p class="hero-lede">ProTube Saver is a Windows app for downloading YouTube videos and playlists locally — built around a queue you can return to, a library that survives offline, and a player that just works. This guide walks through everything you need to use it well.</p>
+            <div class="hero-meta">
+                <span>Reading time · <strong>~8 min</strong></span>
+                <span>Platform · <strong>Windows 10/11</strong></span>
+                <span>Type · <strong>Portable .exe</strong></span>
+            </div>
+        </section>
+
+        <!-- 01 — What it is -->
+        <section class="section" id="s01">
+            <div class="section-num">01</div>
+            <h2 class="section-title">What ProTube Saver is</h2>
+            <p class="section-kicker">It's a desktop YouTube downloader. You paste a link, it downloads. Pretty much the whole pitch.</p>
+
+            <p>Underneath, it's a small Python app wrapping <code>yt-dlp</code> with a custom UI, a download queue, a local library, and a built-in video player. Designed for people who want their stuff on disk — for travel, for archiving, for offline viewing — without dealing with command lines or sketchy websites.</p>
+
+            <p>A few things worth knowing up front:</p>
+            <ul style="padding-left: 18px; margin: 16px 0 24px; color: var(--text); line-height: 1.7;">
+                <li><strong>Portable.</strong> The exe lives in a folder of your choosing. All settings, library data, and downloads sit next to it in a <code>data/</code> folder. Move the folder, everything moves.</li>
+                <li><strong>Offline-first.</strong> Once a video is downloaded, you can play it inside the app even without internet. Thumbnails are cached locally too.</li>
+                <li><strong>No accounts.</strong> No sign-in, no telemetry, no cloud anything.</li>
+            </ul>
+
+            <div class="shot">
+                <svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="800" fill="#0a0a0a"/>
+                    <!-- Title bar -->
+                    <rect x="0" y="0" width="1280" height="32" fill="#0a0a0a"/>
+                    <line x1="0" y1="32" x2="1280" y2="32" stroke="#161616"/>
+                    <text x="640" y="20" text-anchor="middle" font-size="11" fill="#5a5a5a">ProTube Saver</text>
+                    <g stroke="#5a5a5a" stroke-width="1.1" fill="none">
+                        <line x1="1206" y1="16" x2="1218" y2="16"/>
+                        <rect x="1232" y="11" width="10" height="10"/>
+                        <path d="M1256 11 l8 8 M1256 19 l8 -8"/>
+                    </g>
+                    <!-- Rail -->
+                    <rect x="0" y="32" width="220" height="768" fill="#0a0a0a"/>
+                    <line x1="220" y1="32" x2="220" y2="800" stroke="#161616"/>
+                    <g transform="translate(20, 56)">
+                        <rect width="28" height="28" rx="7" fill="#3b82f6"/>
+                        <g transform="translate(7,7)" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9"/>
+                            <path d="M5 6.5l3 3 3-3"/>
+                            <line x1="8" y1="9.5" x2="8" y2="2"/>
+                        </g>
+                        <text x="40" y="20" font-size="14" font-weight="600" fill="#ededed" letter-spacing="-0.01em">ProTube</text>
+                    </g>
+                    <!-- Library -->
+                    <g transform="translate(12, 124)">
+                        <g transform="translate(12, 10)" fill="#a0a0a0">
+                            <rect width="6" height="6" rx="1"/>
+                            <rect x="10" width="6" height="6" rx="1"/>
+                            <rect y="10" width="6" height="6" rx="1"/>
+                            <rect x="10" y="10" width="6" height="6" rx="1"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#a0a0a0" font-weight="500">Library</text>
+                        <text x="190" y="22" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10.5" fill="#5a5a5a">28</text>
+                    </g>
+                    <!-- Queue (active) -->
+                    <g transform="translate(12, 168)">
+                        <rect width="196" height="36" rx="7" fill="#1a1a1a"/>
+                        <g transform="translate(12, 10)" stroke="#fff" stroke-width="1.6" stroke-linecap="round">
+                            <line x1="0" y1="2" x2="14" y2="2"/>
+                            <line x1="0" y1="8" x2="14" y2="8"/>
+                            <line x1="0" y1="14" x2="14" y2="14"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#ededed" font-weight="600">Queue</text>
+                        <rect x="170" y="11" width="20" height="14" rx="7" fill="rgba(59,130,246,0.16)"/>
+                        <text x="180" y="22" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#93c5fd" font-weight="600">8</text>
+                    </g>
+                    <line x1="20" y1="232" x2="200" y2="232" stroke="#161616"/>
+                    <!-- URL bar -->
+                    <g transform="translate(252, 60)">
+                        <rect width="1000" height="44" rx="8" fill="#141414" stroke="#1f1f1f"/>
+                        <text x="20" y="28" font-size="12.5" fill="#5a5a5a">Paste YouTube URL or playlist</text>
+                        <rect x="906" y="6" width="80" height="32" rx="6" fill="#3b82f6"/>
+                        <text x="946" y="26" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Add</text>
+                    </g>
+                    <!-- Filter chips -->
+                    <g transform="translate(252, 124)" font-size="11.5">
+                        <rect width="64" height="28" rx="7" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="32" y="18" text-anchor="middle" fill="#ededed" font-weight="600">All 8</text>
+                        <rect x="74" width="80" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="114" y="18" text-anchor="middle" fill="#a0a0a0">Active 1</text>
+                        <rect x="164" width="92" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="210" y="18" text-anchor="middle" fill="#a0a0a0">Queued 7</text>
+                        <rect x="266" width="80" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="306" y="18" text-anchor="middle" fill="#5a5a5a">Failed 0</text>
+                    </g>
+                    <!-- Queue cards -->
+                    <g transform="translate(252, 176)">
+                        <g>
+                            <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                            <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                            <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">10 Year Body Transformation — How I Did It</text>
+                            <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Hamza · 15:26</text>
+                            <rect x="146" y="64" width="56" height="20" rx="5" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.3)"/>
+                            <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#93c5fd" font-weight="600">1080p</text>
+                            <rect x="208" y="64" width="68" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="242" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Downloading</text>
+                            <rect x="930" y="32" width="56" height="28" rx="6" fill="transparent" stroke="#1f1f1f"/>
+                            <text x="958" y="50" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#a0a0a0">2.1 GB</text>
+                            <!-- progress bar -->
+                            <rect x="14" y="80" width="972" height="2" rx="1" fill="#1a1a1a"/>
+                            <rect x="14" y="80" width="630" height="2" rx="1" fill="#3b82f6"/>
+                        </g>
+                        <g transform="translate(0, 108)">
+                            <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                            <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                            <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Vibe Coding Has Officially Ruined Software</text>
+                            <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Theo - t3.gg · 21:42</text>
+                            <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                            <rect x="208" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="236" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                        </g>
+                        <g transform="translate(0, 216)">
+                            <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                            <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                            <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Building the Ultimate Desk Setup (2026 Edition)</text>
+                            <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Linus Tech Tips · 18:14</text>
+                            <rect x="146" y="64" width="44" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="168" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">4K</text>
+                            <rect x="196" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="224" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                        </g>
+                        <g transform="translate(0, 324)">
+                            <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                            <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                            <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">100 Seconds of WebView2</text>
+                            <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Fireship · 1:43</text>
+                            <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                            <rect x="208" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                            <text x="236" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                        </g>
+                    </g>
+                    <!-- Path bar -->
+                    <g transform="translate(252, 660)">
+                        <rect width="1000" height="48" rx="8" fill="#0d0d0d" stroke="#1a1a1a"/>
+                        <text x="20" y="22" font-size="10" fill="#5a5a5a" letter-spacing="0.06em">SAVING TO</text>
+                        <text x="20" y="38" font-family="'JetBrains Mono', monospace" font-size="11" fill="#a0a0a0">C:\Apps\ProTube\data\downloads</text>
+                        <rect x="908" y="9" width="80" height="30" rx="6" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="948" y="29" text-anchor="middle" font-size="11.5" fill="#d4d4d4" font-weight="500">Browse</text>
+                    </g>
+                    <!-- Download CTA -->
+                    <g transform="translate(252, 720)">
+                        <rect width="200" height="40" rx="8" fill="#3b82f6"/>
+                        <text x="100" y="25" text-anchor="middle" font-size="13" fill="#fff" font-weight="600">Download 8</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 02 — Install & first launch -->
+        <section class="section" id="s02">
+            <div class="section-num">02</div>
+            <h2 class="section-title">Install &amp; first launch</h2>
+            <p class="section-kicker">There's no installer. Just an exe.</p>
+
+            <ol class="steps">
+                <li>Drop <code>ProTubeSaver.exe</code> in any folder you'd like the app to live. <code>C:\Apps\ProTube\</code> works. So does a USB stick.</li>
+                <li>Double-click the exe.</li>
+                <li>On first launch, Windows SmartScreen may show a warning (unsigned binary). Click <strong>More info</strong> → <strong>Run anyway</strong>.</li>
+                <li>The app opens. A <code>data/</code> folder appears next to the exe — that's where your settings and library will live from here on.</li>
+            </ol>
+
+            <div class="callout">
+                <div class="callout-label">Note</div>
+                <p>If you want to move the app later, close it first, then move the whole folder (exe + <code>data/</code> together). Everything follows.</p>
+            </div>
+
+            <div class="shot">
+                <svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="800" fill="#0a0a0a"/>
+                    <rect x="0" y="0" width="1280" height="32" fill="#0a0a0a"/>
+                    <line x1="0" y1="32" x2="1280" y2="32" stroke="#161616"/>
+                    <text x="640" y="20" text-anchor="middle" font-size="11" fill="#5a5a5a">ProTube Saver</text>
+                    <g stroke="#5a5a5a" stroke-width="1.1" fill="none">
+                        <line x1="1206" y1="16" x2="1218" y2="16"/>
+                        <rect x="1232" y="11" width="10" height="10"/>
+                        <path d="M1256 11 l8 8 M1256 19 l8 -8"/>
+                    </g>
+                    <!-- Rail -->
+                    <rect x="0" y="32" width="220" height="768" fill="#0a0a0a"/>
+                    <line x1="220" y1="32" x2="220" y2="800" stroke="#161616"/>
+                    <g transform="translate(20, 56)">
+                        <rect width="28" height="28" rx="7" fill="#3b82f6"/>
+                        <g transform="translate(7,7)" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9"/>
+                            <path d="M5 6.5l3 3 3-3"/>
+                            <line x1="8" y1="9.5" x2="8" y2="2"/>
+                        </g>
+                        <text x="40" y="20" font-size="14" font-weight="600" fill="#ededed">ProTube</text>
+                    </g>
+                    <g transform="translate(12, 124)">
+                        <g transform="translate(12, 10)" fill="#5a5a5a">
+                            <rect width="6" height="6" rx="1"/>
+                            <rect x="10" width="6" height="6" rx="1"/>
+                            <rect y="10" width="6" height="6" rx="1"/>
+                            <rect x="10" y="10" width="6" height="6" rx="1"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#5a5a5a">Library</text>
+                        <text x="190" y="22" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10.5" fill="#404040">0</text>
+                    </g>
+                    <g transform="translate(12, 168)">
+                        <rect width="196" height="36" rx="7" fill="#1a1a1a"/>
+                        <g transform="translate(12, 10)" stroke="#fff" stroke-width="1.6" stroke-linecap="round">
+                            <line x1="0" y1="2" x2="14" y2="2"/>
+                            <line x1="0" y1="8" x2="14" y2="8"/>
+                            <line x1="0" y1="14" x2="14" y2="14"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#ededed" font-weight="600">Queue</text>
+                    </g>
+                    <line x1="20" y1="232" x2="200" y2="232" stroke="#161616"/>
+                    <!-- URL bar -->
+                    <g transform="translate(252, 60)">
+                        <rect width="1000" height="44" rx="8" fill="#141414" stroke="#1f1f1f"/>
+                        <text x="20" y="28" font-size="12.5" fill="#5a5a5a">Paste YouTube URL or playlist</text>
+                        <rect x="906" y="6" width="80" height="32" rx="6" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="946" y="26" text-anchor="middle" font-size="12" fill="#5a5a5a" font-weight="600">Add</text>
+                    </g>
+                    <!-- Empty filter chips -->
+                    <g transform="translate(252, 124)" font-size="11.5">
+                        <rect width="64" height="28" rx="7" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="32" y="18" text-anchor="middle" fill="#ededed" font-weight="600">All 0</text>
+                        <rect x="74" width="80" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="114" y="18" text-anchor="middle" fill="#5a5a5a">Active 0</text>
+                        <rect x="164" width="92" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="210" y="18" text-anchor="middle" fill="#5a5a5a">Queued 0</text>
+                    </g>
+                    <!-- Empty state -->
+                    <g transform="translate(752, 380)" text-anchor="middle">
+                        <g transform="translate(-32, -80)" stroke="#262626" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M58 36v12a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V36"/>
+                            <path d="M16 22l16 16 16-16"/>
+                            <line x1="32" y1="38" x2="32" y2="2"/>
+                        </g>
+                        <text y="-20" font-size="16" font-weight="600" fill="#a0a0a0" letter-spacing="-0.01em">Queue is empty</text>
+                        <text y="6" font-size="12.5" fill="#5a5a5a">Paste a YouTube URL above to get started</text>
+                    </g>
+                    <!-- Path bar -->
+                    <g transform="translate(252, 660)">
+                        <rect width="1000" height="48" rx="8" fill="#0d0d0d" stroke="#1a1a1a"/>
+                        <text x="20" y="22" font-size="10" fill="#5a5a5a" letter-spacing="0.06em">SAVING TO</text>
+                        <text x="20" y="38" font-family="'JetBrains Mono', monospace" font-size="11" fill="#a0a0a0">C:\Apps\ProTube\data\downloads</text>
+                        <rect x="908" y="9" width="80" height="30" rx="6" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="948" y="29" text-anchor="middle" font-size="11.5" fill="#d4d4d4" font-weight="500">Browse</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 03 — Adding videos -->
+        <section class="section" id="s03">
+            <div class="section-num">03</div>
+            <h2 class="section-title">Adding videos to the queue</h2>
+            <p class="section-kicker">Three ways. All of them work on single videos and full playlists.</p>
+
+            <h3>Paste a URL</h3>
+            <p>The fastest way. Click the URL bar at the top, paste a YouTube link, press <span class="kbd">Enter</span>. The app fetches metadata (title, channel, duration, available qualities) and adds it to the queue. Playlist URLs add as a single playlist card you can expand.</p>
+
+            <h3>Drag &amp; drop</h3>
+            <p>Drag a YouTube link from your browser tab directly into the app window. A blue drop overlay appears — release the link, same as paste.</p>
+
+            <h3>Multiple at once</h3>
+            <p>Paste multiple URLs separated by newlines or spaces. Each becomes its own queue item. Useful when you've copied a batch of links from a doc or chat.</p>
+
+            <div class="shot">
+                <svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="800" fill="#0a0a0a"/>
+                    <rect x="0" y="0" width="1280" height="32" fill="#0a0a0a"/>
+                    <line x1="0" y1="32" x2="1280" y2="32" stroke="#161616"/>
+                    <text x="640" y="20" text-anchor="middle" font-size="11" fill="#5a5a5a">ProTube Saver</text>
+                    <g stroke="#5a5a5a" stroke-width="1.1" fill="none">
+                        <line x1="1206" y1="16" x2="1218" y2="16"/>
+                        <rect x="1232" y="11" width="10" height="10"/>
+                        <path d="M1256 11 l8 8 M1256 19 l8 -8"/>
+                    </g>
+                    <rect x="0" y="32" width="220" height="768" fill="#0a0a0a"/>
+                    <line x1="220" y1="32" x2="220" y2="800" stroke="#161616"/>
+                    <g transform="translate(20, 56)">
+                        <rect width="28" height="28" rx="7" fill="#3b82f6"/>
+                        <g transform="translate(7,7)" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9"/>
+                            <path d="M5 6.5l3 3 3-3"/>
+                            <line x1="8" y1="9.5" x2="8" y2="2"/>
+                        </g>
+                        <text x="40" y="20" font-size="14" font-weight="600" fill="#ededed">ProTube</text>
+                    </g>
+                    <g transform="translate(12, 124)">
+                        <g transform="translate(12, 10)" fill="#a0a0a0">
+                            <rect width="6" height="6" rx="1"/><rect x="10" width="6" height="6" rx="1"/>
+                            <rect y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#a0a0a0">Library</text>
+                    </g>
+                    <g transform="translate(12, 168)">
+                        <rect width="196" height="36" rx="7" fill="#1a1a1a"/>
+                        <g transform="translate(12, 10)" stroke="#fff" stroke-width="1.6" stroke-linecap="round">
+                            <line x1="0" y1="2" x2="14" y2="2"/><line x1="0" y1="8" x2="14" y2="8"/><line x1="0" y1="14" x2="14" y2="14"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#ededed" font-weight="600">Queue</text>
+                        <rect x="170" y="11" width="20" height="14" rx="7" fill="rgba(59,130,246,0.16)"/>
+                        <text x="180" y="22" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#93c5fd" font-weight="600">3</text>
+                    </g>
+                    <line x1="20" y1="232" x2="200" y2="232" stroke="#161616"/>
+
+                    <!-- URL bar — FOCUSED with text and animated cursor stand-in -->
+                    <g transform="translate(252, 60)">
+                        <rect width="1000" height="44" rx="8" fill="#161616" stroke="#3b82f6" stroke-width="1.5"/>
+                        <text x="20" y="28" font-family="'JetBrains Mono', monospace" font-size="12" fill="#ededed">https://www.youtube.com/watch?v=dQw4w9WgXcQ</text>
+                        <rect x="438" y="14" width="1.4" height="16" fill="#3b82f6"/>
+                        <rect x="906" y="6" width="80" height="32" rx="6" fill="#3b82f6"/>
+                        <text x="946" y="26" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Add</text>
+                    </g>
+
+                    <!-- Filter chips -->
+                    <g transform="translate(252, 124)" font-size="11.5">
+                        <rect width="64" height="28" rx="7" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="32" y="18" text-anchor="middle" fill="#ededed" font-weight="600">All 3</text>
+                        <rect x="74" width="80" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="114" y="18" text-anchor="middle" fill="#a0a0a0">Active 0</text>
+                        <rect x="164" width="92" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="210" y="18" text-anchor="middle" fill="#a0a0a0">Queued 3</text>
+                    </g>
+
+                    <!-- Fetching skeleton card -->
+                    <g transform="translate(252, 176)">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="rgba(59,130,246,0.28)" stroke-width="1.5"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#1a1a1a"/>
+                        <!-- skeleton lines -->
+                        <rect x="146" y="22" width="320" height="12" rx="3" fill="#1f1f1f"/>
+                        <rect x="146" y="44" width="180" height="9" rx="3" fill="#1a1a1a"/>
+                        <!-- fetching pill -->
+                        <rect x="146" y="62" width="92" height="22" rx="6" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.32)"/>
+                        <circle cx="158" cy="73" r="3" fill="#3b82f6">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite"/>
+                        </circle>
+                        <text x="170" y="77" font-size="10.5" fill="#93c5fd" font-weight="500">Fetching metadata…</text>
+                    </g>
+
+                    <!-- Existing items below -->
+                    <g transform="translate(252, 284)" opacity="0.7">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Sleep Optimization Protocol</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Andrew Huberman · 2:14:08</text>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                    </g>
+
+                    <g transform="translate(252, 392)" opacity="0.4">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Daily Mobility Routine — 15 min</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Knees Over Toes Guy · 14:52</text>
+                    </g>
+
+                    <!-- Path bar -->
+                    <g transform="translate(252, 660)">
+                        <rect width="1000" height="48" rx="8" fill="#0d0d0d" stroke="#1a1a1a"/>
+                        <text x="20" y="22" font-size="10" fill="#5a5a5a" letter-spacing="0.06em">SAVING TO</text>
+                        <text x="20" y="38" font-family="'JetBrains Mono', monospace" font-size="11" fill="#a0a0a0">C:\Apps\ProTube\data\downloads</text>
+                        <rect x="908" y="9" width="80" height="30" rx="6" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="948" y="29" text-anchor="middle" font-size="11.5" fill="#d4d4d4" font-weight="500">Browse</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="callout">
+                <div class="callout-label">Tip</div>
+                <p>Default download quality is whatever you last picked. If you want a different quality for one video, use the per-item picker (next section) — your default doesn't change.</p>
+            </div>
+        </section>
+
+        <!-- 04 — Quality -->
+        <section class="section" id="s04">
+            <div class="section-num">04</div>
+            <h2 class="section-title">Picking quality</h2>
+            <p class="section-kicker">Per-video, per-playlist, or globally.</p>
+
+            <p>Each queue item has a quality picker showing the formats YouTube exposes for that video — usually 4K, 1440p, 1080p, 720p, 480p, plus audio-only. Click the picker, choose, done.</p>
+
+            <p>For playlists, the picker on the playlist card sets the default for all videos inside. Individual videos in the playlist can still override.</p>
+
+            <p>The picker is smart about positioning — if there's no room below (last card in the queue), it flips and opens upward. Either way, your layout doesn't shift.</p>
+
+            <div class="shot shot-sm">
+                <svg viewBox="0 0 1280 480" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="480" fill="#0a0a0a"/>
+                    <!-- top shadow hint to suggest content above -->
+                    <rect width="1280" height="22" fill="#0d0d0d"/>
+                    <rect y="22" width="1280" height="3" fill="#161616"/>
+
+                    <!-- Top queue card (cropped at top) -->
+                    <g transform="translate(80, 64)" opacity="0.92">
+                        <rect width="1120" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">The Discipline Mindset</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Hamza · 18:42</text>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                        <rect x="208" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="236" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                    </g>
+
+                    <!-- Quality menu (FLIPPED UP — appears ABOVE the trigger card) -->
+                    <g transform="translate(1006, 184)">
+                        <rect width="180" height="184" rx="8" fill="#141414" stroke="#262626" filter="drop-shadow(0 12px 24px rgba(0,0,0,0.6))"/>
+                        <text x="14" y="22" font-size="9.5" fill="#5a5a5a" letter-spacing="0.08em">QUALITY</text>
+                        <!-- Items -->
+                        <g transform="translate(8, 30)" font-size="12">
+                            <rect width="164" height="28" rx="6" fill="transparent"/>
+                            <text x="14" y="18" fill="#d4d4d4">4K (2160p)</text>
+                            <text x="150" y="18" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a">2.4 GB</text>
+                        </g>
+                        <g transform="translate(8, 60)" font-size="12">
+                            <rect width="164" height="28" rx="6" fill="transparent"/>
+                            <text x="14" y="18" fill="#d4d4d4">1440p</text>
+                            <text x="150" y="18" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a">1.1 GB</text>
+                        </g>
+                        <g transform="translate(8, 90)" font-size="12">
+                            <rect width="164" height="28" rx="6" fill="rgba(59,130,246,0.1)"/>
+                            <text x="14" y="18" fill="#93c5fd" font-weight="600">1080p</text>
+                            <text x="150" y="18" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#3b82f6">540 MB</text>
+                        </g>
+                        <g transform="translate(8, 120)" font-size="12">
+                            <rect width="164" height="28" rx="6" fill="transparent"/>
+                            <text x="14" y="18" fill="#d4d4d4">720p</text>
+                            <text x="150" y="18" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a">280 MB</text>
+                        </g>
+                        <g transform="translate(8, 150)" font-size="12">
+                            <rect width="164" height="28" rx="6" fill="transparent"/>
+                            <text x="14" y="18" fill="#a0a0a0">Audio only</text>
+                            <text x="150" y="18" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a">14 MB</text>
+                        </g>
+                    </g>
+
+                    <!-- Bottom queue card (the LAST card — picker on it triggered the flip-up) -->
+                    <g transform="translate(80, 376)">
+                        <rect width="1120" height="92" rx="10" fill="#161616" stroke="#262626"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Why Most Men Fail at Fitness</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Hamza · 21:08</text>
+                        <!-- Quality picker (active/highlighted) -->
+                        <g transform="translate(926, 32)">
+                            <rect width="80" height="28" rx="6" fill="#1a1a1a" stroke="#3b82f6" stroke-width="1.4"/>
+                            <text x="20" y="18" font-size="11.5" fill="#93c5fd" font-weight="600">1080p</text>
+                            <path d="M58 11 l5 5 5 -5" stroke="#3b82f6" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        </g>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="callout">
+                <div class="callout-label">Heads up</div>
+                <p>Higher quality = larger file. 4K can run 1.5–3 GB for a 10-minute video. Audio-only is best for podcasts or music.</p>
+            </div>
+        </section>
+
+        <!-- 05 — Managing the queue -->
+        <section class="section" id="s05">
+            <div class="section-num">05</div>
+            <h2 class="section-title">Managing the queue</h2>
+            <p class="section-kicker">The queue is the heart of the app. Here's how to bend it.</p>
+
+            <h3>Pause &amp; resume</h3>
+            <p>While a download is running, hover the card and hit pause. The download stops mid-stream and writes a <code>.part</code> file to disk. Hit resume later — even after closing and reopening the app — and it picks up exactly where it left off.</p>
+
+            <h3>Cancel &amp; remove</h3>
+            <p>Cancel removes the item from the queue. If it was mid-download, the partial file is cleaned up. Use the kebab menu (the <code>⋯</code> on each card) for full options including "Open folder" and "Copy URL".</p>
+
+            <h3>Reorder</h3>
+            <p>Drag any queue card up or down to change download order. Useful when you've added a long playlist but want to grab one specific video first.</p>
+
+            <h3>Selection mode</h3>
+            <p>Right-click any card (or use the per-card checkbox on hover) to enter selection mode. From there, every click toggles selection. An action bar slides up from the bottom with bulk options. <span class="kbd">Esc</span> exits selection mode without acting.</p>
+
+            <div class="shot">
+                <svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="800" fill="#0a0a0a"/>
+                    <rect x="0" y="0" width="1280" height="32" fill="#0a0a0a"/>
+                    <line x1="0" y1="32" x2="1280" y2="32" stroke="#161616"/>
+                    <text x="640" y="20" text-anchor="middle" font-size="11" fill="#5a5a5a">ProTube Saver</text>
+                    <g stroke="#5a5a5a" stroke-width="1.1" fill="none">
+                        <line x1="1206" y1="16" x2="1218" y2="16"/>
+                        <rect x="1232" y="11" width="10" height="10"/>
+                        <path d="M1256 11 l8 8 M1256 19 l8 -8"/>
+                    </g>
+                    <rect x="0" y="32" width="220" height="768" fill="#0a0a0a"/>
+                    <line x1="220" y1="32" x2="220" y2="800" stroke="#161616"/>
+                    <g transform="translate(20, 56)">
+                        <rect width="28" height="28" rx="7" fill="#3b82f6"/>
+                        <g transform="translate(7,7)" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9"/>
+                            <path d="M5 6.5l3 3 3-3"/>
+                            <line x1="8" y1="9.5" x2="8" y2="2"/>
+                        </g>
+                        <text x="40" y="20" font-size="14" font-weight="600" fill="#ededed">ProTube</text>
+                    </g>
+                    <g transform="translate(12, 124)">
+                        <g transform="translate(12, 10)" fill="#a0a0a0">
+                            <rect width="6" height="6" rx="1"/><rect x="10" width="6" height="6" rx="1"/>
+                            <rect y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#a0a0a0">Library</text>
+                    </g>
+                    <g transform="translate(12, 168)">
+                        <rect width="196" height="36" rx="7" fill="#1a1a1a"/>
+                        <g transform="translate(12, 10)" stroke="#fff" stroke-width="1.6" stroke-linecap="round">
+                            <line x1="0" y1="2" x2="14" y2="2"/><line x1="0" y1="8" x2="14" y2="8"/><line x1="0" y1="14" x2="14" y2="14"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#ededed" font-weight="600">Queue</text>
+                        <rect x="170" y="11" width="20" height="14" rx="7" fill="rgba(59,130,246,0.16)"/>
+                        <text x="180" y="22" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#93c5fd" font-weight="600">5</text>
+                    </g>
+                    <line x1="20" y1="232" x2="200" y2="232" stroke="#161616"/>
+
+                    <!-- URL bar -->
+                    <g transform="translate(252, 60)">
+                        <rect width="1000" height="44" rx="8" fill="#141414" stroke="#1f1f1f"/>
+                        <text x="20" y="28" font-size="12.5" fill="#5a5a5a">Paste YouTube URL or playlist</text>
+                        <rect x="906" y="6" width="80" height="32" rx="6" fill="#3b82f6"/>
+                        <text x="946" y="26" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Add</text>
+                    </g>
+                    <g transform="translate(252, 124)" font-size="11.5">
+                        <rect width="64" height="28" rx="7" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="32" y="18" text-anchor="middle" fill="#ededed" font-weight="600">All 5</text>
+                        <rect x="74" width="80" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="114" y="18" text-anchor="middle" fill="#a0a0a0">Active 1</text>
+                        <rect x="164" width="92" height="28" rx="7" fill="transparent" stroke="#1f1f1f"/>
+                        <text x="210" y="18" text-anchor="middle" fill="#a0a0a0">Queued 4</text>
+                    </g>
+
+                    <!-- DOWNLOADING -->
+                    <g transform="translate(252, 176)">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="rgba(59,130,246,0.32)" stroke-width="1.4"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Push Day — Chest, Shoulders, Triceps</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Jeff Nippard · 28:14</text>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.32)"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#93c5fd" font-weight="600">1080p</text>
+                        <rect x="208" y="64" width="100" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <circle cx="220" cy="74" r="2.5" fill="#3b82f6"/>
+                        <text x="258" y="78" text-anchor="middle" font-size="10.5" fill="#93c5fd" font-weight="500">Downloading</text>
+                        <text x="930" y="34" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="11" fill="#a0a0a0">7.2 MB/s</text>
+                        <text x="930" y="50" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a">312 MB / 458 MB</text>
+                        <rect x="14" y="80" width="972" height="2.5" rx="1" fill="#1a1a1a"/>
+                        <rect x="14" y="80" width="660" height="2.5" rx="1" fill="#3b82f6"/>
+                    </g>
+
+                    <!-- PAUSED -->
+                    <g transform="translate(252, 284)">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Pull Day — Back, Biceps, Rear Delts</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Jeff Nippard · 26:48</text>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                        <rect x="208" y="64" width="80" height="20" rx="5" fill="rgba(245,158,11,0.1)" stroke="rgba(245,158,11,0.3)"/>
+                        <g transform="translate(220, 70)" fill="#f59e0b">
+                            <rect width="2" height="8"/><rect x="4" width="2" height="8"/>
+                        </g>
+                        <text x="258" y="78" text-anchor="middle" font-size="10.5" fill="#fbbf24" font-weight="500">Paused</text>
+                        <text x="930" y="50" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a">182 MB / 412 MB</text>
+                        <rect x="14" y="80" width="972" height="2.5" rx="1" fill="#1a1a1a"/>
+                        <rect x="14" y="80" width="430" height="2.5" rx="1" fill="#f59e0b"/>
+                    </g>
+
+                    <!-- QUEUED 1 -->
+                    <g transform="translate(252, 392)">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Leg Day — Quads, Hamstrings, Calves</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Jeff Nippard · 31:02</text>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                        <rect x="208" y="64" width="62" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="239" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                    </g>
+
+                    <!-- QUEUED 2 -->
+                    <g transform="translate(252, 500)">
+                        <rect width="1000" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Mobility &amp; Recovery — Active Rest Day</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Knees Over Toes Guy · 14:52</text>
+                        <rect x="146" y="64" width="56" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="174" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">1080p</text>
+                        <rect x="208" y="64" width="62" height="20" rx="5" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="239" y="78" text-anchor="middle" font-size="10.5" fill="#a0a0a0">Queued</text>
+                    </g>
+
+                    <!-- Path bar -->
+                    <g transform="translate(252, 660)">
+                        <rect width="1000" height="48" rx="8" fill="#0d0d0d" stroke="#1a1a1a"/>
+                        <text x="20" y="22" font-size="10" fill="#5a5a5a" letter-spacing="0.06em">SAVING TO</text>
+                        <text x="20" y="38" font-family="'JetBrains Mono', monospace" font-size="11" fill="#a0a0a0">C:\Apps\ProTube\data\downloads</text>
+                        <rect x="908" y="9" width="80" height="30" rx="6" fill="#1a1a1a" stroke="#262626"/>
+                        <text x="948" y="29" text-anchor="middle" font-size="11.5" fill="#d4d4d4" font-weight="500">Browse</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 06 — Library mode -->
+        <section class="section" id="s06">
+            <div class="section-num">06</div>
+            <h2 class="section-title">Library mode</h2>
+            <p class="section-kicker">Everything you've ever downloaded, in one place.</p>
+
+            <p>Once a download finishes, it moves to the Library — accessible from the left rail. Library is grid-based by default: thumbnail, title, channel, duration. Click any card to open the in-app player.</p>
+
+            <p>Library entries persist across sessions and survive offline. Thumbnails are cached locally on first download, so even with no internet your grid stays populated.</p>
+
+            <h3>Search &amp; filter</h3>
+            <p>The search bar matches against title and channel. Filters let you narrow to playlists, audio-only, or specific resolutions.</p>
+
+            <h3>Playlists</h3>
+            <p>Downloaded playlists show as a single card with a count badge. Click to expand into the playlist detail view, where you can play individual videos, re-order, or remove from library.</p>
+
+            <div class="shot">
+                <svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="800" fill="#0a0a0a"/>
+                    <rect x="0" y="0" width="1280" height="32" fill="#0a0a0a"/>
+                    <line x1="0" y1="32" x2="1280" y2="32" stroke="#161616"/>
+                    <text x="640" y="20" text-anchor="middle" font-size="11" fill="#5a5a5a">ProTube Saver</text>
+                    <g stroke="#5a5a5a" stroke-width="1.1" fill="none">
+                        <line x1="1206" y1="16" x2="1218" y2="16"/>
+                        <rect x="1232" y="11" width="10" height="10"/>
+                        <path d="M1256 11 l8 8 M1256 19 l8 -8"/>
+                    </g>
+                    <rect x="0" y="32" width="220" height="768" fill="#0a0a0a"/>
+                    <line x1="220" y1="32" x2="220" y2="800" stroke="#161616"/>
+                    <g transform="translate(20, 56)">
+                        <rect width="28" height="28" rx="7" fill="#3b82f6"/>
+                        <g transform="translate(7,7)" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9"/>
+                            <path d="M5 6.5l3 3 3-3"/>
+                            <line x1="8" y1="9.5" x2="8" y2="2"/>
+                        </g>
+                        <text x="40" y="20" font-size="14" font-weight="600" fill="#ededed">ProTube</text>
+                    </g>
+                    <!-- Library ACTIVE -->
+                    <g transform="translate(12, 124)">
+                        <rect width="196" height="36" rx="7" fill="#1a1a1a"/>
+                        <g transform="translate(12, 10)" fill="#fff">
+                            <rect width="6" height="6" rx="1"/><rect x="10" width="6" height="6" rx="1"/>
+                            <rect y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#ededed" font-weight="600">Library</text>
+                        <rect x="170" y="11" width="22" height="14" rx="7" fill="rgba(59,130,246,0.16)"/>
+                        <text x="181" y="22" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#93c5fd" font-weight="600">42</text>
+                    </g>
+                    <g transform="translate(12, 168)">
+                        <g transform="translate(12, 10)" stroke="#a0a0a0" stroke-width="1.6" stroke-linecap="round">
+                            <line x1="0" y1="2" x2="14" y2="2"/><line x1="0" y1="8" x2="14" y2="8"/><line x1="0" y1="14" x2="14" y2="14"/>
+                        </g>
+                        <text x="40" y="22" font-size="12.5" fill="#a0a0a0">Queue</text>
+                    </g>
+                    <line x1="20" y1="232" x2="200" y2="232" stroke="#161616"/>
+
+                    <!-- Library header -->
+                    <g transform="translate(252, 60)">
+                        <text font-size="22" font-weight="600" fill="#ededed" letter-spacing="-0.02em">Library</text>
+                        <text x="118" y="-2" font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b6b6b">42 videos · 18.4 GB</text>
+                        <!-- Search bar -->
+                        <g transform="translate(580, -10)">
+                            <rect width="280" height="36" rx="7" fill="#141414" stroke="#1f1f1f"/>
+                            <g transform="translate(12, 12)" stroke="#5a5a5a" stroke-width="1.6" fill="none" stroke-linecap="round">
+                                <circle cx="6" cy="6" r="5"/>
+                                <path d="M10 10 l4 4"/>
+                            </g>
+                            <text x="36" y="23" font-size="12" fill="#5a5a5a">Search library</text>
+                        </g>
+                        <g transform="translate(880, -10)">
+                            <rect width="120" height="36" rx="7" fill="#141414" stroke="#1f1f1f"/>
+                            <g transform="translate(14, 12)" stroke="#a0a0a0" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 1v10 M2 7l4 4 4-4"/>
+                            </g>
+                            <text x="34" y="23" font-size="11.5" fill="#a0a0a0">Import</text>
+                        </g>
+                    </g>
+
+                    <!-- Grid: 4 cols × 2 rows = 8 cards -->
+                    <g transform="translate(252, 132)">
+                        <!-- Card template: 232 wide, 200 tall -->
+                        <!-- Row 1 -->
+                        <g>
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">15:26</text>
+                            <rect x="6" y="106" width="44" height="16" rx="3" fill="#0a0a0a" opacity="0.8"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">15:26</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">10 Year Body Transformation</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Hamza · 1080p · 412 MB</text>
+                        </g>
+                        <g transform="translate(248, 0)">
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="6" y="106" width="44" height="16" rx="3" fill="#0a0a0a" opacity="0.8"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">21:42</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">Vibe Coding Has Ruined Software</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Theo · 1080p · 287 MB</text>
+                        </g>
+                        <!-- PLAYLIST CARD with stack effect -->
+                        <g transform="translate(496, 0)">
+                            <rect x="6" y="-4" width="232" height="200" rx="10" fill="#0d0d0d" stroke="#1a1a1a"/>
+                            <rect x="3" y="-2" width="232" height="200" rx="10" fill="#121212" stroke="#1a1a1a"/>
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="160" y="6" width="64" height="22" rx="6" fill="rgba(0,0,0,0.7)"/>
+                            <g transform="translate(170, 14)" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round">
+                                <line x1="0" y1="0" x2="6" y2="0"/>
+                                <line x1="0" y1="3" x2="6" y2="3"/>
+                                <line x1="0" y1="6" x2="6" y2="6"/>
+                            </g>
+                            <text x="218" y="22" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#fff">12 videos</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">Best of Hamza</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Playlist · 4.1 GB</text>
+                        </g>
+                        <g transform="translate(744, 0)">
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="6" y="106" width="44" height="16" rx="3" fill="#0a0a0a" opacity="0.8"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">14:52</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">Building the Ultimate Desk</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">LTT · 4K · 1.8 GB</text>
+                        </g>
+                        <!-- Row 2 -->
+                        <g transform="translate(0, 220)">
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="6" y="106" width="56" height="16" rx="3" fill="#0a0a0a" opacity="0.8"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">2:14:08</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">Sleep Optimization Protocol</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Andrew Huberman · 1080p</text>
+                        </g>
+                        <g transform="translate(248, 220)">
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="6" y="106" width="44" height="16" rx="3" fill="#0a0a0a" opacity="0.8"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">1:43</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">100 Seconds of WebView2</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Fireship · 1080p · 42 MB</text>
+                        </g>
+                        <!-- 2nd playlist -->
+                        <g transform="translate(496, 220)">
+                            <rect x="6" y="-4" width="232" height="200" rx="10" fill="#0d0d0d" stroke="#1a1a1a"/>
+                            <rect x="3" y="-2" width="232" height="200" rx="10" fill="#121212" stroke="#1a1a1a"/>
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="160" y="6" width="64" height="22" rx="6" fill="rgba(0,0,0,0.7)"/>
+                            <g transform="translate(170, 14)" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round">
+                                <line x1="0" y1="0" x2="6" y2="0"/><line x1="0" y1="3" x2="6" y2="3"/><line x1="0" y1="6" x2="6" y2="6"/>
+                            </g>
+                            <text x="218" y="22" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="10" fill="#fff">6 videos</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">Workout Routines</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Playlist · 1.7 GB</text>
+                        </g>
+                        <g transform="translate(744, 220)">
+                            <rect width="232" height="200" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                            <rect x="0" y="0" width="232" height="130" rx="10 10 0 0" fill="#262626"/>
+                            <polygon points="105,55 130,72 105,89" fill="#0a0a0a" opacity="0.5"/>
+                            <rect x="6" y="106" width="44" height="16" rx="3" fill="#0a0a0a" opacity="0.8"/>
+                            <text x="14" y="116" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#fff">9:08</text>
+                            <text x="14" y="156" font-size="12" font-weight="600" fill="#ededed">Lex Fridman on Discipline</text>
+                            <text x="14" y="178" font-size="10.5" fill="#6b6b6b">Lex Clips · 1080p · 168 MB</text>
+                        </g>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 07 — In-app player -->
+        <section class="section" id="s07">
+            <div class="section-num">07</div>
+            <h2 class="section-title">The in-app player</h2>
+            <p class="section-kicker">YouTube-style controls, full keyboard support, fullscreen that actually works.</p>
+
+            <p>Double-click any library card and the player view opens. Top overlay shows the title and a back button. Bottom overlay has the standard cluster: play/pause, skip, volume, time, playback speed, fullscreen.</p>
+
+            <p>Controls auto-hide after 2 seconds of no movement. Move the mouse and they fade back in. Click anywhere on the video itself to play/pause.</p>
+
+            <h3>Keyboard shortcuts</h3>
+            <div class="shortcuts">
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">Space</span></div>
+                    <div class="desc">Play / pause</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">←</span><span class="kbd">→</span></div>
+                    <div class="desc">Skip back / forward 10 seconds</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">F</span></div>
+                    <div class="desc">Toggle fullscreen</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">M</span></div>
+                    <div class="desc">Mute / unmute</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">Esc</span></div>
+                    <div class="desc">Exit fullscreen, then back to library</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">Double-click</span></div>
+                    <div class="desc">Toggle fullscreen (on the video)</div>
+                </div>
+            </div>
+
+            <p>Playback speed is adjustable from 0.5× to 2× via the menu in the bottom-right cluster. If a codec isn't supported by the embedded player (rare — usually only with very obscure formats), an "Open in VLC" button appears in the top-right.</p>
+
+            <div class="shot">
+                <svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="800" fill="#000"/>
+                    <!-- Title bar -->
+                    <rect x="0" y="0" width="1280" height="32" fill="#0a0a0a"/>
+                    <text x="640" y="20" text-anchor="middle" font-size="11" fill="#5a5a5a">ProTube Saver</text>
+                    <g stroke="#5a5a5a" stroke-width="1.1" fill="none">
+                        <line x1="1206" y1="16" x2="1218" y2="16"/>
+                        <rect x="1232" y="11" width="10" height="10"/>
+                        <path d="M1256 11 l8 8 M1256 19 l8 -8"/>
+                    </g>
+
+                    <!-- Rail collapsed (icon-only) -->
+                    <rect x="0" y="32" width="64" height="768" fill="#0a0a0a"/>
+                    <line x1="64" y1="32" x2="64" y2="800" stroke="#161616"/>
+                    <g transform="translate(18, 56)">
+                        <rect width="28" height="28" rx="7" fill="#3b82f6"/>
+                        <g transform="translate(7,7)" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9"/>
+                            <path d="M5 6.5l3 3 3-3"/>
+                            <line x1="8" y1="9.5" x2="8" y2="2"/>
+                        </g>
+                    </g>
+                    <g transform="translate(20, 124)" fill="#5a5a5a">
+                        <rect width="6" height="6" rx="1"/><rect x="10" width="6" height="6" rx="1"/>
+                        <rect y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/>
+                    </g>
+                    <g transform="translate(22, 168)" stroke="#5a5a5a" stroke-width="1.6" stroke-linecap="round">
+                        <line x1="0" y1="0" x2="14" y2="0"/><line x1="0" y1="6" x2="14" y2="6"/><line x1="0" y1="12" x2="14" y2="12"/>
+                    </g>
+
+                    <!-- Player canvas (the entire content area, edge to edge from rail) -->
+                    <rect x="64" y="32" width="1216" height="768" fill="#000"/>
+
+                    <!-- Subject silhouette (very abstract — suggests a video is playing) -->
+                    <defs>
+                        <radialGradient id="vignette" cx="50%" cy="50%" r="55%">
+                            <stop offset="60%" stop-color="#1a1a1a" stop-opacity="0"/>
+                            <stop offset="100%" stop-color="#000" stop-opacity="0.8"/>
+                        </radialGradient>
+                    </defs>
+                    <g transform="translate(64, 32)">
+                        <!-- backdrop -->
+                        <rect width="1216" height="768" fill="#1f1f1f"/>
+                        <!-- abstract figure -->
+                        <ellipse cx="608" cy="320" rx="160" ry="170" fill="#262626"/>
+                        <ellipse cx="608" cy="180" rx="64" ry="76" fill="#2f2f2f"/>
+                        <rect x="448" y="500" width="320" height="268" fill="#262626"/>
+                        <!-- vignette -->
+                        <rect width="1216" height="768" fill="url(#vignette)"/>
+                    </g>
+
+                    <!-- Top overlay gradient + chrome -->
+                    <defs>
+                        <linearGradient id="top-fade" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#000" stop-opacity="0.55"/>
+                            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="64" y="32" width="1216" height="120" fill="url(#top-fade)"/>
+
+                    <!-- Back button -->
+                    <g transform="translate(96, 64)">
+                        <rect width="40" height="40" rx="20" fill="rgba(20,20,20,0.7)" stroke="rgba(255,255,255,0.08)"/>
+                        <path d="M22 12 l-8 8 l8 8" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </g>
+                    <!-- Title chip -->
+                    <g transform="translate(150, 64)">
+                        <rect width="380" height="40" rx="10" fill="rgba(20,20,20,0.55)" stroke="rgba(255,255,255,0.08)"/>
+                        <text x="16" y="18" font-size="12.5" font-weight="600" fill="#ededed">10 Year Body Transformation</text>
+                        <text x="16" y="32" font-size="10.5" fill="#a0a0a0">Hamza · 15:26</text>
+                    </g>
+                    <!-- Open in VLC -->
+                    <g transform="translate(1132, 64)">
+                        <rect width="116" height="40" rx="10" fill="rgba(20,20,20,0.55)" stroke="rgba(255,255,255,0.08)"/>
+                        <g transform="translate(14, 14)" stroke="#a0a0a0" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 1 l5 5 -5 5 M1 6 H10"/>
+                        </g>
+                        <text x="34" y="25" font-size="11" fill="#d4d4d4" font-weight="500">Open in VLC</text>
+                    </g>
+
+                    <!-- Bottom overlay gradient + controls -->
+                    <defs>
+                        <linearGradient id="bot-fade" x1="0" y1="1" x2="0" y2="0">
+                            <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="64" y="640" width="1216" height="160" fill="url(#bot-fade)"/>
+
+                    <!-- Progress bar -->
+                    <g transform="translate(112, 720)">
+                        <rect width="1120" height="4" rx="2" fill="rgba(255,255,255,0.18)"/>
+                        <rect width="448" height="4" rx="2" fill="#3b82f6"/>
+                        <circle cx="448" cy="2" r="7" fill="#3b82f6"/>
+                    </g>
+
+                    <!-- Controls cluster -->
+                    <g transform="translate(112, 740)">
+                        <!-- Play/pause -->
+                        <g transform="translate(0, 8)">
+                            <rect width="14" height="20" fill="#fff" rx="1"/>
+                            <rect x="20" width="14" height="20" fill="#fff" rx="1"/>
+                        </g>
+                        <!-- Skip back -->
+                        <g transform="translate(60, 12)" fill="#fff">
+                            <polygon points="14,0 14,14 4,7"/>
+                            <rect width="2" height="14"/>
+                            <text x="20" y="11" font-family="'JetBrains Mono', monospace" font-size="9" fill="#a0a0a0">10</text>
+                        </g>
+                        <!-- Skip fwd -->
+                        <g transform="translate(118, 12)" fill="#fff">
+                            <polygon points="0,0 0,14 10,7"/>
+                            <rect x="12" width="2" height="14"/>
+                            <text x="-12" y="11" font-family="'JetBrains Mono', monospace" font-size="9" fill="#a0a0a0">10</text>
+                        </g>
+                        <!-- Volume -->
+                        <g transform="translate(166, 14)">
+                            <path d="M0 4 H4 L10 0 V12 L4 8 H0 Z" fill="#fff"/>
+                            <path d="M14 2 a4 4 0 0 1 0 8 M14 5 a1.5 1.5 0 0 1 0 2" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+                        </g>
+                        <!-- Time -->
+                        <text transform="translate(216, 22)" font-family="'JetBrains Mono', monospace" font-size="11.5" fill="#fff">6:08 / 15:26</text>
+
+                        <!-- Right side controls -->
+                        <!-- Speed -->
+                        <g transform="translate(996, 6)">
+                            <rect width="42" height="28" rx="6" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+                            <text x="21" y="18" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" fill="#fff">1x</text>
+                        </g>
+                        <!-- Fullscreen -->
+                        <g transform="translate(1052, 12)" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M0 4 V0 H4 M14 0 H18 V4 M0 14 V18 H4 M14 18 H18 V14"/>
+                        </g>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 08 — Settings -->
+        <section class="section" id="s08">
+            <div class="section-num">08</div>
+            <h2 class="section-title">Settings</h2>
+            <p class="section-kicker">There aren't many. That's intentional.</p>
+
+            <h3>Download folder</h3>
+            <p>By default, downloads go into <code>&lt;app folder&gt;/data/downloads/</code>. To change it: click the folder path at the bottom of the queue view, pick a new location. Existing files stay where they are. New downloads write to the new path.</p>
+
+            <h3>Concurrent downloads</h3>
+            <p>The app downloads up to 2 videos in parallel by default. This is a balance between speed and not getting rate-limited by YouTube. Coming soon: a slider to tune this.</p>
+
+            <h3>yt-dlp updates</h3>
+            <p>The app auto-updates its bundled <code>yt-dlp</code> on launch in the background. YouTube changes their internals fairly often; without updates, downloads start failing within weeks. You don't have to do anything — it just runs.</p>
+
+            <div class="shot shot-sm">
+                <svg viewBox="0 0 1280 480" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;" font-family="'DM Sans', sans-serif">
+                    <rect width="1280" height="480" fill="#0a0a0a"/>
+
+                    <!-- Hint of a queue card cropped at top -->
+                    <g transform="translate(80, 40)" opacity="0.55">
+                        <rect width="1120" height="92" rx="10" fill="#161616" stroke="#1f1f1f"/>
+                        <rect x="14" y="14" width="116" height="64" rx="6" fill="#262626"/>
+                        <polygon points="63,33 78,46 63,59" fill="#0a0a0a" opacity="0.6"/>
+                        <text x="146" y="34" font-size="13.5" font-weight="600" fill="#ededed">Daily Mobility Routine — 15 min</text>
+                        <text x="146" y="54" font-size="11.5" fill="#6b6b6b">Knees Over Toes Guy · 14:52</text>
+                    </g>
+                    <!-- fade-out gradient toward the focused row below -->
+                    <defs>
+                        <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#0a0a0a" stop-opacity="0"/>
+                            <stop offset="100%" stop-color="#0a0a0a" stop-opacity="1"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="80" y="100" width="1120" height="60" fill="url(#fade-down)"/>
+
+                    <!-- Path bar — the focal element -->
+                    <g transform="translate(80, 200)">
+                        <rect width="1120" height="64" rx="10" fill="#0d0d0d" stroke="#1f1f1f"/>
+                        <!-- Folder icon -->
+                        <g transform="translate(20, 20)" stroke="#a0a0a0" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M0 4 V20 a2 2 0 0 0 2 2 H22 a2 2 0 0 0 2 -2 V8 a2 2 0 0 0 -2 -2 H12 L9 2 H2 a2 2 0 0 0 -2 2 Z"/>
+                        </g>
+                        <text x="60" y="26" font-size="10" fill="#5a5a5a" letter-spacing="0.08em">SAVING TO</text>
+                        <text x="60" y="48" font-family="'JetBrains Mono', monospace" font-size="13" fill="#ededed">C:\Apps\ProTube\data\downloads</text>
+
+                        <!-- Open folder icon -->
+                        <g transform="translate(960, 18)">
+                            <rect width="32" height="28" rx="6" fill="transparent" stroke="#1f1f1f"/>
+                            <g transform="translate(8, 7)" stroke="#a0a0a0" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M0 3 V13 a1 1 0 0 0 1 1 H15 a1 1 0 0 0 1 -1 V6 a1 1 0 0 0 -1 -1 H8 L6 2 H1 a1 1 0 0 0 -1 1 Z"/>
+                            </g>
+                        </g>
+                        <!-- Browse button (focal) -->
+                        <g transform="translate(1004, 18)">
+                            <rect width="96" height="28" rx="6" fill="#1a1a1a" stroke="#3b82f6"/>
+                            <text x="48" y="18" text-anchor="middle" font-size="12" fill="#93c5fd" font-weight="600">Browse</text>
+                        </g>
+                    </g>
+
+                    <!-- Subtle Download CTA below for context -->
+                    <g transform="translate(80, 296)" opacity="0.7">
+                        <rect width="200" height="40" rx="8" fill="#3b82f6"/>
+                        <text x="100" y="25" text-anchor="middle" font-size="13" fill="#fff" font-weight="600">Download 5</text>
+                    </g>
+
+                    <!-- Caption pointer -->
+                    <g transform="translate(940, 290)">
+                        <text font-family="'JetBrains Mono', monospace" font-size="10" fill="#5a5a5a" letter-spacing="0.06em">CLICK TO CHANGE LOCATION</text>
+                        <path d="M88 -8 q12 -28 60 -50" stroke="#3b82f6" stroke-width="1.4" fill="none" stroke-dasharray="3,3"/>
+                        <path d="M148 -58 l-2 8 l8 -2" stroke="#3b82f6" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 09 — Troubleshooting -->
+        <section class="section" id="s09">
+            <div class="section-num">09</div>
+            <h2 class="section-title">When things go wrong</h2>
+            <p class="section-kicker">Common issues and how to unstick them.</p>
+
+            <h3>"Video unavailable" or fetch fails</h3>
+            <p>Usually means YouTube changed something and yt-dlp hasn't caught up yet. Wait a few hours and try again — the auto-updater will pull a fix on next launch. If urgent, reinstall yt-dlp manually (advanced).</p>
+
+            <h3>Download stuck at 99%</h3>
+            <p>The merge step (combining video + audio streams via ffmpeg) is running. Give it 10–30 seconds. If it stays stuck for over a minute, cancel and retry the download — the partial file will be cleaned up automatically.</p>
+
+            <h3>Quality I want isn't shown</h3>
+            <p>YouTube doesn't expose every resolution for every video. If 1440p is missing, it likely doesn't exist for that upload. The picker shows what's actually available, not what's theoretically possible.</p>
+
+            <h3>App won't launch on a new machine</h3>
+            <p>Make sure WebView2 Runtime is installed. Most Windows 10/11 systems have it preinstalled, but some stripped builds don't. Download the runtime from Microsoft's site, install, retry.</p>
+
+            <h3>Lost my settings / library</h3>
+            <p>Check next to your exe for a <code>data/</code> folder. If it's gone, restore from backup if you have one. The app falls back to a fresh install when <code>data/</code> is missing — your downloaded video files are still on disk, just not indexed in the library anymore.</p>
+
+            <div class="callout">
+                <div class="callout-label">Last resort</div>
+                <p>Close the app. Delete <code>data/settings.json</code> only (keep the folder and other files). Relaunch. The app rebuilds with defaults but keeps your library.</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-signoff">All in a day's work.</div>
+            <div>ProTube Saver · made by Cincade</div>
+        </footer>
+
+    </div>
+
+    <!-- Sticky table of contents -->
+    <aside class="toc">
+        <div class="toc-label">Contents</div>
+        <ol>
+            <li><a href="#s01" data-target="s01">What it is</a></li>
+            <li><a href="#s02" data-target="s02">Install &amp; first launch</a></li>
+            <li><a href="#s03" data-target="s03">Adding videos</a></li>
+            <li><a href="#s04" data-target="s04">Picking quality</a></li>
+            <li><a href="#s05" data-target="s05">Managing the queue</a></li>
+            <li><a href="#s06" data-target="s06">Library mode</a></li>
+            <li><a href="#s07" data-target="s07">In-app player</a></li>
+            <li><a href="#s08" data-target="s08">Settings</a></li>
+            <li><a href="#s09" data-target="s09">Troubleshooting</a></li>
+        </ol>
+    </aside>
+</main>
+
+<script>
+    // Highlight the TOC entry whose section is currently most-visible.
+    // Uses IntersectionObserver so this is cheap — no scroll listener.
+    (function () {
+        const sections = document.querySelectorAll('.section');
+        const links = document.querySelectorAll('.toc a');
+
+        function setActive(id) {
+            links.forEach(a => {
+                a.classList.toggle('is-active', a.dataset.target === id);
+            });
+        }
+
+        // Default the first section as active so something is highlighted on load
+        if (links.length) links[0].classList.add('is-active');
+
+        const observer = new IntersectionObserver((entries) => {
+            // Pick the entry closest to the top of the viewport that's currently
+            // intersecting. Multiple sections can intersect during scroll; we want
+            // the one whose top is highest while still visible.
+            const visible = entries
+                .filter(e => e.isIntersecting)
+                .sort((a, b) => a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top);
+            if (visible.length) {
+                setActive(visible[0].target.id);
+            }
+        }, {
+            rootMargin: '-80px 0px -60% 0px',  // top offset for sticky header, bottom keeps current section "active" longer
+            threshold: 0,
+        });
+
+        sections.forEach(s => observer.observe(s));
+
+        // Smooth-scroll TOC clicks (CSS scroll-margin-top handles the offset)
+        links.forEach(a => {
+            a.addEventListener('click', (e) => {
+                const id = a.dataset.target;
+                const target = document.getElementById(id);
+                if (target) {
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setActive(id);
+                    history.replaceState(null, '', '#' + id);
+                }
+            });
+        });
+    })();
+</script>
+
+</body>
+</html>

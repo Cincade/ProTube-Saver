@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ProTube Saver — Guide · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    /* ============================================================
+       PROTUBE SAVER — GUIDE
+       Editorial-style technical doc. Visual continuity with the app:
+       same near-black background, same fonts, same single-accent blue.
+       Layout: asymmetric. Big mono chapter numerals hang in the left
+       gutter as marginalia. Center column carries the content. Sticky
+       TOC on the right tracks reading position. Designed to look
+       intentional and quiet so screen recordings over it don't fight
+       the underlying surface for attention.
+       ============================================================ */
+
+    :root {
+        --bg: #0a0a0a;
+        --bg-elev: #141414;
+        --bg-card: #161616;
+        --bg-input: #0f0f0f;
+        --line: #262626;
+        --line-soft: #1c1c1c;
+        --text: #ededed;
+        --text-2: #a8a8a8;
+        --text-3: #6a6a6a;
+        --text-4: #3a3a3a;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.12);
+        --accent-line: rgba(59, 130, 246, 0.32);
+
+        /* Spacing rhythm — multiples of 4 */
+        --gutter: 88px;          /* left chapter-number gutter on desktop */
+        --col-content: 680px;    /* main reading column max width */
+        --col-toc: 220px;        /* sticky TOC width */
+        --pad-page: 64px;        /* page edge padding desktop */
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'DM Sans', -apple-system, 'Segoe UI', BlinkMacSystemFont, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Subtle vignette so the page has atmosphere without
+       becoming decorative. Only visible at the very top corners. */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 320px;
+        background: radial-gradient(
+            ellipse 80% 100% at 50% -20%,
+            rgba(59, 130, 246, 0.04) 0%,
+            transparent 70%
+        );
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /* ===========================
+       HEADER — sticky, minimal
+       =========================== */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(10, 10, 10, 0.86);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line-soft);
+    }
+
+    .topbar-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 14px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 500;
+        font-size: 14px;
+        letter-spacing: -0.005em;
+    }
+
+    .brand-mark {
+        width: 26px;
+        height: 26px;
+        background: var(--accent);
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+
+    .brand-mark svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .topbar-meta {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    /* ===========================
+       PAGE LAYOUT
+       Three-column on wide screens: gutter, content, toc
+       =========================== */
+    .page {
+        position: relative;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 80px var(--pad-page) 200px;
+        display: grid;
+        grid-template-columns: 1fr var(--col-toc);
+        gap: 64px;
+    }
+
+    .content {
+        position: relative;
+        max-width: var(--col-content);
+    }
+
+    /* ===========================
+       HERO
+       =========================== */
+    .hero {
+        margin-bottom: 96px;
+        position: relative;
+    }
+
+    .eyebrow {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 20px;
+    }
+
+    .hero-title {
+        font-family: 'DM Sans', sans-serif;
+        font-size: clamp(40px, 6vw, 64px);
+        font-weight: 600;
+        line-height: 1.04;
+        letter-spacing: -0.025em;
+        margin: 0 0 24px;
+        color: var(--text);
+    }
+
+    .hero-title em {
+        font-style: italic;
+        font-weight: 400;
+        color: var(--text-2);
+    }
+
+    .hero-lede {
+        font-size: 19px;
+        line-height: 1.55;
+        color: var(--text-2);
+        font-weight: 400;
+        max-width: 580px;
+        margin: 0 0 40px;
+    }
+
+    .hero-meta {
+        display: flex;
+        gap: 32px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding-top: 24px;
+        border-top: 1px solid var(--line-soft);
+    }
+
+    .hero-meta span strong {
+        color: var(--text);
+        font-weight: 500;
+    }
+
+    /* ===========================
+       SECTIONS
+       Big mono numeral hangs to the left of the content column.
+       On narrow screens it collapses inline above the heading.
+       =========================== */
+    .section {
+        position: relative;
+        margin-bottom: 96px;
+        scroll-margin-top: 80px;  /* offset for sticky topbar when jumping via TOC */
+    }
+
+    .section-num {
+        position: absolute;
+        left: calc(-1 * var(--gutter));
+        top: 6px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-4);
+        letter-spacing: 0.04em;
+    }
+
+    .section-num::before {
+        content: '';
+        display: inline-block;
+        width: 24px;
+        height: 1px;
+        background: var(--text-4);
+        vertical-align: middle;
+        margin-right: 12px;
+        transform: translateY(-1px);
+    }
+
+    .section-title {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 32px;
+        font-weight: 600;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 12px;
+        color: var(--text);
+    }
+
+    .section-kicker {
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--text-2);
+        margin: 0 0 36px;
+        max-width: 620px;
+    }
+
+    /* ===========================
+       PROSE
+       =========================== */
+    .content p {
+        font-size: 16px;
+        line-height: 1.65;
+        color: var(--text);
+        margin: 0 0 20px;
+    }
+
+    .content p.muted {
+        color: var(--text-2);
+    }
+
+    .content h3 {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+        margin: 40px 0 12px;
+        color: var(--text);
+    }
+
+    .content strong {
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    .content em {
+        font-style: italic;
+        color: var(--text-2);
+    }
+
+    .content a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid var(--accent-line);
+        transition: border-color 0.15s ease;
+    }
+
+    .content a:hover {
+        border-bottom-color: var(--accent);
+    }
+
+    /* Inline keyboard / code snippets — mono, soft surface */
+    .kbd, .content code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12.5px;
+        font-weight: 500;
+        background: var(--bg-elev);
+        border: 1px solid var(--line);
+        padding: 2px 7px;
+        border-radius: 5px;
+        color: var(--text);
+        white-space: nowrap;
+    }
+
+    /* Numbered step lists — replace bullets with mono indices */
+    .steps {
+        list-style: none;
+        counter-reset: step;
+        padding: 0;
+        margin: 24px 0 32px;
+    }
+
+    .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding: 0 0 0 44px;
+        margin-bottom: 16px;
+        line-height: 1.65;
+    }
+
+    .steps > li::before {
+        content: counter(step, decimal-leading-zero);
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.02em;
+    }
+
+    /* ===========================
+       SHOT SLOTS — shared between admin and exported guide.
+       In the exported guide, only the IMG and the empty-state placeholder
+       remain; admin overlays are stripped.
+       =========================== */
+    .shot {
+        position: relative;
+        margin: 28px 0 36px;
+        background: var(--bg-card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        aspect-ratio: 16 / 10;
+        overflow: hidden;
+    }
+    .shot.shot-sm { aspect-ratio: 16 / 6; }
+    /* Kill the old hatch — we have real slot affordance now */
+    .shot::before { display: none; }
+
+    .shot-img {
+        display: none;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 9px;
+    }
+    .shot[data-has-image] .shot-img { display: block; }
+    .shot[data-has-image] .shot-empty { display: none; }
+
+    .shot-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+        padding: 24px;
+        color: var(--text-3);
+        pointer-events: none;
+    }
+    .shot-empty-icon {
+        width: 40px;
+        height: 40px;
+        border: 1.5px dashed var(--line);
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-3);
+    }
+    .shot-empty-text {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 13px;
+        color: var(--text-2);
+        font-weight: 500;
+    }
+    .shot-empty-hint {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 10.5px;
+        color: var(--text-3);
+        letter-spacing: 0.04em;
+    }
+
+    /* ===========================
+       CALLOUT — for tips & notes
+       =========================== */
+    .callout {
+        margin: 28px 0 32px;
+        padding: 18px 22px;
+        background: var(--accent-soft);
+        border-left: 2px solid var(--accent);
+        border-radius: 0 8px 8px 0;
+    }
+
+    .callout-label {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 10.5px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .callout p {
+        margin: 0;
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: var(--text);
+    }
+
+    .callout p + p {
+        margin-top: 8px;
+    }
+
+    /* ===========================
+       SHORTCUT TABLE
+       =========================== */
+    .shortcuts {
+        margin: 24px 0 32px;
+        border-top: 1px solid var(--line-soft);
+    }
+
+    .shortcut-row {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--line-soft);
+        align-items: center;
+    }
+
+    .shortcut-keys {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .shortcut-row .desc {
+        font-size: 14.5px;
+        color: var(--text-2);
+        line-height: 1.5;
+    }
+
+    /* ===========================
+       SIDEBAR TOC — sticky right column
+       =========================== */
+    .toc {
+        position: sticky;
+        top: 80px;
+        align-self: start;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+    }
+
+    .toc-label {
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 500;
+        margin-bottom: 16px;
+        font-size: 10.5px;
+    }
+
+    .toc ol {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        counter-reset: toc;
+    }
+
+    .toc li {
+        counter-increment: toc;
+        margin-bottom: 10px;
+    }
+
+    .toc a {
+        display: block;
+        color: var(--text-3);
+        text-decoration: none;
+        padding-left: 28px;
+        position: relative;
+        line-height: 1.4;
+        transition: color 0.15s ease;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .toc a::before {
+        content: counter(toc, decimal-leading-zero);
+        position: absolute;
+        left: 0;
+        top: 0;
+        color: var(--text-4);
+        font-size: 11px;
+    }
+
+    .toc a:hover { color: var(--text); }
+
+    .toc a.is-active {
+        color: var(--text);
+    }
+
+    .toc a.is-active::before {
+        color: var(--accent);
+    }
+
+    /* Outer scrollbar — subtle */
+    ::-webkit-scrollbar {
+        width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--line);
+        border-radius: 100px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-4);
+    }
+
+    /* ===========================
+       FOOTER — the sign-off
+       =========================== */
+    .footer {
+        max-width: var(--col-content);
+        padding: 64px 0 0;
+        margin-top: 64px;
+        border-top: 1px solid var(--line-soft);
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .footer-signoff {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 14px;
+        font-style: italic;
+        color: var(--text-2);
+        text-transform: none;
+        letter-spacing: -0.005em;
+        margin-bottom: 12px;
+    }
+
+    /* ===========================
+       RESPONSIVE
+       =========================== */
+    @media (max-width: 1100px) {
+        :root {
+            --gutter: 0px;
+            --pad-page: 32px;
+        }
+        .page {
+            grid-template-columns: 1fr;
+            gap: 0;
+            padding-top: 56px;
+        }
+        .toc {
+            display: none;
+        }
+        .section-num {
+            position: static;
+            display: block;
+            margin-bottom: 12px;
+        }
+        .section-num::before {
+            display: none;
+        }
+        .hero-title {
+            font-size: clamp(36px, 9vw, 56px);
+        }
+    }
+
+    @media (max-width: 600px) {
+        :root {
+            --pad-page: 22px;
+        }
+        .topbar-inner { padding: 12px 22px; }
+        .hero { margin-bottom: 64px; }
+        .section { margin-bottom: 72px; }
+        .section-title { font-size: 26px; }
+        .hero-meta { flex-wrap: wrap; gap: 16px 24px; }
+        .shortcut-row {
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+    }
+
+    /* Subtle one-time entrance — only animates the hero, not every section,
+       so scrolling stays calm. */
+    @keyframes hero-fade {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .hero { animation: hero-fade 0.6s ease both; }
+    .hero .eyebrow { animation: hero-fade 0.6s ease both; animation-delay: 0.05s; }
+    .hero-title { animation: hero-fade 0.7s ease both; animation-delay: 0.1s; }
+    .hero-lede { animation: hero-fade 0.7s ease both; animation-delay: 0.18s; }
+    .hero-meta { animation: hero-fade 0.7s ease both; animation-delay: 0.26s; }
+</style>
+<style id="admin-only">
+    /* ============================================================
+       ADMIN MODE — overlay UI for assembling real screenshots.
+       Stripped from the exported guide.
+       ============================================================ */
+    body { padding-top: 56px; }
+
+    #ab-bar {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        background: rgba(13, 13, 13, 0.94);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid #1f1f1f;
+        z-index: 200;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    }
+    .ab-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+    }
+    .ab-status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11.5px;
+        color: #a0a0a0;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+    .ab-dot {
+        width: 8px; height: 8px;
+        border-radius: 100px;
+        background: #3b82f6;
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+        animation: ab-pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes ab-pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.45; }
+    }
+    .ab-label   { color: #ededed; font-weight: 500; }
+    .ab-progress { color: #6a6a6a; }
+
+    .ab-actions { display: flex; gap: 8px; }
+    .ab-btn {
+        height: 32px;
+        padding: 0 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        border: 1px solid #262626;
+        background: #1a1a1a;
+        color: #d4d4d4;
+        transition: background .12s, border-color .12s;
+    }
+    .ab-btn:hover { background: #1f1f1f; border-color: #3a3a3a; }
+    .ab-btn-primary {
+        background: #3b82f6;
+        border-color: #3b82f6;
+        color: #fff;
+    }
+    .ab-btn-primary:hover { background: #2563eb; border-color: #2563eb; }
+
+    /* Slot interactivity in admin mode */
+    .shot[data-slot] {
+        cursor: pointer;
+        transition: border-color .14s, background .14s;
+    }
+    .shot[data-slot]:hover {
+        border-color: rgba(59, 130, 246, 0.4);
+    }
+    .shot[data-slot].is-dragover {
+        border-color: #3b82f6 !important;
+        background: rgba(59, 130, 246, 0.06);
+    }
+    .shot[data-slot]:hover .shot-empty-icon {
+        border-color: rgba(59, 130, 246, 0.5);
+        color: #93c5fd;
+    }
+
+    /* Admin overlay (pick / replace / clear buttons) */
+    .shot-admin {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        gap: 6px;
+        opacity: 0;
+        transition: opacity .14s;
+        z-index: 5;
+    }
+    .shot[data-slot]:hover .shot-admin { opacity: 1; }
+    .shot[data-has-image] .shot-admin { opacity: 1; }
+
+    .sa-btn {
+        height: 28px;
+        padding: 0 11px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        background: rgba(20, 20, 20, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #d4d4d4;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+    .sa-btn:hover {
+        background: rgba(30, 30, 30, 0.95);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: #fff;
+    }
+    .sa-btn-clear:hover {
+        color: #fca5a5;
+        border-color: rgba(252, 165, 165, 0.4);
+    }
+
+    /* Toggle visibility of "Pick image" / "Replace" labels based on slot state */
+    .sa-pick    { display: inline; }
+    .sa-replace { display: none; }
+    .shot[data-has-image] .sa-pick    { display: none; }
+    .shot[data-has-image] .sa-replace { display: inline; }
+    .shot:not([data-has-image]) .sa-btn-clear { display: none; }
+
+    /* The empty-state placeholder needs to be visible/click-through-able even in admin mode */
+    .shot-empty { pointer-events: none; }
+</style>
+</head>
+<body>
+<!-- Admin top bar — stripped on export -->
+<div id="ab-bar">
+    <div class="ab-inner">
+        <div class="ab-status">
+            <span class="ab-dot"></span>
+            <span class="ab-label">Admin mode</span>
+            <span class="ab-progress" id="ab-progress">0 / 8 slots filled</span>
+        </div>
+        <div class="ab-actions">
+            <button class="ab-btn" id="ab-reset">Reset all</button>
+            <button class="ab-btn ab-btn-primary" id="ab-export">Export guide.html</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- Topbar — quiet brand presence -->
+<header class="topbar">
+    <div class="topbar-inner">
+        <div class="brand">
+            <div class="brand-mark">
+                <!-- Same downward-arrow icon used in the app rail -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </div>
+            <span>ProTube Saver</span>
+        </div>
+        <div class="topbar-meta">Guide · v1.0</div>
+    </div>
+</header>
+
+<!-- Main page -->
+<main class="page">
+    <div class="content">
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="eyebrow">User guide</div>
+            <h1 class="hero-title">A quiet way to <em>save</em> what you watch.</h1>
+            <p class="hero-lede">ProTube Saver is a Windows app for downloading YouTube videos and playlists locally — built around a queue you can return to, a library that survives offline, and a player that just works. This guide walks through everything you need to use it well.</p>
+            <div class="hero-meta">
+                <span>Reading time · <strong>~8 min</strong></span>
+                <span>Platform · <strong>Windows 10/11</strong></span>
+                <span>Type · <strong>Portable .exe</strong></span>
+            </div>
+        </section>
+
+        <!-- 01 — What it is -->
+        <section class="section" id="s01">
+            <div class="section-num">01</div>
+            <h2 class="section-title">What ProTube Saver is</h2>
+            <p class="section-kicker">It's a desktop YouTube downloader. You paste a link, it downloads. Pretty much the whole pitch.</p>
+
+            <p>Underneath, it's a small Python app wrapping <code>yt-dlp</code> with a custom UI, a download queue, a local library, and a built-in video player. Designed for people who want their stuff on disk — for travel, for archiving, for offline viewing — without dealing with command lines or sketchy websites.</p>
+
+            <p>A few things worth knowing up front:</p>
+            <ul style="padding-left: 18px; margin: 16px 0 24px; color: var(--text); line-height: 1.7;">
+                <li><strong>Portable.</strong> The exe lives in a folder of your choosing. All settings, library data, and downloads sit next to it in a <code>data/</code> folder. Move the folder, everything moves.</li>
+                <li><strong>Offline-first.</strong> Once a video is downloaded, you can play it inside the app even without internet. Thumbnails are cached locally too.</li>
+                <li><strong>No accounts.</strong> No sign-in, no telemetry, no cloud anything.</li>
+            </ul>
+
+            <div class="shot" data-slot="01-main" data-aspect="16/10">
+                <img class="shot-img" alt="Main window — queue view">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">Main window — queue view</div>
+                    <div class="shot-empty-hint">Drop image · 16:10</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 02 — Install & first launch -->
+        <section class="section" id="s02">
+            <div class="section-num">02</div>
+            <h2 class="section-title">Install &amp; first launch</h2>
+            <p class="section-kicker">There's no installer. Just an exe.</p>
+
+            <ol class="steps">
+                <li>Drop <code>ProTubeSaver.exe</code> in any folder you'd like the app to live. <code>C:\Apps\ProTube\</code> works. So does a USB stick.</li>
+                <li>Double-click the exe.</li>
+                <li>On first launch, Windows SmartScreen may show a warning (unsigned binary). Click <strong>More info</strong> → <strong>Run anyway</strong>.</li>
+                <li>The app opens. A <code>data/</code> folder appears next to the exe — that's where your settings and library will live from here on.</li>
+            </ol>
+
+            <div class="callout">
+                <div class="callout-label">Note</div>
+                <p>If you want to move the app later, close it first, then move the whole folder (exe + <code>data/</code> together). Everything follows.</p>
+            </div>
+
+            <div class="shot" data-slot="02-empty" data-aspect="16/10">
+                <img class="shot-img" alt="First-launch — empty state">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">First-launch — empty state</div>
+                    <div class="shot-empty-hint">Drop image · 16:10</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 03 — Adding videos -->
+        <section class="section" id="s03">
+            <div class="section-num">03</div>
+            <h2 class="section-title">Adding videos to the queue</h2>
+            <p class="section-kicker">Three ways. All of them work on single videos and full playlists.</p>
+
+            <h3>Paste a URL</h3>
+            <p>The fastest way. Click the URL bar at the top, paste a YouTube link, press <span class="kbd">Enter</span>. The app fetches metadata (title, channel, duration, available qualities) and adds it to the queue. Playlist URLs add as a single playlist card you can expand.</p>
+
+            <h3>Drag &amp; drop</h3>
+            <p>Drag a YouTube link from your browser tab directly into the app window. A blue drop overlay appears — release the link, same as paste.</p>
+
+            <h3>Multiple at once</h3>
+            <p>Paste multiple URLs separated by newlines or spaces. Each becomes its own queue item. Useful when you've copied a batch of links from a doc or chat.</p>
+
+            <div class="shot" data-slot="03-fetching" data-aspect="16/10">
+                <img class="shot-img" alt="URL bar fetching a video">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">URL bar fetching a video</div>
+                    <div class="shot-empty-hint">Drop image · 16:10</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+
+            <div class="callout">
+                <div class="callout-label">Tip</div>
+                <p>Default download quality is whatever you last picked. If you want a different quality for one video, use the per-item picker (next section) — your default doesn't change.</p>
+            </div>
+        </section>
+
+        <!-- 04 — Quality -->
+        <section class="section" id="s04">
+            <div class="section-num">04</div>
+            <h2 class="section-title">Picking quality</h2>
+            <p class="section-kicker">Per-video, per-playlist, or globally.</p>
+
+            <p>Each queue item has a quality picker showing the formats YouTube exposes for that video — usually 4K, 1440p, 1080p, 720p, 480p, plus audio-only. Click the picker, choose, done.</p>
+
+            <p>For playlists, the picker on the playlist card sets the default for all videos inside. Individual videos in the playlist can still override.</p>
+
+            <p>The picker is smart about positioning — if there's no room below (last card in the queue), it flips and opens upward. Either way, your layout doesn't shift.</p>
+
+            <div class="shot shot-sm" data-slot="04-quality" data-aspect="16/6">
+                <img class="shot-img" alt="Quality picker — flip-up">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">Quality picker — flip-up</div>
+                    <div class="shot-empty-hint">Drop image · 16:6</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+
+            <div class="callout">
+                <div class="callout-label">Heads up</div>
+                <p>Higher quality = larger file. 4K can run 1.5–3 GB for a 10-minute video. Audio-only is best for podcasts or music.</p>
+            </div>
+        </section>
+
+        <!-- 05 — Managing the queue -->
+        <section class="section" id="s05">
+            <div class="section-num">05</div>
+            <h2 class="section-title">Managing the queue</h2>
+            <p class="section-kicker">The queue is the heart of the app. Here's how to bend it.</p>
+
+            <h3>Pause &amp; resume</h3>
+            <p>While a download is running, hover the card and hit pause. The download stops mid-stream and writes a <code>.part</code> file to disk. Hit resume later — even after closing and reopening the app — and it picks up exactly where it left off.</p>
+
+            <h3>Cancel &amp; remove</h3>
+            <p>Cancel removes the item from the queue. If it was mid-download, the partial file is cleaned up. Use the kebab menu (the <code>⋯</code> on each card) for full options including "Open folder" and "Copy URL".</p>
+
+            <h3>Reorder</h3>
+            <p>Drag any queue card up or down to change download order. Useful when you've added a long playlist but want to grab one specific video first.</p>
+
+            <h3>Selection mode</h3>
+            <p>Right-click any card (or use the per-card checkbox on hover) to enter selection mode. From there, every click toggles selection. An action bar slides up from the bottom with bulk options. <span class="kbd">Esc</span> exits selection mode without acting.</p>
+
+            <div class="shot" data-slot="05-multistate" data-aspect="16/10">
+                <img class="shot-img" alt="Queue with multiple states">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">Queue with multiple states</div>
+                    <div class="shot-empty-hint">Drop image · 16:10</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 06 — Library mode -->
+        <section class="section" id="s06">
+            <div class="section-num">06</div>
+            <h2 class="section-title">Library mode</h2>
+            <p class="section-kicker">Everything you've ever downloaded, in one place.</p>
+
+            <p>Once a download finishes, it moves to the Library — accessible from the left rail. Library is grid-based by default: thumbnail, title, channel, duration. Click any card to open the in-app player.</p>
+
+            <p>Library entries persist across sessions and survive offline. Thumbnails are cached locally on first download, so even with no internet your grid stays populated.</p>
+
+            <h3>Search &amp; filter</h3>
+            <p>The search bar matches against title and channel. Filters let you narrow to playlists, audio-only, or specific resolutions.</p>
+
+            <h3>Playlists</h3>
+            <p>Downloaded playlists show as a single card with a count badge. Click to expand into the playlist detail view, where you can play individual videos, re-order, or remove from library.</p>
+
+            <div class="shot" data-slot="06-library" data-aspect="16/10">
+                <img class="shot-img" alt="Library grid">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">Library grid</div>
+                    <div class="shot-empty-hint">Drop image · 16:10</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 07 — In-app player -->
+        <section class="section" id="s07">
+            <div class="section-num">07</div>
+            <h2 class="section-title">The in-app player</h2>
+            <p class="section-kicker">YouTube-style controls, full keyboard support, fullscreen that actually works.</p>
+
+            <p>Double-click any library card and the player view opens. Top overlay shows the title and a back button. Bottom overlay has the standard cluster: play/pause, skip, volume, time, playback speed, fullscreen.</p>
+
+            <p>Controls auto-hide after 2 seconds of no movement. Move the mouse and they fade back in. Click anywhere on the video itself to play/pause.</p>
+
+            <h3>Keyboard shortcuts</h3>
+            <div class="shortcuts">
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">Space</span></div>
+                    <div class="desc">Play / pause</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">←</span><span class="kbd">→</span></div>
+                    <div class="desc">Skip back / forward 10 seconds</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">F</span></div>
+                    <div class="desc">Toggle fullscreen</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">M</span></div>
+                    <div class="desc">Mute / unmute</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">Esc</span></div>
+                    <div class="desc">Exit fullscreen, then back to library</div>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><span class="kbd">Double-click</span></div>
+                    <div class="desc">Toggle fullscreen (on the video)</div>
+                </div>
+            </div>
+
+            <p>Playback speed is adjustable from 0.5× to 2× via the menu in the bottom-right cluster. If a codec isn't supported by the embedded player (rare — usually only with very obscure formats), an "Open in VLC" button appears in the top-right.</p>
+
+            <div class="shot" data-slot="07-player" data-aspect="16/10">
+                <img class="shot-img" alt="Player view — mid-playback">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">Player view — mid-playback</div>
+                    <div class="shot-empty-hint">Drop image · 16:10</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 08 — Settings -->
+        <section class="section" id="s08">
+            <div class="section-num">08</div>
+            <h2 class="section-title">Settings</h2>
+            <p class="section-kicker">There aren't many. That's intentional.</p>
+
+            <h3>Download folder</h3>
+            <p>By default, downloads go into <code>&lt;app folder&gt;/data/downloads/</code>. To change it: click the folder path at the bottom of the queue view, pick a new location. Existing files stay where they are. New downloads write to the new path.</p>
+
+            <h3>Concurrent downloads</h3>
+            <p>The app downloads up to 2 videos in parallel by default. This is a balance between speed and not getting rate-limited by YouTube. Coming soon: a slider to tune this.</p>
+
+            <h3>yt-dlp updates</h3>
+            <p>The app auto-updates its bundled <code>yt-dlp</code> on launch in the background. YouTube changes their internals fairly often; without updates, downloads start failing within weeks. You don't have to do anything — it just runs.</p>
+
+            <div class="shot shot-sm" data-slot="08-savingto" data-aspect="16/6">
+                <img class="shot-img" alt="Saving-to bar">
+                <div class="shot-empty">
+                    <div class="shot-empty-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="shot-empty-text">Saving-to bar</div>
+                    <div class="shot-empty-hint">Drop image · 16:6</div>
+                </div>
+                <input type="file" class="shot-input" accept="image/*" hidden>
+                <div class="shot-admin">
+                    <button class="sa-btn" data-action="pick"><span class="sa-pick">Pick image</span><span class="sa-replace">Replace</span></button>
+                    <button class="sa-btn sa-btn-clear" data-action="clear">Clear</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 09 — Troubleshooting -->
+        <section class="section" id="s09">
+            <div class="section-num">09</div>
+            <h2 class="section-title">When things go wrong</h2>
+            <p class="section-kicker">Common issues and how to unstick them.</p>
+
+            <h3>"Video unavailable" or fetch fails</h3>
+            <p>Usually means YouTube changed something and yt-dlp hasn't caught up yet. Wait a few hours and try again — the auto-updater will pull a fix on next launch. If urgent, reinstall yt-dlp manually (advanced).</p>
+
+            <h3>Download stuck at 99%</h3>
+            <p>The merge step (combining video + audio streams via ffmpeg) is running. Give it 10–30 seconds. If it stays stuck for over a minute, cancel and retry the download — the partial file will be cleaned up automatically.</p>
+
+            <h3>Quality I want isn't shown</h3>
+            <p>YouTube doesn't expose every resolution for every video. If 1440p is missing, it likely doesn't exist for that upload. The picker shows what's actually available, not what's theoretically possible.</p>
+
+            <h3>App won't launch on a new machine</h3>
+            <p>Make sure WebView2 Runtime is installed. Most Windows 10/11 systems have it preinstalled, but some stripped builds don't. Download the runtime from Microsoft's site, install, retry.</p>
+
+            <h3>Lost my settings / library</h3>
+            <p>Check next to your exe for a <code>data/</code> folder. If it's gone, restore from backup if you have one. The app falls back to a fresh install when <code>data/</code> is missing — your downloaded video files are still on disk, just not indexed in the library anymore.</p>
+
+            <div class="callout">
+                <div class="callout-label">Last resort</div>
+                <p>Close the app. Delete <code>data/settings.json</code> only (keep the folder and other files). Relaunch. The app rebuilds with defaults but keeps your library.</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-signoff">All in a day's work.</div>
+            <div>ProTube Saver · made by Cincade</div>
+        </footer>
+
+    </div>
+
+    <!-- Sticky table of contents -->
+    <aside class="toc">
+        <div class="toc-label">Contents</div>
+        <ol>
+            <li><a href="#s01" data-target="s01">What it is</a></li>
+            <li><a href="#s02" data-target="s02">Install &amp; first launch</a></li>
+            <li><a href="#s03" data-target="s03">Adding videos</a></li>
+            <li><a href="#s04" data-target="s04">Picking quality</a></li>
+            <li><a href="#s05" data-target="s05">Managing the queue</a></li>
+            <li><a href="#s06" data-target="s06">Library mode</a></li>
+            <li><a href="#s07" data-target="s07">In-app player</a></li>
+            <li><a href="#s08" data-target="s08">Settings</a></li>
+            <li><a href="#s09" data-target="s09">Troubleshooting</a></li>
+        </ol>
+    </aside>
+</main>
+
+<script>
+    // Highlight the TOC entry whose section is currently most-visible.
+    // Uses IntersectionObserver so this is cheap — no scroll listener.
+    (function () {
+        const sections = document.querySelectorAll('.section');
+        const links = document.querySelectorAll('.toc a');
+
+        function setActive(id) {
+            links.forEach(a => {
+                a.classList.toggle('is-active', a.dataset.target === id);
+            });
+        }
+
+        // Default the first section as active so something is highlighted on load
+        if (links.length) links[0].classList.add('is-active');
+
+        const observer = new IntersectionObserver((entries) => {
+            // Pick the entry closest to the top of the viewport that's currently
+            // intersecting. Multiple sections can intersect during scroll; we want
+            // the one whose top is highest while still visible.
+            const visible = entries
+                .filter(e => e.isIntersecting)
+                .sort((a, b) => a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top);
+            if (visible.length) {
+                setActive(visible[0].target.id);
+            }
+        }, {
+            rootMargin: '-80px 0px -60% 0px',  // top offset for sticky header, bottom keeps current section "active" longer
+            threshold: 0,
+        });
+
+        sections.forEach(s => observer.observe(s));
+
+        // Smooth-scroll TOC clicks (CSS scroll-margin-top handles the offset)
+        links.forEach(a => {
+            a.addEventListener('click', (e) => {
+                const id = a.dataset.target;
+                const target = document.getElementById(id);
+                if (target) {
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setActive(id);
+                    history.replaceState(null, '', '#' + id);
+                }
+            });
+        });
+    })();
+</script>
+
+<script id="admin-script">
+(function () {
+    'use strict';
+
+    // We use IndexedDB rather than localStorage because base64 images quickly
+    // blow past the 5–10 MB localStorage quota. IDB has gigabyte-scale headroom.
+    var DB_NAME = 'protube-guide-admin';
+    var DB_STORE = 'slots';
+
+    function openDB() {
+        return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = function () {
+                req.result.createObjectStore(DB_STORE);
+            };
+            req.onsuccess = function () { resolve(req.result); };
+            req.onerror   = function () { reject(req.error); };
+        });
+    }
+    function idbGet(key) {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(DB_STORE, 'readonly');
+                var st = tx.objectStore(DB_STORE);
+                var r  = st.get(key);
+                r.onsuccess = function () { resolve(r.result); };
+                r.onerror   = function () { reject(r.error); };
+            });
+        });
+    }
+    function idbSet(key, value) {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(DB_STORE, 'readwrite');
+                var st = tx.objectStore(DB_STORE);
+                var r  = st.put(value, key);
+                r.onsuccess = function () { resolve(); };
+                r.onerror   = function () { reject(r.error); };
+            });
+        });
+    }
+    function idbDelete(key) {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(DB_STORE, 'readwrite');
+                var st = tx.objectStore(DB_STORE);
+                var r  = st.delete(key);
+                r.onsuccess = function () { resolve(); };
+                r.onerror   = function () { reject(r.error); };
+            });
+        });
+    }
+    function idbClear() {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(DB_STORE, 'readwrite');
+                var st = tx.objectStore(DB_STORE);
+                var r  = st.clear();
+                r.onsuccess = function () { resolve(); };
+                r.onerror   = function () { reject(r.error); };
+            });
+        });
+    }
+
+    var slots       = Array.prototype.slice.call(document.querySelectorAll('.shot[data-slot]'));
+    var progressEl  = document.getElementById('ab-progress');
+    var exportBtn   = document.getElementById('ab-export');
+    var resetBtn    = document.getElementById('ab-reset');
+
+    function setSlotImage(slot, dataUrl) {
+        var img = slot.querySelector('.shot-img');
+        if (!img) return;
+        img.src = dataUrl;
+        slot.setAttribute('data-has-image', '');
+    }
+    function clearSlotImage(slot) {
+        var img = slot.querySelector('.shot-img');
+        if (img) img.removeAttribute('src');
+        slot.removeAttribute('data-has-image');
+    }
+    function refreshProgress() {
+        var filled = document.querySelectorAll('.shot[data-has-image]').length;
+        progressEl.textContent = filled + ' / ' + slots.length + ' slots filled';
+    }
+
+    function readFile(file, slot) {
+        if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+            alert('That doesn\'t look like an image. Drop a PNG, JPG, or WebP.');
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var dataUrl = e.target.result;
+            setSlotImage(slot, dataUrl);
+            idbSet(slot.getAttribute('data-slot'), dataUrl)
+                .catch(function (err) {
+                    console.error('IDB set failed', err);
+                    alert('Saving failed: ' + (err && err.message ? err.message : err));
+                });
+            refreshProgress();
+        };
+        reader.onerror = function () {
+            alert('Failed to read file.');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    slots.forEach(function (slot) {
+        var input = slot.querySelector('.shot-input');
+
+        slot.addEventListener('click', function (e) {
+            var actionEl = e.target.closest('[data-action]');
+            if (actionEl) {
+                if (actionEl.dataset.action === 'clear') {
+                    e.stopPropagation();
+                    if (!confirm('Clear this image?')) return;
+                    clearSlotImage(slot);
+                    idbDelete(slot.getAttribute('data-slot'));
+                    refreshProgress();
+                    return;
+                }
+                // pick / replace -> open file picker
+            }
+            input.click();
+        });
+
+        input.addEventListener('change', function (e) {
+            var f = e.target.files && e.target.files[0];
+            if (f) readFile(f, slot);
+            input.value = '';
+        });
+
+        // Drag/drop on each slot
+        slot.addEventListener('dragenter', function (e) {
+            e.preventDefault();
+            slot.classList.add('is-dragover');
+        });
+        slot.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        });
+        slot.addEventListener('dragleave', function (e) {
+            if (slot.contains(e.relatedTarget)) return;
+            slot.classList.remove('is-dragover');
+        });
+        slot.addEventListener('drop', function (e) {
+            e.preventDefault();
+            slot.classList.remove('is-dragover');
+            var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) readFile(f, slot);
+        });
+    });
+
+    // Reset all
+    resetBtn.addEventListener('click', function () {
+        if (!confirm('Clear ALL uploaded images? This cannot be undone.')) return;
+        slots.forEach(clearSlotImage);
+        idbClear();
+        refreshProgress();
+    });
+
+    // Export bundled guide.html
+    exportBtn.addEventListener('click', function () {
+        var clone = document.documentElement.cloneNode(true);
+
+        // Remove admin-only chrome
+        var bar = clone.querySelector('#ab-bar');                 if (bar)    bar.remove();
+        var as  = clone.querySelector('style#admin-only');        if (as)     as.remove();
+        var ascr = clone.querySelector('script#admin-script');    if (ascr)   ascr.remove();
+
+        // Strip per-slot admin overlays + file inputs
+        clone.querySelectorAll('.shot[data-slot]').forEach(function (slot) {
+            slot.querySelectorAll('.shot-input, .shot-admin').forEach(function (el) { el.remove(); });
+            // Tidy: production export shouldn't carry the editor-y data-aspect attr
+            slot.removeAttribute('data-aspect');
+            // For empty slots, swap the editor copy for a quiet "pending" placeholder
+            if (!slot.hasAttribute('data-has-image')) {
+                var empty = slot.querySelector('.shot-empty');
+                if (empty) {
+                    empty.innerHTML =
+                        '<div style="font-family: \'JetBrains Mono\', ui-monospace, monospace; font-size: 10.5px; color: #3a3a3a; letter-spacing: 0.06em; text-transform: uppercase;">Screenshot pending</div>';
+                }
+            }
+        });
+
+        var title = clone.querySelector('title');
+        if (title) title.textContent = 'ProTube Saver — Guide';
+
+        var html = '<!DOCTYPE html>\n' + clone.outerHTML;
+        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href = url;
+        a.download = 'protube-guide.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    // Restore on load
+    Promise.all(slots.map(function (slot) {
+        return idbGet(slot.getAttribute('data-slot')).then(function (data) {
+            if (data) setSlotImage(slot, data);
+        });
+    })).then(refreshProgress);
+})();
+</script>
+</body>
+</html>
