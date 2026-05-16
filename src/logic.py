@@ -2931,9 +2931,12 @@ class API:
         Resolves the browse/playlist ID to a list of video IDs via yt-dlp's flat
         extraction, then queues each one through `add_music_track`. Fire-and-forget.
         kind: 'album' | 'playlist' | 'artist' — only used to label progress toasts.
+        For kind='album', the resolved collection is also persisted as a first-class
+        `music_albums` entry with aggregate progress (track grouping in the library).
         """
         try:
             url = browse_id_or_url
+            collection_id = browse_id_or_url if not browse_id_or_url.startswith('http') else ''
             if not url.startswith('http'):
                 # YT Music browseIds: albums (MPREb_), artists (UC), playlists (VLPLor RDCLAK5)
                 if url.startswith('MPREb_') or url.startswith('OLAK5uy_'):
@@ -2947,15 +2950,20 @@ class API:
                     url = f'https://music.youtube.com/browse/{url}'
             threading.Thread(
                 target=self._music_collection_worker,
-                args=(url, kind or 'collection'),
+                args=(url, kind or 'collection', collection_id),
                 daemon=True,
             ).start()
             return {'ok': True, 'started': True}
         except Exception as e:
             return {'error': str(e)}
 
-    def _music_collection_worker(self, url, kind):
-        """Resolve a YT Music collection URL → list of video IDs, then download each."""
+    def _music_collection_worker(self, url, kind, collection_id=''):
+        """Resolve a YT Music collection URL → list of video IDs, then download each.
+
+        For kind='album', also writes a `music_albums` entry up-front so the library
+        grid can show a single album card with aggregate progress instead of N
+        independent track rows.
+        """
         try:
             self._send_to_js('showToast', f'Resolving {kind}…', None, None)
             opts = self._get_ydl_opts('browser', 'none')
@@ -2988,6 +2996,69 @@ class API:
             # Cap artist downloads at 25 tracks so we don't accidentally grab a whole channel
             if kind == 'artist' and len(video_ids) > 25:
                 video_ids = video_ids[:25]
+
+            # -- Album entity: persist BEFORE spawning workers so the library grid
+            # can pick up the in-progress album card immediately. --
+            album_id = ''
+            if kind == 'album':
+                # Resolve a stable album_id. Prefer the original browse id (MPREb_/OLAK5uy_),
+                # otherwise yt-dlp's own id field, otherwise hash the URL.
+                album_id = collection_id or (info.get('id') or '') or ''
+                if not album_id:
+                    import hashlib as _hashlib
+                    album_id = 'AL' + _hashlib.md5(url.encode('utf-8')).hexdigest()[:14]
+                album_title = info.get('title') or info.get('album') or 'Untitled Album'
+                album_artist = (
+                    info.get('uploader')
+                    or info.get('artist')
+                    or info.get('creator')
+                    or info.get('channel')
+                    or 'Unknown Artist'
+                )
+                # Best cover candidate: largest thumbnail in the info dict.
+                cover_url = ''
+                thumbs = info.get('thumbnails') or []
+                if thumbs and isinstance(thumbs, list):
+                    try:
+                        best = max(
+                            (t for t in thumbs if isinstance(t, dict) and t.get('url')),
+                            key=lambda t: (t.get('width') or 0) * (t.get('height') or 0),
+                            default=None,
+                        )
+                        if best:
+                            cover_url = best.get('url') or ''
+                    except Exception:
+                        cover_url = ''
+                if not cover_url:
+                    cover_url = info.get('thumbnail') or ''
+                # Filter to the IDs we'll actually attempt — keep the originally resolved
+                # ordered list (including already-in-library ones) as the album manifest,
+                # so the album detail view always shows the full track list.
+                self._upsert_music_album({
+                    'id': album_id,
+                    'title': album_title,
+                    'artist': album_artist,
+                    'cover_url': cover_url,
+                    'source_url': url,
+                    'added_at': int(time.time()),
+                    'total_tracks': len(video_ids),
+                    'downloaded_count': 0,
+                    'status': 'downloading',
+                    'track_ids': list(video_ids),
+                    'seen_at': None,
+                })
+                # If some tracks were already in the user's library (singles), stamp
+                # them with this album_id so they get absorbed under the album card.
+                self._stamp_existing_tracks_with_album(video_ids, album_id)
+                # Recompute downloaded_count to reflect already-owned tracks before
+                # spawning workers — the album might already be partially complete.
+                self._recount_album(album_id)
+                # Initial 0% event so the JS can render the ring + paint the card.
+                done = self._album_downloaded_count(album_id)
+                self._send_to_js(
+                    'updateMusicAlbumProgress', album_id, done, len(video_ids)
+                )
+
             lib_ids = self._build_music_library_id_set()
             queued = 0
             skipped = 0
@@ -2999,7 +3070,7 @@ class API:
                 track_url = f'https://music.youtube.com/watch?v={vid}'
                 threading.Thread(
                     target=self._music_download_worker,
-                    args=(track_url,),
+                    args=(track_url, album_id or None),
                     daemon=True,
                 ).start()
                 queued += 1
@@ -3009,13 +3080,19 @@ class API:
             if queued: msg_parts.append(f'Queued {queued} tracks')
             if skipped: msg_parts.append(f'{skipped} already in library')
             self._send_to_js('showToast', ' · '.join(msg_parts) or 'Nothing to download', None, None)
+            # Edge case: album with zero new downloads (everything was already in
+            # library). Flip status to complete immediately so the card doesn't
+            # sit forever on 'downloading'.
+            if kind == 'album' and queued == 0:
+                self._mark_album_complete_if_done(album_id)
         except Exception as e:
             print(f'[ProTube/music] collection download failed: {e}')
             self._send_to_js('showToast', f'{kind.title()} download failed: {e}', None, None)
 
-    def _music_download_worker(self, url):
+    def _music_download_worker(self, url, album_id=None):
         """Background worker: extract metadata, download audio, embed tags + art,
-        stamp the library."""
+        stamp the library. If `album_id` is provided, the resulting track entry is
+        stamped with it AND the parent album's downloaded_count is incremented."""
         try:
             from app_paths import music_dir
             base_dir = music_dir()
@@ -3131,7 +3208,15 @@ class API:
                 'url': url,
                 'added_at': int(time.time()),
             }
+            # Stamp the album link BEFORE persisting so the track is grouped on
+            # first paint of the music library grid.
+            if album_id:
+                entry['album_id'] = album_id
             self.add_to_music_library(entry)
+            # Increment the album's downloaded_count + emit progress so the card
+            # ring + detail-view counter both update.
+            if album_id:
+                self._bump_album_progress(album_id)
             self._send_to_js('musicDownloadDone', entry)
         except Exception as e:
             print(f'[ProTube/music] download failed: {e}')
@@ -3187,6 +3272,210 @@ class API:
         self.settings['music_library'] = [t for t in lib if t.get('id') != track_id]
         self._save_settings()
         return {'ok': True}
+
+    # ----------------------------------------------------------------- #
+    # Music albums (first-class library entity grouping multiple tracks) #
+    # ----------------------------------------------------------------- #
+
+    def load_music_albums(self):
+        """Frontend reads this on the Music view's mount, alongside load_music_library."""
+        return self.settings.get('music_albums', []) or []
+
+    def get_music_album(self, album_id):
+        """Return one album joined with its full track objects, ordered by
+        track_ids. Missing tracks (still downloading) appear as placeholder
+        stubs with `pending=True` so the detail view can render a greyed row."""
+        if not album_id:
+            return None
+        albums = self.settings.get('music_albums', []) or []
+        album = next((a for a in albums if a.get('id') == album_id), None)
+        if not album:
+            return None
+        lib = self.settings.get('music_library', []) or []
+        by_id = {t.get('id'): t for t in lib if t.get('id')}
+        tracks = []
+        for tid in album.get('track_ids', []) or []:
+            t = by_id.get(tid)
+            if t:
+                tracks.append(t)
+            else:
+                # Pending stub — track not yet downloaded (or download failed).
+                tracks.append({
+                    'id': tid,
+                    'type': 'music',
+                    'title': '',          # will be filled once download lands
+                    'artist': album.get('artist', ''),
+                    'album': album.get('title', ''),
+                    'album_id': album_id,
+                    'thumbnail': album.get('cover_url', ''),
+                    'duration_string': '',
+                    'duration_seconds': 0,
+                    'pending': True,
+                })
+        joined = dict(album)
+        joined['tracks'] = tracks
+        return joined
+
+    def delete_music_album(self, album_id, delete_files=True):
+        """Remove an album record. If delete_files is true, also remove every
+        track in track_ids from music_library AND delete the underlying M4As.
+        Singles stamped with this album_id (from a re-import flow) are also
+        unlinked so they don't leak back into the top-level grid as orphans
+        pointing at a deleted album."""
+        if not album_id:
+            return {'ok': False, 'error': 'no album_id'}
+        albums = self.settings.get('music_albums', []) or []
+        album = next((a for a in albums if a.get('id') == album_id), None)
+        if not album:
+            return {'ok': False, 'error': 'album not found'}
+        if delete_files:
+            lib = self.settings.get('music_library', []) or []
+            track_id_set = set(album.get('track_ids') or [])
+            # Delete files for tracks linked to this album (by id or album_id stamp).
+            for t in lib:
+                if t.get('id') in track_id_set or t.get('album_id') == album_id:
+                    fp = t.get('filepath') or ''
+                    if fp and os.path.exists(fp):
+                        try:
+                            os.remove(fp)
+                        except OSError as e:
+                            print(f'[ProTube/music] failed to delete {fp}: {e}')
+            # Drop those entries from the library.
+            self.settings['music_library'] = [
+                t for t in lib
+                if not (t.get('id') in track_id_set or t.get('album_id') == album_id)
+            ]
+        else:
+            # Unlink without deleting: clear the album_id stamp so tracks remain
+            # as singles in the top-level grid.
+            lib = self.settings.get('music_library', []) or []
+            for t in lib:
+                if t.get('album_id') == album_id:
+                    t.pop('album_id', None)
+        # Drop the album record.
+        self.settings['music_albums'] = [a for a in albums if a.get('id') != album_id]
+        self._save_settings()
+        return {'ok': True}
+
+    def mark_album_seen(self, album_id):
+        """Stamp the album as 'seen' so the NEW pill on its card disappears.
+        Called when the user opens the album detail view."""
+        if not album_id:
+            return {'ok': False}
+        albums = self.settings.get('music_albums', []) or []
+        changed = False
+        for a in albums:
+            if a.get('id') == album_id and not a.get('seen_at'):
+                a['seen_at'] = int(time.time())
+                changed = True
+                break
+        if changed:
+            self._save_settings()
+        return {'ok': True}
+
+    # ---- Internal album helpers -------------------------------------- #
+
+    def _upsert_music_album(self, album_entry):
+        """Insert or replace an album record by id. Latest write wins on the
+        mutable fields (downloaded_count, status, etc.) but preserves the
+        seen_at stamp from any existing record so reopening the album later
+        doesn't re-light the NEW pill."""
+        if not album_entry or not album_entry.get('id'):
+            return False
+        albums = self.settings.get('music_albums', []) or []
+        existing = next((a for a in albums if a.get('id') == album_entry['id']), None)
+        if existing:
+            # Preserve seen_at + original added_at across re-downloads (e.g.
+            # user re-adds an album after deleting it — the NEW pill will
+            # re-light because added_at gets refreshed, which is the desired
+            # behavior; but a partial re-resolve shouldn't reset seen_at if
+            # the user has already opened it). We keep both fields from the
+            # existing record when present.
+            album_entry['seen_at'] = existing.get('seen_at') or album_entry.get('seen_at')
+            album_entry['added_at'] = existing.get('added_at') or album_entry.get('added_at')
+            albums = [a for a in albums if a.get('id') != album_entry['id']]
+        albums.append(album_entry)
+        self.settings['music_albums'] = albums
+        self._save_settings()
+        return True
+
+    def _stamp_existing_tracks_with_album(self, track_ids, album_id):
+        """When an album re-download starts and some tracks are already in the
+        user's library as singles, stamp them with the album_id so they get
+        absorbed into the album card instead of showing as duplicates."""
+        if not album_id or not track_ids:
+            return
+        lib = self.settings.get('music_library', []) or []
+        target = set(track_ids)
+        changed = False
+        for t in lib:
+            if t.get('id') in target and t.get('album_id') != album_id:
+                t['album_id'] = album_id
+                changed = True
+        if changed:
+            self.settings['music_library'] = lib
+            self._save_settings()
+
+    def _album_downloaded_count(self, album_id):
+        """Count how many of the album's track_ids are currently in the library."""
+        albums = self.settings.get('music_albums', []) or []
+        album = next((a for a in albums if a.get('id') == album_id), None)
+        if not album:
+            return 0
+        track_id_set = set(album.get('track_ids') or [])
+        lib = self.settings.get('music_library', []) or []
+        return sum(1 for t in lib if t.get('id') in track_id_set)
+
+    def _recount_album(self, album_id):
+        """Recompute downloaded_count from the library and persist."""
+        albums = self.settings.get('music_albums', []) or []
+        album = next((a for a in albums if a.get('id') == album_id), None)
+        if not album:
+            return
+        album['downloaded_count'] = self._album_downloaded_count(album_id)
+        if album['downloaded_count'] >= album.get('total_tracks', 0) and album.get('total_tracks', 0) > 0:
+            album['status'] = 'complete'
+        self._save_settings()
+
+    def _bump_album_progress(self, album_id):
+        """A track from this album just landed. Increment the counter, emit a
+        progress event, and flip to 'complete' status if we're done."""
+        if not album_id:
+            return
+        albums = self.settings.get('music_albums', []) or []
+        album = next((a for a in albums if a.get('id') == album_id), None)
+        if not album:
+            return
+        # Always recount from library (cheap, ~hundreds of entries max) — avoids
+        # off-by-one drift if a worker double-fires or a track is re-downloaded.
+        album['downloaded_count'] = self._album_downloaded_count(album_id)
+        total = album.get('total_tracks', 0) or 0
+        if total and album['downloaded_count'] >= total:
+            album['status'] = 'complete'
+        self._save_settings()
+        self._send_to_js(
+            'updateMusicAlbumProgress',
+            album_id,
+            album['downloaded_count'],
+            total,
+        )
+
+    def _mark_album_complete_if_done(self, album_id):
+        """Flip status to 'complete' if all tracks are already in library
+        (used for the case where every track was already owned before download)."""
+        if not album_id:
+            return
+        albums = self.settings.get('music_albums', []) or []
+        album = next((a for a in albums if a.get('id') == album_id), None)
+        if not album:
+            return
+        done = self._album_downloaded_count(album_id)
+        total = album.get('total_tracks', 0) or 0
+        album['downloaded_count'] = done
+        if total and done >= total:
+            album['status'] = 'complete'
+        self._save_settings()
+        self._send_to_js('updateMusicAlbumProgress', album_id, done, total)
 
     def get_music_stream_url(self, track_id):
         """Return a localhost-served URL for an M4A in the music library so the

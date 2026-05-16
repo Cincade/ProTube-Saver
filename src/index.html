@@ -3232,6 +3232,269 @@
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
             pointer-events: none;
         }
+        /* Album card variant — same .music-card shell, but with a bottom-left
+           "ALBUM · N tracks" pill on the artwork + an aggregate-progress ring
+           overlay while the album is still downloading. */
+        .music-card-album-pill {
+            position: absolute; bottom: 10px; left: 10px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #3b82f6;
+            font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+            padding: 3px 8px; border-radius: 4px;
+            text-transform: uppercase;
+            backdrop-filter: blur(6px);
+            pointer-events: none;
+            max-width: calc(100% - 70px);   /* don't overlap the play button */
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        /* Aggregate-progress ring + % overlay on a downloading album card.
+           Same blue-ring pattern as per-track downloads. r=46 (in a 100×100
+           viewBox) → circumference 2π·46 ≈ 289.03. */
+        .music-card.album-downloading .music-card-art img { opacity: 0.55; }
+        .music-card.album-downloading .music-card-play { display: none; }
+        .mcd-ring-wrap {
+            position: absolute; inset: 0;
+            display: none;
+            align-items: center; justify-content: center;
+            pointer-events: none;
+        }
+        .music-card.album-downloading .mcd-ring-wrap { display: flex; }
+        .mcd-ring-wrap svg { width: 64%; height: 64%; transform: rotate(-90deg); }
+        .mcd-ring-wrap .ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.15); stroke-width: 5; }
+        .mcd-ring-wrap .ring-fg {
+            fill: none; stroke: #3b82f6; stroke-width: 5; stroke-linecap: round;
+            transition: stroke-dashoffset 0.25s ease;
+        }
+        .mcd-ring-pct {
+            position: absolute;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 18px; font-weight: 600; color: #fff;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+        }
+        /* ---- Music Album Detail view (mad-*) ----
+           Spotify-shaped album page: blurred-art hero up top with art + meta +
+           action row, flat track list below. Left-aligned (browsing surface)
+           in contrast to the F3 centered now-playing player. Display rule is
+           scoped to .active so the .view-pane default of display:none wins
+           on other tabs (the "view-pane gotcha" called out in protube-ui). */
+        #music-album-detail-view { padding: 0; }
+        #music-album-detail-view.active { display: flex; }
+        .mad-scroll {
+            flex: 1; overflow-y: auto;
+            display: flex; flex-direction: column;
+            min-height: 0;
+        }
+        .mad-hero {
+            position: relative;
+            padding: 28px 36px 24px;
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+        .mad-hero-backdrop {
+            position: absolute; inset: 0;
+            background-size: cover;
+            background-position: center;
+            filter: blur(70px) saturate(1.4);
+            transform: scale(1.2);
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .mad-hero-scrim {
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, rgba(10, 10, 10, 0.35) 0%, rgba(10, 10, 10, 0.85) 75%, #0a0a0a 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .mad-hero > * { position: relative; z-index: 2; }
+        .mad-back {
+            background: rgba(0, 0, 0, 0.4); border: none; color: #c0c0c0; cursor: pointer;
+            width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: color 0.12s, background 0.12s;
+            align-self: flex-start;
+            margin-bottom: 22px;
+        }
+        .mad-back:hover { color: #fff; background: rgba(0, 0, 0, 0.6); }
+        .mad-back svg { width: 18px; height: 18px; transform: rotate(90deg); }
+        .mad-hero-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 28px;
+        }
+        .mad-art {
+            width: 240px; height: 240px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1a1a1a;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+            flex-shrink: 0;
+        }
+        .mad-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mad-meta {
+            display: flex; flex-direction: column;
+            min-width: 0;
+            padding-bottom: 6px;
+        }
+        .mad-kind {
+            font-size: 11px; font-weight: 700; color: #8a8a8a;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .mad-title {
+            font-size: 38px; font-weight: 700;
+            color: #fff; letter-spacing: -0.02em;
+            line-height: 1.1;
+            margin: 0 0 12px;
+            word-break: break-word;
+        }
+        .mad-submeta {
+            font-size: 13px; color: #c0c0c0;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+        }
+        .mad-submeta-artist { color: #f5f5f5; font-weight: 600; }
+        .mad-submeta-sep { color: #6e6e6e; }
+        .mad-actions {
+            display: flex; align-items: center; gap: 16px;
+            padding: 20px 36px 8px;
+            position: relative;
+            z-index: 2;
+        }
+        .mad-play-all {
+            width: 56px; height: 56px;
+            background: #fff; color: #0a0a0a;
+            border: none; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.12s;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+        }
+        .mad-play-all:hover { background: #f0f0f0; }
+        .mad-play-all:active { background: #e0e0e0; }
+        .mad-play-all:disabled { background: #2a2a2a; color: #6e6e6e; cursor: not-allowed; box-shadow: none; }
+        .mad-play-all svg { width: 24px; height: 24px; display: block; }
+        .mad-action-btn {
+            width: 38px; height: 38px;
+            background: transparent; border: none; color: #c0c0c0; cursor: pointer;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: color 0.12s, background 0.12s;
+        }
+        .mad-action-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+        .mad-action-btn:disabled { color: #444; cursor: not-allowed; background: transparent; }
+        .mad-action-btn svg { width: 18px; height: 18px; }
+        .mad-progress-note {
+            margin-left: 4px;
+            font-size: 12.5px; color: #8a8a8a;
+        }
+        .mad-progress-note strong { color: #3b82f6; font-weight: 600; }
+        .mad-tracklist {
+            padding: 12px 28px 32px;
+        }
+        .mad-tracklist-head {
+            display: grid;
+            grid-template-columns: 40px 1fr 80px;
+            gap: 14px;
+            padding: 0 12px 8px;
+            border-bottom: 1px solid #1f1f1f;
+            margin-bottom: 6px;
+            position: sticky; top: 0;
+            background: #0a0a0a;
+            color: #8a8a8a;
+            font-size: 11px; font-weight: 600;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            z-index: 3;
+        }
+        .mad-tracklist-head-num { text-align: center; }
+        .mad-tracklist-head-dur { text-align: right; }
+        .mad-row {
+            display: grid;
+            grid-template-columns: 40px 1fr 80px;
+            gap: 14px;
+            align-items: center;
+            height: 48px;
+            padding: 0 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #c0c0c0;
+            transition: background 0.1s;
+        }
+        .mad-row:hover { background: rgba(255, 255, 255, 0.04); color: #fff; }
+        .mad-row:hover .mad-row-num { color: #fff; }
+        .mad-row-num {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 13px; color: #8a8a8a;
+            text-align: center;
+        }
+        .mad-row-title {
+            font-size: 14.5px; font-weight: 600;
+            color: #f5f5f5;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            display: flex; align-items: center; gap: 10px;
+            min-width: 0;
+        }
+        .mad-row-artist {
+            font-size: 12.5px; color: #8a8a8a;
+            font-weight: 400;
+            margin-left: 6px;
+        }
+        .mad-row-duration {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 13px; color: #8a8a8a;
+            text-align: right;
+        }
+        .mad-row.now-playing { background: rgba(59, 130, 246, 0.08); }
+        .mad-row.now-playing .mad-row-title { color: #3b82f6; }
+        .mad-row.now-playing .mad-row-num { color: #3b82f6; }
+        .mad-row.pending { color: #6e6e6e; cursor: default; }
+        .mad-row.pending:hover { background: transparent; color: #6e6e6e; }
+        .mad-row.pending .mad-row-title { color: #6e6e6e; }
+        .mad-row.pending .mad-row-num { color: #6e6e6e; }
+        .mad-pending-spinner {
+            width: 12px; height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: mad-spin 0.85s linear infinite;
+            display: inline-block;
+        }
+        @keyframes mad-spin { to { transform: rotate(360deg); } }
+        /* Playing dot — small animated bars cluster next to the title */
+        .mad-playing-indicator {
+            display: inline-flex; align-items: flex-end; gap: 2px;
+            width: 14px; height: 14px;
+        }
+        .mad-playing-indicator span {
+            display: block; width: 2.5px; background: #3b82f6;
+            animation: mad-eq 1s ease-in-out infinite;
+            border-radius: 1px;
+        }
+        .mad-playing-indicator span:nth-child(1) { height: 60%; animation-delay: 0s; }
+        .mad-playing-indicator span:nth-child(2) { height: 100%; animation-delay: 0.15s; }
+        .mad-playing-indicator span:nth-child(3) { height: 40%; animation-delay: 0.3s; }
+        @keyframes mad-eq {
+            0%, 100% { transform: scaleY(0.55); transform-origin: bottom; }
+            50% { transform: scaleY(1); transform-origin: bottom; }
+        }
+        /* Right-click context menu — reuse the .music-ctx pattern from the
+           search results pane so the visual is consistent. */
+        .mad-ctx {
+            position: fixed;
+            background: #141414; border: 1px solid #2a2a2a; border-radius: 8px;
+            padding: 4px; min-width: 200px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+        }
+        .mad-ctx button {
+            display: flex; align-items: center; gap: 10px; width: 100%;
+            background: transparent; border: none; color: #c0c0c0;
+            font: inherit; font-size: 13px;
+            padding: 8px 12px; border-radius: 4px; cursor: pointer;
+            text-align: left;
+        }
+        .mad-ctx button:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+        .mad-ctx button svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .mad-ctx-sep { height: 1px; background: #1f1f1f; margin: 4px 0; }
         .music-lib-empty {
             display: none;
             padding: 60px 20px;
@@ -8194,6 +8457,53 @@
                 </div>
             </div>
 
+            <!-- Music album detail view (Spotify-shaped album page).
+                 Reached by clicking an album card on the Your Library tab. Hero
+                 = blurred-art backdrop + art + title/artist meta + Play All /
+                 Shuffle / More actions. Tracklist below in flat #0a0a0a.
+                 Filled by _renderMusicAlbumDetail(album_id). -->
+            <div id="music-album-detail-view" class="view-pane">
+                <div class="mad-scroll" id="mad-scroll">
+                    <div class="mad-hero">
+                        <div class="mad-hero-backdrop" id="mad-hero-backdrop"></div>
+                        <div class="mad-hero-scrim"></div>
+                        <button class="mad-back" id="mad-back" title="Back to music library" aria-label="Back">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="mad-hero-row">
+                            <div class="mad-art" id="mad-art">
+                                <img id="mad-art-img" alt="" />
+                            </div>
+                            <div class="mad-meta">
+                                <div class="mad-kind">Album</div>
+                                <h1 class="mad-title" id="mad-title">—</h1>
+                                <div class="mad-submeta" id="mad-submeta"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mad-actions">
+                        <button class="mad-play-all" id="mad-play-all" title="Play album" aria-label="Play album">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>
+                        </button>
+                        <button class="mad-action-btn" id="mad-shuffle" title="Shuffle play" aria-label="Shuffle play">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                        </button>
+                        <button class="mad-action-btn" id="mad-more" title="More" aria-label="More">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </button>
+                        <span class="mad-progress-note" id="mad-progress-note" hidden></span>
+                    </div>
+                    <div class="mad-tracklist">
+                        <div class="mad-tracklist-head">
+                            <span class="mad-tracklist-head-num">#</span>
+                            <span>Title</span>
+                            <span class="mad-tracklist-head-dur">Duration</span>
+                        </div>
+                        <div id="mad-rows"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Playlist detail view -->
             <div class="playlist-detail-view" id="playlist-detail-view">
                 <div class="pd-topbar">
@@ -9235,6 +9545,8 @@
                 if (musicView) musicView.classList.toggle('active', view === 'music');
                 const musicPlayerView = document.getElementById('music-player-view');
                 if (musicPlayerView) musicPlayerView.classList.toggle('active', view === 'music-player');
+                const musicAlbumDetailView = document.getElementById('music-album-detail-view');
+                if (musicAlbumDetailView) musicAlbumDetailView.classList.toggle('active', view === 'music-album-detail');
                 document.body.classList.toggle('music-player-open', view === 'music-player');
                 // Toggle rail items
                 this.elements.railLibrary.classList.toggle('active', view === 'library');
@@ -16958,6 +17270,8 @@
         let _musicBound = false;
         let _musicState = {
             library: [],
+            albums: [],              // music album entities (parallel to library)
+            currentAlbumId: null,    // album currently shown in the detail view
             sub: 'library',          // 'library' | 'search'
             searchKind: 'songs',
             searchToken: 0,
@@ -17180,10 +17494,18 @@
         }
 
         async function _refreshMusicLibrary() {
+            // Load tracks + albums in parallel so first paint includes both.
             try {
-                const lib = await pywebview.api.load_music_library();
+                const [lib, albums] = await Promise.all([
+                    pywebview.api.load_music_library().catch(() => []),
+                    (pywebview.api.load_music_albums
+                        ? pywebview.api.load_music_albums().catch(() => [])
+                        : Promise.resolve([])),
+                ]);
                 _musicState.library = Array.isArray(lib) ? lib : [];
                 _musicState.library.sort((a, b) => (b.added_at || 0) - (a.added_at || 0));
+                _musicState.albums = Array.isArray(albums) ? albums : [];
+                _musicState.albums.sort((a, b) => (b.added_at || 0) - (a.added_at || 0));
                 _renderMusicLibrary();
             } catch (_) { /* ignore */ }
         }
@@ -17194,30 +17516,85 @@
             const meta = document.getElementById('music-lib-meta');
             if (!grid) return;
             const lib = _musicState.library || [];
-            if (!lib.length) {
+            const albums = _musicState.albums || [];
+            // Build a set of track IDs that belong to a known album — those are
+            // hidden from the top-level grid (they live inside the album detail
+            // view instead). Tracks whose album_id doesn't match any known album
+            // fall back to being rendered as singles (defensive: orphans shouldn't
+            // disappear silently).
+            const knownAlbumIds = new Set(albums.map(a => a.id));
+            const albumTrackIds = new Set();
+            for (const a of albums) {
+                for (const tid of (a.track_ids || [])) albumTrackIds.add(tid);
+            }
+            const singles = lib.filter(t => {
+                if (t.album_id && knownAlbumIds.has(t.album_id)) return false;
+                if (albumTrackIds.has(t.id)) return false;   // stamped-but-album_id-missing
+                return true;
+            });
+            if (!albums.length && !singles.length) {
                 grid.innerHTML = '';
                 if (empty) empty.classList.add('visible');
                 if (meta) meta.textContent = '';
                 return;
             }
             if (empty) empty.classList.remove('visible');
-            // Compute total size for the meta line — best-effort, ignores unknowns.
+            // Meta line: count tracks (incl. inside albums) + total size best-effort.
+            const trackCount = lib.length;
             let totalBytes = 0;
             for (const t of lib) { if (t.filesize) totalBytes += t.filesize; }
             const sizeStr = totalBytes ? _formatBytesShort(totalBytes) : '';
-            if (meta) meta.textContent = `${lib.length} track${lib.length === 1 ? '' : 's'}${sizeStr ? ' · ' + sizeStr : ''}`;
+            const albumStr = albums.length ? `${albums.length} album${albums.length === 1 ? '' : 's'} · ` : '';
+            if (meta) meta.textContent = `${albumStr}${trackCount} track${trackCount === 1 ? '' : 's'}${sizeStr ? ' · ' + sizeStr : ''}`;
 
             const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const currentId = _musicPlayer.currentTrack?.id || '';
             const nowSec = Date.now() / 1000;
-            grid.innerHTML = lib.map(t => {
+
+            // --- Album cards first ---
+            const albumHtml = albums.map(a => {
+                const cover = a.cover_url ? `<img src="${esc(a.cover_url)}" loading="lazy" />` : '';
+                const total = a.total_tracks || (a.track_ids || []).length || 0;
+                const done = a.downloaded_count || 0;
+                const isDownloading = a.status === 'downloading' && done < total;
+                const isNew = a.added_at && !a.seen_at && (nowSec - a.added_at) < 86400;
+                const newPill = isNew ? '<span class="music-card-new">NEW</span>' : '';
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                // r=46 in a 100×100 viewBox → C = 2π·46 ≈ 289.03
+                const dashOffset = 289.03 * (1 - pct / 100);
+                const ring = `
+                    <div class="mcd-ring-wrap">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="ring-bg" cx="50" cy="50" r="46"/>
+                            <circle class="ring-fg" cx="50" cy="50" r="46"
+                                stroke-dasharray="289.03" stroke-dashoffset="${dashOffset}"/>
+                        </svg>
+                        <span class="mcd-ring-pct">${pct}%</span>
+                    </div>`;
+                const trackCountStr = `${total} track${total === 1 ? '' : 's'}`;
+                const cls = isDownloading ? ' album-downloading' : '';
+                return `
+                    <div class="music-card${cls}" data-album-id="${esc(a.id)}" data-card-kind="album">
+                        <div class="music-card-art">
+                            ${cover}
+                            ${newPill}
+                            <span class="music-card-album-pill">Album · ${esc(trackCountStr)}</span>
+                            <div class="music-card-play" title="Play album"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg></div>
+                            ${ring}
+                        </div>
+                        <div class="music-card-title">${esc(a.title || 'Untitled Album')}</div>
+                        <div class="music-card-artist">${esc(a.artist || '')}</div>
+                    </div>`;
+            }).join('');
+
+            // --- Singles (tracks with no album_id) ---
+            const singleHtml = singles.map(t => {
                 const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy" />` : '';
                 const playing = t.id === currentId ? ' now-playing' : '';
-                // NEW shows only if the track is unplayed AND recent. Playing once clears it.
                 const isNew = t.added_at && !t.seen_at && (nowSec - t.added_at) < 86400 * 7;
                 const newPill = isNew ? '<span class="music-card-new">NEW</span>' : '';
                 return `
-                    <div class="music-card${playing}" data-track-id="${esc(t.id)}">
+                    <div class="music-card${playing}" data-track-id="${esc(t.id)}" data-card-kind="track">
                         <div class="music-card-art">
                             ${thumb}
                             ${newPill}
@@ -17227,13 +17604,270 @@
                         <div class="music-card-artist">${esc(t.artist || '')}</div>
                     </div>`;
             }).join('');
-            grid.querySelectorAll('.music-card').forEach(card => {
+
+            grid.innerHTML = albumHtml + singleHtml;
+
+            // Single track click → play the track.
+            grid.querySelectorAll('.music-card[data-card-kind="track"]').forEach(card => {
                 card.addEventListener('click', () => {
                     const id = card.dataset.trackId;
                     const track = lib.find(x => x.id === id);
                     if (track) _playMusicTrack(track);
                 });
             });
+            // Album cards: body click → open detail view; play-button click → play first track.
+            grid.querySelectorAll('.music-card[data-card-kind="album"]').forEach(card => {
+                const albumId = card.dataset.albumId;
+                const playBtn = card.querySelector('.music-card-play');
+                if (playBtn) {
+                    playBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        _playMusicAlbum(albumId, { shuffle: false });
+                    });
+                }
+                card.addEventListener('click', () => {
+                    _openMusicAlbumDetail(albumId);
+                });
+            });
+        }
+
+        // ---- Music album detail view ----------------------------------- //
+        // Opens the dedicated album page (Spotify-shaped). Switches the view
+        // pane, fetches the joined album+tracks payload from the backend, and
+        // calls _renderMusicAlbumDetail. Also clears the NEW pill for the album.
+        async function _openMusicAlbumDetail(albumId) {
+            if (!albumId) return;
+            _musicState.currentAlbumId = albumId;
+            // Optimistic UI: clear NEW immediately so the badge doesn't linger
+            // on the return-to-library paint.
+            const local = (_musicState.albums || []).find(a => a.id === albumId);
+            if (local && !local.seen_at) local.seen_at = Math.floor(Date.now() / 1000);
+            try { pywebview.api.mark_album_seen(albumId); } catch (_) {}
+            // Switch view first so the user sees the scaffold immediately.
+            app.switchView('music-album-detail');
+            await _renderMusicAlbumDetail(albumId);
+        }
+
+        async function _renderMusicAlbumDetail(albumId) {
+            if (!albumId) return;
+            let album;
+            try {
+                album = await pywebview.api.get_music_album(albumId);
+            } catch (_) {
+                album = null;
+            }
+            if (!album) {
+                showToast('Album not found', null, null);
+                app.switchView('music');
+                return;
+            }
+            const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const titleEl = document.getElementById('mad-title');
+            const artImg = document.getElementById('mad-art-img');
+            const backdrop = document.getElementById('mad-hero-backdrop');
+            const submeta = document.getElementById('mad-submeta');
+            const rowsWrap = document.getElementById('mad-rows');
+            const progressNote = document.getElementById('mad-progress-note');
+            const playAllBtn = document.getElementById('mad-play-all');
+            const shuffleBtn = document.getElementById('mad-shuffle');
+
+            const cover = album.cover_url || '';
+            if (titleEl) titleEl.textContent = album.title || 'Untitled Album';
+            if (artImg) {
+                artImg.src = cover || '';
+                artImg.alt = album.title || '';
+            }
+            if (backdrop) {
+                backdrop.style.backgroundImage = cover ? `url("${cover.replace(/"/g, '\\"')}")` : '';
+            }
+            // Submeta line: Artist · Year · N tracks · total duration
+            const tracks = album.tracks || [];
+            const total = album.total_tracks || tracks.length || 0;
+            const downloaded = album.downloaded_count || 0;
+            const downloadedTracks = tracks.filter(t => !t.pending);
+            const totalSeconds = downloadedTracks.reduce((acc, t) => acc + (t.duration_seconds || 0), 0);
+            const durStr = totalSeconds > 0 ? _formatAlbumDuration(totalSeconds) : '';
+            // Pick year from any downloaded track (they all share it). Fall back to ''.
+            const year = (downloadedTracks.find(t => t.year)?.year) || '';
+            const parts = [];
+            if (album.artist) parts.push(`<span class="mad-submeta-artist">${esc(album.artist)}</span>`);
+            if (year) parts.push(`<span>${esc(year)}</span>`);
+            parts.push(`<span>${total} track${total === 1 ? '' : 's'}</span>`);
+            if (durStr) parts.push(`<span>${durStr}</span>`);
+            if (submeta) {
+                submeta.innerHTML = parts.join('<span class="mad-submeta-sep">·</span>');
+            }
+
+            // Progress note + button disable while downloading.
+            const isDownloading = album.status === 'downloading' && downloaded < total;
+            if (progressNote) {
+                if (isDownloading) {
+                    progressNote.hidden = false;
+                    progressNote.innerHTML = `Downloading <strong>${downloaded}</strong> of ${total} tracks…`;
+                } else {
+                    progressNote.hidden = true;
+                    progressNote.textContent = '';
+                }
+            }
+            // Disable Play All / Shuffle if nothing is downloaded yet (avoid no-op clicks).
+            const anyPlayable = downloadedTracks.length > 0;
+            if (playAllBtn) playAllBtn.disabled = !anyPlayable;
+            if (shuffleBtn) shuffleBtn.disabled = !anyPlayable;
+
+            // Render track rows.
+            const currentId = _musicPlayer.currentTrack?.id || '';
+            const playingDot = '<span class="mad-playing-indicator"><span></span><span></span><span></span></span>';
+            if (rowsWrap) {
+                rowsWrap.innerHTML = tracks.map((t, idx) => {
+                    const isPlaying = t.id === currentId;
+                    const pending = t.pending;
+                    const cls = 'mad-row' + (isPlaying ? ' now-playing' : '') + (pending ? ' pending' : '');
+                    const indicator = isPlaying
+                        ? playingDot
+                        : (pending ? '<span class="mad-pending-spinner"></span>' : `<span class="mad-row-num-text">${idx + 1}</span>`);
+                    const numHtml = isPlaying || pending ? indicator : `<span>${idx + 1}</span>`;
+                    const titleText = pending ? 'Downloading…' : (t.title || 'Untitled');
+                    const dur = pending ? '' : (t.duration_string || '');
+                    return `
+                        <div class="${cls}" data-track-id="${esc(t.id)}" data-track-idx="${idx}">
+                            <span class="mad-row-num">${numHtml}</span>
+                            <span class="mad-row-title">${esc(titleText)}</span>
+                            <span class="mad-row-duration">${esc(dur)}</span>
+                        </div>`;
+                }).join('');
+                rowsWrap.querySelectorAll('.mad-row').forEach(row => {
+                    row.addEventListener('click', () => {
+                        if (row.classList.contains('pending')) return;
+                        const idx = parseInt(row.dataset.trackIdx, 10);
+                        if (!isNaN(idx)) _playMusicAlbum(albumId, { startIndex: idx });
+                    });
+                    row.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        if (row.classList.contains('pending')) return;
+                        _showMadCtx(e.clientX, e.clientY, row, albumId);
+                    });
+                });
+            }
+        }
+
+        // Format aggregate album duration as "12 min" / "1 hr 4 min".
+        function _formatAlbumDuration(seconds) {
+            if (!seconds || seconds < 60) return '';
+            const m = Math.round(seconds / 60);
+            if (m < 60) return `${m} min`;
+            const h = Math.floor(m / 60);
+            const rem = m % 60;
+            return rem ? `${h} hr ${rem} min` : `${h} hr`;
+        }
+
+        // Set the shuffle bag from an arbitrary list of tracks (album, in our case)
+        // then play the first track. Used by Play All (when shuffle is off, the bag
+        // is the ordered list; when shuffle is on, we shuffle in-place).
+        function _playMusicAlbum(albumId, opts) {
+            opts = opts || {};
+            const album = (_musicState.albums || []).find(a => a.id === albumId);
+            if (!album) return;
+            // Resolve playable tracks from the library, preserving album order.
+            const lib = _musicState.library || [];
+            const byId = new Map(lib.map(t => [t.id, t]));
+            const ordered = (album.track_ids || []).map(tid => byId.get(tid)).filter(Boolean);
+            if (!ordered.length) {
+                showToast('No downloaded tracks yet', null, null);
+                return;
+            }
+            let startIndex = typeof opts.startIndex === 'number' ? opts.startIndex : 0;
+            let playlist = ordered;
+            if (opts.shuffle) {
+                // Shuffle in place (Fisher-Yates).
+                playlist = ordered.slice();
+                for (let i = playlist.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+                }
+                startIndex = 0;
+                // Stamp the music player's shuffle bag so subsequent "Next" pops
+                // from this album's order (matches existing shuffle UX).
+                _musicPlayer.shuffle = true;
+                _paintModeButtons();
+                try { pywebview.api.set_setting('music_shuffle', true); } catch (_) {}
+            }
+            // If startIndex was a row click into an ordered (non-shuffle) play,
+            // seed the shuffle bag with the remaining ordered tracks so "Next"
+            // continues through the album in order regardless of shuffle setting.
+            _musicPlayer.shuffleOrder = playlist
+                .slice(startIndex + 1)
+                .map(t => t.id);
+            const startTrack = playlist[startIndex];
+            if (startTrack) _playMusicTrack(startTrack);
+        }
+
+        // ---- Album row right-click context menu ----
+        let _madCtxRow = null;
+        let _madCtxAlbumId = null;
+        function _showMadCtx(x, y, row, albumId) {
+            let ctx = document.getElementById('mad-ctx');
+            if (!ctx) {
+                ctx = document.createElement('div');
+                ctx.id = 'mad-ctx';
+                ctx.className = 'mad-ctx';
+                ctx.innerHTML = `
+                    <button data-mad-ctx="play">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>
+                        Play
+                    </button>
+                    <button data-mad-ctx="copy-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        Copy YouTube link
+                    </button>
+                    <div class="mad-ctx-sep"></div>
+                    <button data-mad-ctx="remove">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        Remove from library
+                    </button>`;
+                document.body.appendChild(ctx);
+                ctx.addEventListener('click', _onMadCtxClick);
+            }
+            _madCtxRow = row;
+            _madCtxAlbumId = albumId;
+            ctx.style.left = `${Math.min(x, window.innerWidth - 220)}px`;
+            ctx.style.top = `${Math.min(y, window.innerHeight - 160)}px`;
+            ctx.style.display = 'block';
+            // Click outside closes
+            setTimeout(() => {
+                const close = (e) => {
+                    if (!ctx.contains(e.target)) {
+                        ctx.style.display = 'none';
+                        document.removeEventListener('mousedown', close);
+                    }
+                };
+                document.addEventListener('mousedown', close);
+            }, 0);
+        }
+        function _onMadCtxClick(e) {
+            const btn = e.target.closest('button[data-mad-ctx]');
+            if (!btn) return;
+            const action = btn.getAttribute('data-mad-ctx');
+            const row = _madCtxRow;
+            if (!row) return;
+            document.getElementById('mad-ctx').style.display = 'none';
+            const trackId = row.dataset.trackId;
+            const idx = parseInt(row.dataset.trackIdx, 10);
+            const track = (_musicState.library || []).find(t => t.id === trackId);
+            if (action === 'play') {
+                if (!isNaN(idx)) _playMusicAlbum(_madCtxAlbumId, { startIndex: idx });
+            } else if (action === 'copy-link') {
+                const url = track?.url || `https://music.youtube.com/watch?v=${trackId}`;
+                try { navigator.clipboard.writeText(url); showToast('Link copied', null, null); } catch (_) {}
+            } else if (action === 'remove') {
+                try {
+                    pywebview.api.remove_from_music_library(trackId).then(() => {
+                        showToast('Removed from library', null, null);
+                        _refreshMusicLibrary().then(() => {
+                            if (_musicState.currentAlbumId) _renderMusicAlbumDetail(_musicState.currentAlbumId);
+                        });
+                    });
+                } catch (_) {}
+            }
         }
 
         function _formatBytesShort(b) {
@@ -17702,6 +18336,41 @@
             });
         };
 
+        // Aggregate album progress event from the backend. Fired on each per-track
+        // completion AND once at the start (0 of N). Updates the library album
+        // card's ring + the detail view's progress note if open. When complete,
+        // flips the card out of the downloading state.
+        window.updateMusicAlbumProgress = function(albumId, done, total) {
+            if (!albumId) return;
+            // Update local state copy so subsequent re-renders pick up the new
+            // counts without a full backend reload.
+            const album = (_musicState.albums || []).find(a => a.id === albumId);
+            if (album) {
+                album.downloaded_count = done;
+                album.total_tracks = total || album.total_tracks;
+                if (total && done >= total) album.status = 'complete';
+            }
+            // Update the library album card ring in place (no full re-render
+            // needed — re-rendering would scroll-reset the grid).
+            const safe = (window.CSS && CSS.escape) ? CSS.escape(albumId) : albumId.replace(/"/g, '\\"');
+            const card = document.querySelector(`.music-card[data-album-id="${safe}"]`);
+            if (card) {
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                const dashOffset = 289.03 * (1 - pct / 100);
+                const ringFg = card.querySelector('.mcd-ring-wrap .ring-fg');
+                const ringPct = card.querySelector('.mcd-ring-pct');
+                if (ringFg) ringFg.setAttribute('stroke-dashoffset', String(dashOffset));
+                if (ringPct) ringPct.textContent = `${pct}%`;
+                if (total > 0 && done >= total) {
+                    card.classList.remove('album-downloading');
+                }
+            }
+            // Update the detail view if it's currently showing this album.
+            if (_musicState.currentAlbumId === albumId && app.currentView === 'music-album-detail') {
+                _renderMusicAlbumDetail(albumId);
+            }
+        };
+
         window.musicDownloadDone = function(entry) {
             if (!entry || !entry.id) return;
             _musicState.downloading.delete(entry.id);
@@ -18073,6 +18742,48 @@
                     _applyMusicVolume(Math.max(0, Math.min(1, _musicPlayer.volume + step)), true);
                 }, { passive: false });
             }
+
+            _initMusicAlbumDetailView();
+        }
+
+        // ---- Music album detail view controls (back / play-all / shuffle / more) ---- //
+        let _madBound = false;
+        function _initMusicAlbumDetailView() {
+            if (_madBound) return; _madBound = true;
+            const backBtn = document.getElementById('mad-back');
+            if (backBtn) backBtn.addEventListener('click', () => {
+                _musicState.currentAlbumId = null;
+                app.switchView('music');
+            });
+            const playAll = document.getElementById('mad-play-all');
+            if (playAll) playAll.addEventListener('click', () => {
+                if (_musicState.currentAlbumId) {
+                    _playMusicAlbum(_musicState.currentAlbumId, { shuffle: false });
+                }
+            });
+            const shuffle = document.getElementById('mad-shuffle');
+            if (shuffle) shuffle.addEventListener('click', () => {
+                if (_musicState.currentAlbumId) {
+                    _playMusicAlbum(_musicState.currentAlbumId, { shuffle: true });
+                }
+            });
+            const moreBtn = document.getElementById('mad-more');
+            if (moreBtn) moreBtn.addEventListener('click', () => {
+                // Minimal "more" menu — for now, just a confirm-style "delete album".
+                if (!_musicState.currentAlbumId) return;
+                const album = (_musicState.albums || []).find(a => a.id === _musicState.currentAlbumId);
+                if (!album) return;
+                const ok = window.confirm(`Delete "${album.title || 'this album'}" from your library and disk?\n\nThis removes all ${album.total_tracks || 0} tracks.`);
+                if (!ok) return;
+                try {
+                    pywebview.api.delete_music_album(album.id, true).then(() => {
+                        showToast('Album deleted', null, null);
+                        _musicState.currentAlbumId = null;
+                        app.switchView('music');
+                        _refreshMusicLibrary();
+                    });
+                } catch (e) { showToast('Delete failed', null, null); }
+            });
         }
 
         // Paint shuffle/repeat active state. Repeat-one shows a tiny "1" badge.
