@@ -17414,6 +17414,12 @@
             loading: false,
             downloading: new Set(),  // video IDs currently downloading
         };
+        // Where the back chevron in the full music player should return to.
+        // Captured at the moment we switch INTO music-player so we can restore
+        // album detail / library / wherever the user was. Defaults to 'music'
+        // (library tab) when origin isn't a valid return target (e.g. they hit
+        // play from a search row on a non-music view).
+        let _musicPlayerReturnTo = 'music';
         // Player state. `volume` is the LINEAR slider position (0..1); audio.volume
         // gets a perceptual log curve (Math.pow(v, 4)) applied on every assign.
         let _musicPlayer = {
@@ -19096,7 +19102,9 @@
 
         function _initMusicPlayerView() {
             const backBtn = document.getElementById('mp-back');
-            if (backBtn) backBtn.addEventListener('click', () => app.switchView('music'));
+            // Return to whichever music-side view the user opened the player
+            // from (library or album detail). Captured in _playMusicTrack.
+            if (backBtn) backBtn.addEventListener('click', () => app.switchView(_musicPlayerReturnTo || 'music'));
 
             const audio = _musicPlayer.audio;
 
@@ -19414,6 +19422,16 @@
             // skipViewSwitch=true lets the dock's play/pause re-fire playback without
             // forcing the user out of whatever tab they're on.
             if (!skipViewSwitch && app.currentView !== 'music-player') {
+                // Remember origin so the back chevron returns to it — fixes the
+                // "play from album detail → back goes to library" bug. Only
+                // honor music-side origins; for anything else fall back to the
+                // library tab so we don't punt the user into the video player
+                // or some unrelated view.
+                if (app.currentView === 'music-album-detail' || app.currentView === 'music') {
+                    _musicPlayerReturnTo = app.currentView;
+                } else {
+                    _musicPlayerReturnTo = 'music';
+                }
                 app.switchView('music-player');
             }
             try {
