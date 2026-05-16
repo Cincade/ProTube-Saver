@@ -3282,6 +3282,11 @@
 
         /* Compact track rows (Spotify-style) */
         .music-results { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+        /* When no search is active, the empty results container would still
+           claim flex:1 space and push the For-You landing far below the fold.
+           Collapse it via :empty so For-You floats up directly under the chips.
+           Same pattern as .music-foryou:empty below. */
+        .music-results:empty { display: none; }
         .music-track-row {
             display: grid;
             grid-template-columns: 56px 1fr auto auto auto;
@@ -16978,6 +16983,29 @@
             return Math.pow(v, 4);
         }
 
+        // --- Music-player keyboard shortcut helpers (used by the listener registered
+        //     at the end of _initMusicPlayerView). Module-level so they're reusable
+        //     if we ever wire dock-side shortcuts. ---
+        let _musicFsActive = false;
+        function _musicToggleFs() {
+            // Reuse the video player's body-class for fullscreen — same CSS rules
+            // collapse the rail and hide the music dock, both desirable here.
+            _musicFsActive = !_musicFsActive;
+            document.body.classList.toggle('player-is-fullscreen', _musicFsActive);
+            try { pywebview.api.set_fullscreen(_musicFsActive); } catch (_) {}
+        }
+        function _musicSeekBy(seconds) {
+            const a = _musicPlayer.audio;
+            if (!a || !a.duration || !isFinite(a.duration)) return;
+            a.currentTime = Math.max(0, Math.min(a.duration, a.currentTime + seconds));
+            _paintDockProgress();
+            _paintFullPlayerProgress();
+        }
+        function _musicVolStep(delta) {
+            const v = Math.max(0, Math.min(1, _musicPlayer.volume + delta));
+            _applyMusicVolume(v, true);
+        }
+
         function initMusicView() {
             // Load the library on first mount; refresh on every subsequent activation
             // so newly downloaded tracks appear right away.
@@ -17964,6 +17992,87 @@
 
             _paintModeButtons();
             _initMpPanel();
+
+            // --- Keyboard shortcuts (approved binding table 2026-05-16) ---
+            // Fires only when the music-player view is active. The video player has
+            // its own scoped handler at the top of the file; we deliberately don't
+            // share one so each can evolve independently.
+            //
+            // Input-field guard is mandatory — without it, typing 'n' in a URL box
+            // would skip a track. Same trap docs/agents flagged.
+            document.addEventListener('keydown', (e) => {
+                if (app.currentView !== 'music-player') return;
+                const t = e.target;
+                if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+                const ctrl = e.ctrlKey || e.metaKey;
+                const shift = e.shiftKey;
+                const k = e.key;
+
+                // Play / pause — Space (universal) and K (YouTube alias).
+                if (((k === ' ' || e.code === 'Space') || ((k === 'k' || k === 'K') && !ctrl && !shift))) {
+                    e.preventDefault(); _musicTogglePlay(); return;
+                }
+                // Seek ±5s — arrows. ±10s — J / L (YouTube power-user aliases).
+                if (k === 'ArrowLeft'  && !ctrl) { e.preventDefault(); _musicSeekBy(-5);  return; }
+                if (k === 'ArrowRight' && !ctrl) { e.preventDefault(); _musicSeekBy( 5);  return; }
+                if ((k === 'j' || k === 'J') && !ctrl && !shift) { e.preventDefault(); _musicSeekBy(-10); return; }
+                if ((k === 'l' || k === 'L') && !ctrl && !shift) { e.preventDefault(); _musicSeekBy( 10); return; }
+                // Volume ±5%.
+                if (k === 'ArrowUp'   && !ctrl) { e.preventDefault(); _musicVolStep( 0.05); return; }
+                if (k === 'ArrowDown' && !ctrl) { e.preventDefault(); _musicVolStep(-0.05); return; }
+                // Mute.
+                if ((k === 'm' || k === 'M') && !ctrl && !shift) { e.preventDefault(); _musicToggleMute(); return; }
+                // Next / prev — Shift+N / Shift+P (plain N/P would clash if focus ever lands on body during a typing session).
+                if (shift && (k === 'N' || k === 'n')) { e.preventDefault(); _musicGoAdjacent( 1); return; }
+                if (shift && (k === 'P' || k === 'p')) { e.preventDefault(); _musicGoAdjacent(-1); return; }
+                // Fullscreen.
+                if ((k === 'f' || k === 'F') && !ctrl && !shift) { e.preventDefault(); _musicToggleFs(); return; }
+                // Shuffle — Ctrl+S. Chromium binds Ctrl+S to "Save Page As"; preventDefault stops that.
+                if (ctrl && (k === 's' || k === 'S')) {
+                    e.preventDefault();
+                    _musicPlayer.shuffle = !_musicPlayer.shuffle;
+                    _musicPlayer.shuffleOrder = [];
+                    _paintModeButtons(); _paintMpPanel();
+                    try { pywebview.api.set_setting('music_shuffle', _musicPlayer.shuffle); } catch (_) {}
+                    return;
+                }
+                // Repeat — Shift+R (Ctrl+R reloads the page in Chromium/WebView2).
+                if (shift && (k === 'R' || k === 'r')) {
+                    e.preventDefault();
+                    const order = ['off', 'all', 'one'];
+                    _musicPlayer.repeat = order[(order.indexOf(_musicPlayer.repeat) + 1) % 3];
+                    _paintModeButtons(); _paintMpPanel();
+                    try { pywebview.api.set_setting('music_repeat', _musicPlayer.repeat); } catch (_) {}
+                    return;
+                }
+                // Escape — exit fullscreen if in fullscreen, otherwise let other handlers (modals) win.
+                if (k === 'Escape' && _musicFsActive) { e.preventDefault(); _musicToggleFs(); return; }
+            });
+
+            // --- Mouse-wheel volume on the right half of the player stage ---
+            // User asked for "scroll on the right half of the screen = volume".
+            // We listen on the whole player view, then early-return if the wheel
+            // event is on the left half (lets the left side stay scroll-free for
+            // any future content there) or already over a slider (those have
+            // their own wheel handlers).
+            const playerView = document.getElementById('music-player-view');
+            if (playerView) {
+                playerView.addEventListener('wheel', (e) => {
+                    // Don't fight elements that have their own wheel/scroll behavior:
+                    // the volume track + seek bar (their own wheel listeners) and the
+                    // bottom panel (scrollable Up Next list).
+                    if (e.target.closest('.mp-vol-track')) return;
+                    if (e.target.closest('.mp-seek'))     return;
+                    if (e.target.closest('.mp-panel'))    return;
+                    const rect = playerView.getBoundingClientRect();
+                    const xInView = e.clientX - rect.left;
+                    if (xInView < rect.width / 2) return;   // left half = no-op
+                    e.preventDefault();
+                    const step = 0.05 * (e.deltaY < 0 ? 1 : -1);
+                    _applyMusicVolume(Math.max(0, Math.min(1, _musicPlayer.volume + step)), true);
+                }, { passive: false });
+            }
         }
 
         // Paint shuffle/repeat active state. Repeat-one shows a tiny "1" badge.
@@ -18079,7 +18188,12 @@
                 }
                 const audio = _musicPlayer.audio;
                 audio.src = res.url;
-                audio.volume = _musicPlayer.volume;
+                // Run the linear slider value through the perceptual log curve before
+                // assigning to audio.volume — otherwise track-change resets perceived
+                // loudness because the slider's 0.2 becomes 0.2 actual gain (vs the
+                // 0.0016 the curve maps it to). That's the "volume doesn't persist"
+                // bug.
+                audio.volume = _audioVolumeFromSlider(_musicPlayer.volume);
                 audio.play().catch(err => showToast('Playback failed: ' + (err?.message || err), null, null));
             } catch (e) {
                 showToast('Playback failed: ' + (e?.message || e), null, null);
