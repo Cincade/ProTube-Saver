@@ -3621,7 +3621,10 @@
         /* Aggregate-progress ring + % overlay on a downloading album card.
            Same blue-ring pattern as per-track downloads. r=46 (in a 100×100
            viewBox) → circumference 2π·46 ≈ 289.03. */
-        .music-card.album-downloading .music-card-art img { opacity: 0.55; }
+        /* Dim the cover while downloading so the ring + % overlay reads, but
+           keep the art recognizable — 0.55 felt washed-out (user 2026-05-16:
+           "can barely see the cover"). 0.72 is the sweet spot. */
+        .music-card.album-downloading .music-card-art img { opacity: 0.72; }
         .music-card.album-downloading .music-card-play { display: none; }
         .mcd-ring-wrap {
             position: absolute; inset: 0;
@@ -3979,7 +3982,7 @@
             z-index: 2;
         }
         .music-track-row.downloading .mtr-art-pct { display: flex; }
-        .music-track-row.downloading .mtr-art { filter: brightness(0.45); }
+        .music-track-row.downloading .mtr-art { filter: brightness(0.65); }
         .music-track-row.downloading .mtr-play-overlay { display: none; }
         .mtr-meta { min-width: 0; }
         .mtr-title { font-size: 14px; font-weight: 600; color: #f5f5f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }

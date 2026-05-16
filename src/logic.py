@@ -144,8 +144,14 @@ class API:
         # actual worker thread. Wake the processor by setting `_music_queue_event`
         # whenever the queue changes — avoids busy-polling. See
         # `_music_queue_processor` for the drain loop.
+        # Default to 1 (serial) — running multiple yt-dlp instances in parallel
+        # for music triggers a "dictionary changed size during iteration" race
+        # inside yt-dlp's internal extractor state. Music files are small
+        # (~3-5MB each) so serializing barely changes wall-clock time. The
+        # setting still respects user-set higher values, but the default trades
+        # 1-2s of speed per album for reliability.
         self.max_concurrent_music_downloads = int(
-            self.settings.get('max_concurrent_music_downloads') or 3
+            self.settings.get('max_concurrent_music_downloads') or 1
         )
         self.max_concurrent_music_downloads = max(1, min(8, self.max_concurrent_music_downloads))
         self._music_queue_lock = threading.Lock()
@@ -2909,6 +2915,41 @@ class API:
     # ---- Music download + library ----------------------------------------------------
 
     @staticmethod
+    def _strip_collection_prefix(title):
+        """Strip the leading 'Album – ' / 'Single – ' / 'EP – ' / 'Playlist – '
+        / 'Soundtrack – ' / 'Mixtape – ' classifier that YT Music's browse
+        endpoint puts on collection titles. Without this, the library shows
+        cards like 'Album – ICEMAN' instead of just 'ICEMAN'.
+        Handles em-dash, en-dash, and hyphen variants because YT Music uses
+        different separators across regions."""
+        if not title:
+            return title
+        import re
+        return re.sub(
+            r'^(Album|Single|EP|Playlist|Soundtrack|Mixtape|Compilation)\s*[–—\-]\s*',
+            '', title, flags=re.IGNORECASE,
+        )
+
+    @staticmethod
+    def _resolve_album_artist(info):
+        """YT Music returns the artist on the `artist` field for album browse
+        pages. Fall back chain: artist → creator → uploader (with the auto-
+        topic-channel " - Topic" suffix stripped) → channel → Unknown Artist.
+        Without the Topic strip, Drake's album would read 'Drake - Topic'."""
+        for key in ('artist', 'creator'):
+            v = info.get(key)
+            if v:
+                return v
+        for key in ('uploader', 'channel'):
+            v = info.get(key) or ''
+            if v:
+                # YT auto-generates per-artist 'X - Topic' channels for music
+                if v.endswith(' - Topic'):
+                    v = v[:-len(' - Topic')]
+                return v
+        return 'Unknown Artist'
+
+    @staticmethod
     def _sanitize_path_segment(s, fallback='Unknown'):
         """Strip filesystem-unsafe characters from a string so we can use it as a
         path segment. Keeps Unicode letters/digits, replaces the Windows-forbidden
@@ -3075,14 +3116,17 @@ class API:
                 if not album_id:
                     import hashlib as _hashlib
                     album_id = 'AL' + _hashlib.md5(url.encode('utf-8')).hexdigest()[:14]
-                album_title = info.get('title') or info.get('album') or 'Untitled Album'
-                album_artist = (
-                    info.get('uploader')
-                    or info.get('artist')
-                    or info.get('creator')
-                    or info.get('channel')
-                    or 'Unknown Artist'
-                )
+                # YT Music browse pages return titles like 'Album – ICEMAN' /
+                # 'Single – ...' / 'Playlist – ...' / 'EP – ...'. The classifier
+                # prefix is redundant inside the app and noisy in the UI — strip it
+                # so the user sees just the album name.
+                raw_title = info.get('title') or info.get('album') or 'Untitled Album'
+                album_title = self._strip_collection_prefix(raw_title)
+                # Artist resolution: YT Music sets `artist` directly on the info
+                # dict for album pages. Fall back to uploader (with the auto-channel
+                # " - Topic" suffix stripped — that suffix is how YT Music names
+                # its per-artist topic channels and looks ugly in the UI).
+                album_artist = self._resolve_album_artist(info)
                 # Best cover candidate: largest thumbnail in the info dict.
                 cover_url = ''
                 thumbs = info.get('thumbnails') or []
@@ -3343,6 +3387,14 @@ class API:
                 ],
                 'quiet': True,
                 'no_warnings': True,
+                # Force a fresh download every time. Without this, yt-dlp tries to
+                # resume any partial .m4a sitting in target_dir from a previous
+                # failed run, which trips 'HTTP Error 416: Requested range not
+                # satisfiable' when the URL/server state has changed since the
+                # partial was written. Music files are small (~3-5MB) so the
+                # retry cost is negligible.
+                'continue': False,
+                'nopart': False,
             })
 
             def hook(d):
