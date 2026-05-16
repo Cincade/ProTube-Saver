@@ -4307,6 +4307,26 @@
             position: relative;
         }
         #music-player-view.active { display: block; }
+
+        /* Music-player immersive / fullscreen mode — driven by `body.music-player-fullscreen`
+           toggled in _musicToggleFs (F key in music player). Deliberately NOT the
+           video's `player-is-fullscreen` class — that one is video-coupled and
+           previously caused the music view to disappear when F was pressed.
+
+           Three rules: collapse the rail's grid column to 0, hide the rail's
+           contents, and force the music-player view to stay visible (defensive
+           !important so no other rule can hide it during the OS resize). */
+        body.music-player-fullscreen .cockpit {
+            grid-template-columns: 0 minmax(0, 1fr);
+            transition: none;
+        }
+        body.music-player-fullscreen .rail {
+            overflow: hidden;
+            pointer-events: none;
+        }
+        body.music-player-fullscreen .cockpit-main { padding: 0; }
+        body.music-player-fullscreen .music-dock { display: none !important; }
+        body.music-player-fullscreen #music-player-view { display: block !important; }
         .mp-stage {
             position: absolute; inset: 0;
             display: flex;
@@ -4339,15 +4359,23 @@
         }
         .mp-back:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
         .mp-back svg { width: 18px; height: 18px; display: block; }
-        /* Single centered column: art / title / artist / album / progress / controls */
+        /* Single centered column: art / title / artist / album / progress / controls.
+           Was max-width 720 → bumped to 880 so the player uses more horizontal
+           space on widescreens (user feedback 2026-05-16: "doesn't fill the
+           screen"). */
         .mp-col {
             position: relative; z-index: 2;
             display: flex; flex-direction: column; align-items: center;
             padding: 18px 32px;
-            max-width: 720px; width: 100%;
+            max-width: 880px; width: 100%;
         }
+        /* Art scales with viewport height — was a fixed 240px which left huge
+           empty space on tall windows. clamp(240, 34vh, 380) gives 240px floor
+           for small windows, 380px ceiling so it never feels gigantic, and
+           34vh in between so it fills the stage naturally on most screens. */
         .mp-art {
-            width: 240px; height: 240px;
+            width: clamp(240px, 34vh, 380px);
+            height: clamp(240px, 34vh, 380px);
             background: #1a1a1a;
             border-radius: 12px;
             overflow: hidden;
@@ -4466,12 +4494,12 @@
            Stage stays full-viewport; panel covers the bottom ~240px when open. */
         .mp-panel {
             position: absolute; bottom: 0; left: 0; right: 0;
-            /* Sized as % of viewport so smaller laptops don't feel like the
-               panel eats half the screen. User-chosen target: 27–30% of vh.
-               Locked at 30vh — feels right at 600px (180px tall) up through
-               1080p (324px tall). Was a fixed 240px which read as ~40% on
-               small displays. */
-            height: 30vh;
+            /* Sized as % of viewport. Was 30vh (then 240px before that). User
+               feedback 2026-05-16: still too tall. 22vh → ~132px on 600px
+               viewport, ~176px on 800px, ~238px on 1080p. Tight enough to
+               leave the stage breathing room; deep enough to fit the tab
+               row + 5 mini-cards. */
+            height: 22vh;
             background: rgba(10, 10, 10, 0.92);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
@@ -17835,10 +17863,13 @@
         //     if we ever wire dock-side shortcuts. ---
         let _musicFsActive = false;
         function _musicToggleFs() {
-            // Reuse the video player's body-class for fullscreen — same CSS rules
-            // collapse the rail and hide the music dock, both desirable here.
+            // Use a MUSIC-SPECIFIC body class — NOT the video's player-is-fullscreen.
+            // Reusing the video class previously caused the music-player view to
+            // disappear after pressing F (user 2026-05-16 reported landing on the
+            // library after F). The music-player-fullscreen class below has its
+            // own rules that explicitly KEEP the music-player view visible.
             _musicFsActive = !_musicFsActive;
-            document.body.classList.toggle('player-is-fullscreen', _musicFsActive);
+            document.body.classList.toggle('music-player-fullscreen', _musicFsActive);
             try { pywebview.api.set_fullscreen(_musicFsActive); } catch (_) {}
         }
         function _musicSeekBy(seconds) {
