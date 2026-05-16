@@ -3715,6 +3715,54 @@ class API:
         self._save_settings()
         return {'ok': True}
 
+    def hide_music_track(self, track_id, hidden=True):
+        """Toggle a music track's `hidden` flag. Hidden tracks render dimmed
+        with a 'Hidden' badge when the user has the 'Show hidden' toggle on,
+        and don't render at all when it's off. Mirrors the video library's
+        hide-card affordance. Returns the new state so the frontend can flip
+        optimistically and reconcile."""
+        if not track_id:
+            return {'ok': False, 'hidden': False}
+        lib = self.settings.get('music_library', []) or []
+        changed = False
+        new_state = bool(hidden)
+        for t in lib:
+            if t.get('id') == track_id:
+                if bool(t.get('hidden')) != new_state:
+                    if new_state:
+                        t['hidden'] = True
+                    else:
+                        t.pop('hidden', None)
+                    changed = True
+                break
+        if changed:
+            self._save_settings()
+        return {'ok': True, 'hidden': new_state}
+
+    def bulk_hide_music_tracks(self, track_ids, hidden=True):
+        """Apply hide_music_track to many ids in one shot (one save). Used by
+        the album-card "Hide album" right-click action and any future multi-
+        select flow."""
+        if not track_ids:
+            return {'ok': True, 'hidden': bool(hidden), 'count': 0}
+        ids = set(track_ids)
+        lib = self.settings.get('music_library', []) or []
+        changed = False
+        new_state = bool(hidden)
+        count = 0
+        for t in lib:
+            if t.get('id') in ids:
+                if bool(t.get('hidden')) != new_state:
+                    if new_state:
+                        t['hidden'] = True
+                    else:
+                        t.pop('hidden', None)
+                    changed = True
+                count += 1
+        if changed:
+            self._save_settings()
+        return {'ok': True, 'hidden': new_state, 'count': count}
+
     # ----------------------------------------------------------------- #
     # Music albums (first-class library entity grouping multiple tracks) #
     # ----------------------------------------------------------------- #

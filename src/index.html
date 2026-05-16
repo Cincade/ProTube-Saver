@@ -3333,6 +3333,28 @@
         .music-card-artist { font-size: 12px; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .music-card.now-playing { background: rgba(59, 130, 246, 0.08); }
         .music-card.now-playing .music-card-title { color: #3b82f6; }
+        /* Hidden-card visual when "Show hidden" is on. Same affordance as
+           .library-card.is-hidden — dimmed plus a small badge on the artwork
+           so the user can tell at a glance which cards are in the hidden
+           state. Without dimming there's no signal that toggling "Show hidden"
+           off would remove these from view. */
+        .music-card.is-hidden { opacity: 0.55; }
+        .music-card.is-hidden:hover { opacity: 0.85; }
+        .music-card-hidden-badge {
+            position: absolute;
+            top: 16px; right: 16px;
+            background: rgba(20, 20, 20, 0.85);
+            color: #d4d4d4;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+        }
         /* NEW pill — shown for tracks added in the last 24h. Top-left of artwork
            so it doesn't clash with the bottom-right play button. */
         .music-card-new {
@@ -3908,6 +3930,99 @@
         .mctx-item.primary { color: #3b82f6; }
         .mctx-item.primary svg { color: #3b82f6; }
         .mctx-sep { height: 1px; background: #2a2a2a; margin: 4px 0; }
+
+        /* ================================================== */
+        /* MUSIC TRACK DETAIL PANEL — content inside the shared */
+        /* .detail-panel slide-in (#music-detail-panel-body)    */
+        /* ================================================== */
+        .mtd-art {
+            width: 200px; height: 200px;
+            margin: 8px auto 18px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #1a1a1a;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+            flex-shrink: 0;
+        }
+        .mtd-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mtd-title {
+            font-size: 24px; font-weight: 700; color: #f5f5f5;
+            text-align: center; line-height: 1.2;
+            margin: 0 0 6px;
+            letter-spacing: -0.01em;
+        }
+        .mtd-artist {
+            font-size: 16px; font-weight: 500; color: #e0e0e0;
+            text-align: center;
+            margin: 0 0 2px;
+        }
+        .mtd-album {
+            font-size: 13px; color: #8a8a8a;
+            text-align: center;
+            margin: 0 0 18px;
+        }
+        .mtd-actions {
+            display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+            margin: 0 0 22px;
+            position: relative;
+        }
+        .mtd-action-btn {
+            background: #141414; border: 1px solid #1f1f1f; border-radius: 7px;
+            color: #d4d4d4; font-family: inherit; font-size: 12px;
+            padding: 7px 11px;
+            display: inline-flex; align-items: center; gap: 6px;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+        }
+        .mtd-action-btn:hover { background: #1a1a1a; border-color: #2a2a2a; color: #fff; }
+        .mtd-action-btn.primary {
+            background: #3b82f6; border-color: #3b82f6; color: #fff;
+        }
+        .mtd-action-btn.primary:hover { background: #2563eb; border-color: #2563eb; }
+        .mtd-action-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+        /* Inline "More" dropdown — overlays the action row */
+        .mtd-more-wrap { position: relative; }
+        .mtd-more-menu {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
+            padding: 6px; width: 200px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+            z-index: 20;
+        }
+        .mtd-more-menu[hidden] { display: none; }
+        .mtd-meta {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 8px 14px;
+            font-size: 12.5px;
+            margin: 0 0 18px;
+            padding: 14px 0 0;
+            border-top: 1px solid #1a1a1a;
+        }
+        .mtd-meta-key { color: #8a8a8a; }
+        .mtd-meta-val { color: #d4d4d4; word-break: break-word; min-width: 0; }
+        .mtd-source-link {
+            color: #60a5fa; text-decoration: none; cursor: pointer;
+            word-break: break-all;
+        }
+        .mtd-source-link:hover { text-decoration: underline; }
+        .mtd-filepath {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #a0a0a0; word-break: break-all; cursor: pointer;
+            line-height: 1.4;
+        }
+        .mtd-filepath:hover { color: #d4d4d4; }
+        .mtd-about {
+            font-size: 13px; color: #c0c0c0; line-height: 1.55;
+            padding: 14px 0 0;
+            border-top: 1px solid #1a1a1a;
+            white-space: pre-wrap;
+        }
+        .mtd-about-title {
+            font-size: 11px; font-weight: 700; color: #8a8a8a;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            margin: 0 0 8px;
+        }
 
         /* ================================================== */
         /* MUSIC DOWNLOAD STRIP — visible only while downloading */
@@ -8415,6 +8530,16 @@
                             <span id="music-lib-sort-label">Recently added</span>
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                         </button>
+                        <!-- Show-hidden toggle. Default OFF (hidden tracks/albums don't render
+                             in the music grid). Click to flip on; grid renders everything
+                             with hidden cards dimmed and badged. Persists via
+                             show_hidden_music_library setting. Mirrors the video library. -->
+                        <button id="music-show-hidden-btn" class="library-icon-btn" data-tip="Show hidden">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
                         <span class="music-lib-meta" id="music-lib-meta"></span>
                     </div>
                     <div class="music-grid" id="music-grid"></div>
@@ -8508,6 +8633,22 @@
                     <div class="mdl-list" id="mdl-list"></div>
                     <div class="mdl-empty" id="mdl-empty">Your download queue is empty.</div>
                 </div>
+
+                <!-- Music track detail panel — slides in from the right when a music
+                     library card is right-clicked → View details. Reuses the
+                     .detail-panel visual class so it inherits the slide-in animation,
+                     scrim, close button, and width. Body is filled by
+                     _showMusicTrackDetail() with mtd-* content (album art, title,
+                     metadata grid, actions). -->
+                <div class="detail-panel" id="music-detail-panel">
+                    <div class="detail-panel-header">
+                        <button class="detail-panel-close" id="music-detail-panel-close" data-tip="Close (Esc)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <div class="detail-panel-body" id="music-detail-panel-body"></div>
+                </div>
+                <div class="detail-panel-backdrop" id="music-detail-panel-backdrop"></div>
             </div>
 
             <!-- Music PLAYER view (full-screen "now playing" mode, parallel to video player).
@@ -17469,6 +17610,39 @@
             if (_musicBound) return;
             _musicBound = true;
 
+            // Hydrate the "show hidden" music-library preference from settings so
+            // the toggle's state and the render filter agree from first paint.
+            // Default false (hidden cards don't render until the user opts in).
+            // Mirrors the video library's window._showHiddenLibrary pattern.
+            (async () => {
+                try {
+                    const v = await pywebview.api.get_setting('show_hidden_music_library');
+                    window._showHiddenMusicLibrary = v === true;
+                } catch (_) {
+                    window._showHiddenMusicLibrary = false;
+                }
+                const btn = document.getElementById('music-show-hidden-btn');
+                if (btn) {
+                    btn.classList.toggle('active', !!window._showHiddenMusicLibrary);
+                    btn.setAttribute('data-tip', window._showHiddenMusicLibrary ? 'Hide hidden' : 'Show hidden');
+                }
+                // Re-paint if we already drew with the default (false) before settings landed.
+                _renderMusicLibrary();
+            })();
+
+            // "Show hidden" toggle — flips the global, re-renders, and persists.
+            const showHiddenBtn = document.getElementById('music-show-hidden-btn');
+            if (showHiddenBtn) {
+                showHiddenBtn.addEventListener('click', () => {
+                    const next = !window._showHiddenMusicLibrary;
+                    window._showHiddenMusicLibrary = next;
+                    showHiddenBtn.classList.toggle('active', next);
+                    showHiddenBtn.setAttribute('data-tip', next ? 'Hide hidden' : 'Show hidden');
+                    try { pywebview.api.set_setting('show_hidden_music_library', next); } catch (_) {}
+                    _renderMusicLibrary();
+                });
+            }
+
             // Sub-tab switching
             document.querySelectorAll('.music-subtab').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -17677,7 +17851,24 @@
                 if (albumTrackIds.has(t.id)) return false;   // stamped-but-album_id-missing
                 return true;
             });
-            if (!albums.length && !singles.length) {
+            // Hidden filtering. An album is considered "hidden" when EVERY track
+            // it owns has track.hidden === true (empty album → not hidden).
+            // When window._showHiddenMusicLibrary is false, hidden cards skip
+            // rendering; when true, they render dimmed with a "Hidden" badge.
+            const showHidden = !!window._showHiddenMusicLibrary;
+            const byId = new Map(lib.map(t => [t.id, t]));
+            const albumIsHidden = (a) => {
+                const ids = a.track_ids || [];
+                if (!ids.length) return false;
+                for (const tid of ids) {
+                    const t = byId.get(tid);
+                    if (!t || !t.hidden) return false;
+                }
+                return true;
+            };
+            const visibleAlbums = showHidden ? albums : albums.filter(a => !albumIsHidden(a));
+            const visibleSingles = showHidden ? singles : singles.filter(t => !t.hidden);
+            if (!visibleAlbums.length && !visibleSingles.length) {
                 grid.innerHTML = '';
                 if (empty) empty.classList.add('visible');
                 if (meta) meta.textContent = '';
@@ -17685,6 +17876,8 @@
             }
             if (empty) empty.classList.remove('visible');
             // Meta line: count tracks (incl. inside albums) + total size best-effort.
+            // Counts reflect the full library (incl. hidden) so the user can see
+            // what's there — the toggle only changes which cards render.
             const trackCount = lib.length;
             let totalBytes = 0;
             for (const t of lib) { if (t.filesize) totalBytes += t.filesize; }
@@ -17697,13 +17890,15 @@
             const nowSec = Date.now() / 1000;
 
             // --- Album cards first ---
-            const albumHtml = albums.map(a => {
+            const albumHtml = visibleAlbums.map(a => {
                 const cover = a.cover_url ? `<img src="${esc(a.cover_url)}" loading="lazy" />` : '';
                 const total = a.total_tracks || (a.track_ids || []).length || 0;
                 const done = a.downloaded_count || 0;
                 const isDownloading = a.status === 'downloading' && done < total;
                 const isNew = a.added_at && !a.seen_at && (nowSec - a.added_at) < 86400;
                 const newPill = isNew ? '<span class="music-card-new">NEW</span>' : '';
+                const hidden = albumIsHidden(a);
+                const hiddenBadge = hidden ? '<span class="music-card-hidden-badge">Hidden</span>' : '';
                 const pct = total > 0 ? Math.round((done / total) * 100) : 0;
                 // r=46 in a 100×100 viewBox → C = 2π·46 ≈ 289.03
                 const dashOffset = 289.03 * (1 - pct / 100);
@@ -17717,12 +17912,13 @@
                         <span class="mcd-ring-pct">${pct}%</span>
                     </div>`;
                 const trackCountStr = `${total} track${total === 1 ? '' : 's'}`;
-                const cls = isDownloading ? ' album-downloading' : '';
+                const cls = (isDownloading ? ' album-downloading' : '') + (hidden ? ' is-hidden' : '');
                 return `
                     <div class="music-card${cls}" data-album-id="${esc(a.id)}" data-card-kind="album">
                         <div class="music-card-art">
                             ${cover}
                             ${newPill}
+                            ${hiddenBadge}
                             <span class="music-card-album-pill">Album · ${esc(trackCountStr)}</span>
                             <div class="music-card-play" title="Play album"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg></div>
                             ${ring}
@@ -17733,16 +17929,20 @@
             }).join('');
 
             // --- Singles (tracks with no album_id) ---
-            const singleHtml = singles.map(t => {
+            const singleHtml = visibleSingles.map(t => {
                 const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy" />` : '';
                 const playing = t.id === currentId ? ' now-playing' : '';
+                const hidden = !!t.hidden;
+                const cls = playing + (hidden ? ' is-hidden' : '');
                 const isNew = t.added_at && !t.seen_at && (nowSec - t.added_at) < 86400 * 7;
                 const newPill = isNew ? '<span class="music-card-new">NEW</span>' : '';
+                const hiddenBadge = hidden ? '<span class="music-card-hidden-badge">Hidden</span>' : '';
                 return `
-                    <div class="music-card${playing}" data-track-id="${esc(t.id)}" data-card-kind="track">
+                    <div class="music-card${cls}" data-track-id="${esc(t.id)}" data-card-kind="track">
                         <div class="music-card-art">
                             ${thumb}
                             ${newPill}
+                            ${hiddenBadge}
                             <div class="music-card-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg></div>
                         </div>
                         <div class="music-card-title">${esc(t.title || 'Untitled')}</div>
@@ -17752,15 +17952,22 @@
 
             grid.innerHTML = albumHtml + singleHtml;
 
-            // Single track click → play the track.
+            // Single track click → play; right-click → context menu.
             grid.querySelectorAll('.music-card[data-card-kind="track"]').forEach(card => {
                 card.addEventListener('click', () => {
                     const id = card.dataset.trackId;
                     const track = lib.find(x => x.id === id);
                     if (track) _playMusicTrack(track);
                 });
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    const id = card.dataset.trackId;
+                    const track = lib.find(x => x.id === id);
+                    if (track) _showMlibCtx(e.clientX, e.clientY, { kind: 'track', track });
+                });
             });
-            // Album cards: body click → open detail view; play-button click → play first track.
+            // Album cards: body click → open detail view; play-button click → play first track;
+            // right-click → context menu with album-specific actions.
             grid.querySelectorAll('.music-card[data-card-kind="album"]').forEach(card => {
                 const albumId = card.dataset.albumId;
                 const playBtn = card.querySelector('.music-card-play');
@@ -17772,6 +17979,11 @@
                 }
                 card.addEventListener('click', () => {
                     _openMusicAlbumDetail(albumId);
+                });
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    const album = (_musicState.albums || []).find(a => a.id === albumId);
+                    if (album) _showMlibCtx(e.clientX, e.clientY, { kind: 'album', album });
                 });
             });
         }
@@ -17948,6 +18160,420 @@
 
         // ---- Album row right-click context menu ----
         let _madCtxRow = null;
+        // ---- Music LIBRARY-card right-click context menu --------------- //
+        // Separate from _showMusicCtx (which targets the search-row pattern)
+        // because library cards need different actions: View details, Hide/
+        // Unhide, Remove (drop from library, keep file), Delete (drop + erase).
+        // Reuses the .music-ctx visual class. Stamped on body, lazy-created.
+        let _mlibCtxTarget = null;   // { kind: 'track'|'album', track?, album? }
+        function _showMlibCtx(x, y, payload) {
+            let ctx = document.getElementById('mlib-ctx');
+            if (!ctx) {
+                ctx = document.createElement('div');
+                ctx.id = 'mlib-ctx';
+                ctx.className = 'music-ctx';
+                document.body.appendChild(ctx);
+                // One delegated click handler for all items inside this ctx.
+                ctx.addEventListener('click', _onMlibCtxClick);
+            }
+            _mlibCtxTarget = payload;
+            ctx.innerHTML = _buildMlibCtxHTML(payload);
+            ctx.removeAttribute('hidden');
+            ctx.style.display = 'block';
+            const w = 240;
+            const h = ctx.offsetHeight || 280;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            ctx.style.left = `${Math.min(x, vw - w - 8)}px`;
+            ctx.style.top = `${Math.min(y, vh - h - 8)}px`;
+            // Click-outside close (registered next frame so this click doesn't fire it)
+            setTimeout(() => {
+                const close = (e) => {
+                    if (!ctx.contains(e.target)) {
+                        _hideMlibCtx();
+                        document.removeEventListener('mousedown', close);
+                    }
+                };
+                document.addEventListener('mousedown', close);
+            }, 0);
+        }
+        function _hideMlibCtx() {
+            const ctx = document.getElementById('mlib-ctx');
+            if (ctx) { ctx.style.display = 'none'; ctx.setAttribute('hidden', ''); }
+            _mlibCtxTarget = null;
+        }
+        function _buildMlibCtxHTML(payload) {
+            const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>';
+            const detailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+            const hideSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+            const eyeSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            const copySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+            const openSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+            const folderSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+            const removeSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+            const trashSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+            const shuffleSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>';
+
+            if (payload.kind === 'track') {
+                const t = payload.track;
+                const hidden = !!t.hidden;
+                return `
+                    <button class="mctx-item primary" data-mlib-ctx="play">${playSvg} Play</button>
+                    <button class="mctx-item" data-mlib-ctx="details">${detailSvg} View details</button>
+                    <button class="mctx-item" data-mlib-ctx="hide">${hidden ? eyeSvg : hideSvg} ${hidden ? 'Unhide' : 'Hide'}</button>
+                    <button class="mctx-item" data-mlib-ctx="copy-link">${copySvg} Copy YouTube link</button>
+                    <button class="mctx-item" data-mlib-ctx="open-external">${openSvg} Open in YouTube</button>
+                    <button class="mctx-item" data-mlib-ctx="reveal">${folderSvg} Reveal in folder</button>
+                    <div class="mctx-sep"></div>
+                    <button class="mctx-item" data-mlib-ctx="remove">${removeSvg} Remove from library</button>
+                    <button class="mctx-item" data-mlib-ctx="delete">${trashSvg} Delete from disk</button>`;
+            }
+            // Album payload
+            const a = payload.album;
+            const lib = _musicState.library || [];
+            const byId = new Map(lib.map(t => [t.id, t]));
+            const tids = a.track_ids || [];
+            const allHidden = tids.length > 0 && tids.every(tid => byId.get(tid)?.hidden);
+            return `
+                <button class="mctx-item primary" data-mlib-ctx="play-album">${playSvg} Play all</button>
+                <button class="mctx-item" data-mlib-ctx="shuffle-album">${shuffleSvg} Shuffle</button>
+                <button class="mctx-item" data-mlib-ctx="view-album">${detailSvg} View album</button>
+                <button class="mctx-item" data-mlib-ctx="hide-album">${allHidden ? eyeSvg : hideSvg} ${allHidden ? 'Unhide album' : 'Hide album'}</button>
+                <div class="mctx-sep"></div>
+                <button class="mctx-item" data-mlib-ctx="delete-album">${trashSvg} Delete album</button>`;
+        }
+        async function _onMlibCtxClick(e) {
+            const btn = e.target.closest('button[data-mlib-ctx]');
+            if (!btn) return;
+            const action = btn.getAttribute('data-mlib-ctx');
+            const payload = _mlibCtxTarget;
+            _hideMlibCtx();
+            if (!payload) return;
+
+            // ----- Track actions ----- //
+            if (payload.kind === 'track') {
+                const t = payload.track;
+                const id = t.id;
+                if (action === 'play') {
+                    _playMusicTrack(t);
+                } else if (action === 'details') {
+                    _showMusicTrackDetail(id);
+                } else if (action === 'hide') {
+                    const next = !t.hidden;
+                    // Optimistic flip + re-render.
+                    if (next) t.hidden = true; else delete t.hidden;
+                    _renderMusicLibrary();
+                    try {
+                        await pywebview.api.hide_music_track(id, next);
+                        showToast(next ? 'Hidden' : 'Unhidden', null, null);
+                    } catch (_) {
+                        // Roll back on failure.
+                        if (next) delete t.hidden; else t.hidden = true;
+                        _renderMusicLibrary();
+                        showToast("Couldn't update hidden state", null, null);
+                    }
+                } else if (action === 'copy-link') {
+                    const url = t.url || `https://music.youtube.com/watch?v=${id}`;
+                    try { await navigator.clipboard.writeText(url); showToast('Link copied', null, null); } catch (_) {}
+                } else if (action === 'open-external') {
+                    const url = t.url || `https://music.youtube.com/watch?v=${id}`;
+                    try { pywebview.api.open_external_url(url); } catch (_) {}
+                } else if (action === 'reveal') {
+                    if (t.filepath) {
+                        try { pywebview.api.reveal_in_folder(t.filepath); } catch (_) {}
+                    } else {
+                        showToast('No file path on record', null, null);
+                    }
+                } else if (action === 'remove') {
+                    try {
+                        await pywebview.api.remove_from_music_library(id);
+                        showToast('Removed from library', null, null);
+                        await _refreshMusicLibrary();
+                    } catch (_) {
+                        showToast("Couldn't remove track", null, null);
+                    }
+                } else if (action === 'delete') {
+                    const ok = await confirmDialog({
+                        title: `Delete "${t.title || 'this track'}"?`,
+                        body: 'The audio file will be deleted from disk. You\'ll need to re-download to listen again. This cannot be undone.',
+                        confirmText: 'Delete',
+                        cancelText: 'Cancel',
+                        danger: true,
+                    });
+                    if (!ok) return;
+                    try {
+                        await pywebview.api.delete_music_track(id);
+                        showToast(`Deleted "${t.title || 'track'}"`, null, null);
+                        // If the deleted track is currently playing, stop the dock.
+                        if (_musicPlayer.currentTrack?.id === id && _musicPlayer.audio) {
+                            try { _musicPlayer.audio.pause(); } catch (_) {}
+                        }
+                        await _refreshMusicLibrary();
+                    } catch (err) {
+                        showToast(`Couldn't delete: ${err?.message || 'unknown error'}`, null, null);
+                    }
+                }
+                return;
+            }
+
+            // ----- Album actions ----- //
+            if (payload.kind === 'album') {
+                const a = payload.album;
+                const albumId = a.id;
+                if (action === 'play-album') {
+                    _playMusicAlbum(albumId, { shuffle: false });
+                } else if (action === 'shuffle-album') {
+                    _playMusicAlbum(albumId, { shuffle: true });
+                } else if (action === 'view-album') {
+                    _openMusicAlbumDetail(albumId);
+                } else if (action === 'hide-album') {
+                    const tids = a.track_ids || [];
+                    const lib = _musicState.library || [];
+                    const byId = new Map(lib.map(t => [t.id, t]));
+                    const allHidden = tids.length > 0 && tids.every(tid => byId.get(tid)?.hidden);
+                    const next = !allHidden;
+                    // Optimistic flip on every owned track.
+                    for (const tid of tids) {
+                        const t = byId.get(tid);
+                        if (!t) continue;
+                        if (next) t.hidden = true; else delete t.hidden;
+                    }
+                    _renderMusicLibrary();
+                    try {
+                        await pywebview.api.bulk_hide_music_tracks(tids, next);
+                        showToast(next ? 'Album hidden' : 'Album unhidden', null, null);
+                    } catch (_) {
+                        // Roll back.
+                        for (const tid of tids) {
+                            const t = byId.get(tid);
+                            if (!t) continue;
+                            if (next) delete t.hidden; else t.hidden = true;
+                        }
+                        _renderMusicLibrary();
+                        showToast("Couldn't update album hidden state", null, null);
+                    }
+                } else if (action === 'delete-album') {
+                    const ok = await confirmDialog({
+                        title: `Delete album "${a.title || 'this album'}"?`,
+                        body: `All ${(a.track_ids || []).length} track(s) will be deleted from disk. This cannot be undone.`,
+                        confirmText: 'Delete album',
+                        cancelText: 'Cancel',
+                        danger: true,
+                    });
+                    if (!ok) return;
+                    try {
+                        await pywebview.api.delete_music_album(albumId, true);
+                        showToast(`Deleted album "${a.title || ''}"`, null, null);
+                        await _refreshMusicLibrary();
+                    } catch (err) {
+                        showToast(`Couldn't delete album: ${err?.message || 'unknown error'}`, null, null);
+                    }
+                }
+            }
+        }
+
+        // ---- Music track detail panel --------------------------------- //
+        // Reuses the .detail-panel slide-in CSS (shared with the video library)
+        // via a separate DOM node anchored inside #music-view, so the panel
+        // overlays the music grid without disturbing the video library's own
+        // detail panel state. Body is filled with mtd-* content.
+        function _showMusicTrackDetail(trackId) {
+            if (!trackId) return;
+            const lib = _musicState.library || [];
+            const t = lib.find(x => x.id === trackId);
+            if (!t) return;
+            const panel = document.getElementById('music-detail-panel');
+            const backdrop = document.getElementById('music-detail-panel-backdrop');
+            const body = document.getElementById('music-detail-panel-body');
+            if (!panel || !body) return;
+            body.innerHTML = _buildMusicTrackDetailHTML(t);
+            body.scrollTop = 0;
+            panel.classList.remove('closing');
+            panel.classList.add('visible');
+            if (backdrop) backdrop.classList.add('visible');
+            panel.dataset.trackId = trackId;
+            _bindMusicTrackDetailActions(t);
+        }
+        function _hideMusicTrackDetail() {
+            const panel = document.getElementById('music-detail-panel');
+            const backdrop = document.getElementById('music-detail-panel-backdrop');
+            if (!panel) return;
+            panel.classList.remove('visible');
+            panel.classList.add('closing');
+            if (backdrop) backdrop.classList.remove('visible');
+            const onEnd = () => {
+                panel.classList.remove('closing');
+                panel.removeEventListener('transitionend', onEnd);
+            };
+            panel.addEventListener('transitionend', onEnd);
+            setTimeout(onEnd, 300);
+        }
+        function _buildMusicTrackDetailHTML(t) {
+            const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const url = t.url || `https://music.youtube.com/watch?v=${t.id}`;
+            const art = t.thumbnail ? `<img src="${esc(t.thumbnail)}" alt="">` : '';
+            const addedDate = t.added_at
+                ? new Date(t.added_at * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                : '';
+            const size = t.filesize ? _formatBytesShort(t.filesize) : '';
+            // Action row icons
+            const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>';
+            const queueSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+            const folderSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+            const moreSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+
+            // Meta rows
+            const rows = [];
+            if (t.duration_string) rows.push(['Duration', esc(t.duration_string)]);
+            if (size) rows.push(['File size', esc(size)]);
+            if (addedDate) rows.push(['Added', esc(addedDate)]);
+            if (t.year) rows.push(['Year', esc(String(t.year))]);
+            rows.push(['Source', `<a class="mtd-source-link" data-mtd-open-url="${esc(url)}">${esc(url)}</a>`]);
+            if (t.filepath) rows.push(['File path', `<span class="mtd-filepath" data-mtd-copy-path="${esc(t.filepath)}" title="Click to copy">${esc(t.filepath)}</span>`]);
+
+            const metaHtml = rows.map(([k, v]) =>
+                `<div class="mtd-meta-key">${k}</div><div class="mtd-meta-val">${v}</div>`
+            ).join('');
+
+            const aboutBlock = t.description
+                ? `<div class="mtd-about"><div class="mtd-about-title">About this track</div>${esc(t.description)}</div>`
+                : '';
+
+            const hidden = !!t.hidden;
+            const hideLabel = hidden ? 'Unhide' : 'Hide';
+
+            return `
+                <div class="mtd-art">${art}</div>
+                <h2 class="mtd-title">${esc(t.title || 'Untitled')}</h2>
+                <div class="mtd-artist">${esc(t.artist || '')}</div>
+                ${t.album ? `<div class="mtd-album">${esc(t.album)}</div>` : ''}
+                <div class="mtd-actions">
+                    <button class="mtd-action-btn primary" data-mtd-act="play">${playSvg}<span>Play</span></button>
+                    <button class="mtd-action-btn" data-mtd-act="queue">${queueSvg}<span>Add to queue</span></button>
+                    <button class="mtd-action-btn" data-mtd-act="reveal">${folderSvg}<span>Reveal</span></button>
+                    <div class="mtd-more-wrap">
+                        <button class="mtd-action-btn" data-mtd-act="more" aria-label="More">${moreSvg}<span>More</span></button>
+                        <div class="mtd-more-menu" id="mtd-more-menu" hidden>
+                            <button class="mctx-item" data-mtd-act="hide">${hideLabel}</button>
+                            <button class="mctx-item" data-mtd-act="remove">Remove from library</button>
+                            <button class="mctx-item" data-mtd-act="delete">Delete from disk</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mtd-meta">${metaHtml}</div>
+                ${aboutBlock}`;
+        }
+        function _bindMusicTrackDetailActions(t) {
+            const body = document.getElementById('music-detail-panel-body');
+            if (!body) return;
+            // Source-link click → external open (don't navigate the webview).
+            body.querySelectorAll('[data-mtd-open-url]').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const url = el.getAttribute('data-mtd-open-url');
+                    if (url) { try { pywebview.api.open_external_url(url); } catch (_) {} }
+                });
+            });
+            // File-path click → copy to clipboard.
+            body.querySelectorAll('[data-mtd-copy-path]').forEach(el => {
+                el.addEventListener('click', async () => {
+                    const fp = el.getAttribute('data-mtd-copy-path');
+                    if (!fp) return;
+                    try { await navigator.clipboard.writeText(fp); showToast('Path copied', null, null); } catch (_) {}
+                });
+            });
+            // Action buttons.
+            body.querySelectorAll('[data-mtd-act]').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const act = btn.getAttribute('data-mtd-act');
+                    if (act === 'play') {
+                        _playMusicTrack(t);
+                    } else if (act === 'queue') {
+                        // Push the underlying video file into the video-style queue so it
+                        // shows up under the Queue rail. _qAddTrackToQueue isn't a thing;
+                        // simplest path: play the track directly. Toast for clarity.
+                        // (Music has no separate "up next" queue API yet — playing the track
+                        // is the equivalent immediate action.)
+                        _playMusicTrack(t);
+                    } else if (act === 'reveal') {
+                        if (t.filepath) {
+                            try { pywebview.api.reveal_in_folder(t.filepath); } catch (_) {}
+                        } else {
+                            showToast('No file path on record', null, null);
+                        }
+                    } else if (act === 'more') {
+                        const menu = document.getElementById('mtd-more-menu');
+                        if (menu) menu.toggleAttribute('hidden');
+                    } else if (act === 'hide') {
+                        const next = !t.hidden;
+                        if (next) t.hidden = true; else delete t.hidden;
+                        try {
+                            await pywebview.api.hide_music_track(t.id, next);
+                            showToast(next ? 'Hidden' : 'Unhidden', null, null);
+                            // Re-render the grid + the panel so the More menu reflects the new state.
+                            _renderMusicLibrary();
+                            _showMusicTrackDetail(t.id);
+                        } catch (_) {
+                            if (next) delete t.hidden; else t.hidden = true;
+                            showToast("Couldn't update hidden state", null, null);
+                        }
+                    } else if (act === 'remove') {
+                        try {
+                            await pywebview.api.remove_from_music_library(t.id);
+                            showToast('Removed from library', null, null);
+                            _hideMusicTrackDetail();
+                            await _refreshMusicLibrary();
+                        } catch (_) { showToast("Couldn't remove track", null, null); }
+                    } else if (act === 'delete') {
+                        const ok = await confirmDialog({
+                            title: `Delete "${t.title || 'this track'}"?`,
+                            body: 'The audio file will be deleted from disk. You\'ll need to re-download to listen again. This cannot be undone.',
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                            danger: true,
+                        });
+                        if (!ok) return;
+                        try {
+                            await pywebview.api.delete_music_track(t.id);
+                            showToast(`Deleted "${t.title || 'track'}"`, null, null);
+                            if (_musicPlayer.currentTrack?.id === t.id && _musicPlayer.audio) {
+                                try { _musicPlayer.audio.pause(); } catch (_) {}
+                            }
+                            _hideMusicTrackDetail();
+                            await _refreshMusicLibrary();
+                        } catch (err) {
+                            showToast(`Couldn't delete: ${err?.message || 'unknown error'}`, null, null);
+                        }
+                    }
+                });
+            });
+        }
+        // Wire the panel's close/backdrop/esc once at module load.
+        (function _wireMusicDetailPanelChrome() {
+            const setup = () => {
+                const close = document.getElementById('music-detail-panel-close');
+                const backdrop = document.getElementById('music-detail-panel-backdrop');
+                if (close && !close._bound) {
+                    close._bound = true;
+                    close.addEventListener('click', _hideMusicTrackDetail);
+                }
+                if (backdrop && !backdrop._bound) {
+                    backdrop._bound = true;
+                    backdrop.addEventListener('click', _hideMusicTrackDetail);
+                }
+                document.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Escape') return;
+                    const panel = document.getElementById('music-detail-panel');
+                    if (panel && panel.classList.contains('visible')) _hideMusicTrackDetail();
+                });
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setup);
+            } else {
+                setup();
+            }
+        })();
+
         let _madCtxAlbumId = null;
         function _showMadCtx(x, y, row, albumId) {
             let ctx = document.getElementById('mad-ctx');
