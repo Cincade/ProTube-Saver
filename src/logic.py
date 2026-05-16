@@ -3801,7 +3801,7 @@ class API:
             except Exception:
                 pass  # corrupt cache file, just re-fetch
 
-        source = (self.settings.get('update_source') or 'landing').lower()
+        source = (self.settings.get('update_source') or 'github').lower()
         if source == 'github':
             fetch_err, data = self._fetch_update_manifest_github()
         else:
