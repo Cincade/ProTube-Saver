@@ -3362,15 +3362,17 @@
             border: 1px solid rgba(115, 115, 115, 0.3);
         }
 
-        /* Cancel/retry icon button. Style #2 from the protube-ui skill
-           (outlined circle), with the per-state hover colours used by the
-           video queue's status-icon-btn. */
+        /* Cancel/retry icon button — mirrors .status-icon-btn from the video
+           queue (square 22×22, border-radius 5px, same hover token language).
+           The previous round design here didn't match the video queue and
+           the user flagged it. */
         .mq-action {
-            width: 28px; height: 28px;
+            width: 22px; height: 22px;
+            padding: 0;
             background: transparent;
-            border: 1px solid #2a2a2a;
-            border-radius: 50%;
-            color: #a0a0a0;
+            border: 1px solid #262626;
+            border-radius: 5px;
+            color: #737373;
             cursor: pointer;
             display: inline-flex; align-items: center; justify-content: center;
             transition: all 0.15s;
@@ -3386,16 +3388,16 @@
             border-color: rgba(245, 158, 11, 0.5);
             background: rgba(245, 158, 11, 0.08);
         }
-        .mq-action svg { width: 14px; height: 14px; display: block; }
+        .mq-action svg { width: 12px; height: 12px; display: block; }
 
         /* Progress bar — pinned to the bottom edge of the row, same blue
-           accent + 4px height the video queue uses. Visible only while
-           downloading. */
+           accent + 4px height as .progress-bar-bg in the video queue.
+           Visible only while downloading. */
         .mq-progress {
             position: absolute;
             left: 12px; right: 12px;
             bottom: 4px;
-            height: 3px;
+            height: 4px;
             background: #1a1a1a;
             border-radius: 10px;
             overflow: hidden;
@@ -3405,7 +3407,7 @@
             height: 100%;
             background: #3b82f6;
             width: 0;
-            transition: width 0.18s ease;
+            transition: width 0.3s;
         }
 
         /* Fade-out for completed rows */
@@ -3501,7 +3503,7 @@
             position: absolute;
             left: 12px; right: 12px;
             bottom: 4px;
-            height: 3px;
+            height: 4px;
             background: #1a1a1a;
             border-radius: 10px;
             overflow: hidden;
@@ -3511,7 +3513,7 @@
             height: 100%;
             background: #3b82f6;
             width: 0;
-            transition: width 0.18s ease;
+            transition: width 0.3s;
         }
 
         .mq-album-body {
@@ -3545,6 +3547,59 @@
         .music-grid:empty { display: none; }
         .music-card { cursor: pointer; padding: 10px; border-radius: 9px; transition: background 0.12s ease; position: relative; }
         .music-card:hover { background: #141414; }
+
+        /* ----- Music library selection mode (mirrors .library-card.is-selectable / .is-selected) -----
+           Activation: right-click a music card OR click the per-card checkbox
+           that appears on hover. Once active, every card click toggles
+           selection instead of playing the track / opening the album. Same
+           blue ring + checkmark visuals as the video library so the two
+           selection modes feel identical. Esc cancels. */
+        .music-card.is-selectable { user-select: none; -webkit-user-select: none; }
+        /* The checkmark lives inside .music-card-art at top-left so it overlays
+           the artwork (not the surrounding card padding). High z-index keeps
+           it on top of the NEW pill / hidden badge during selection. */
+        .music-card-select-mark {
+            display: none;
+            position: absolute;
+            top: 8px; left: 8px;
+            width: 22px; height: 22px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border: 1.5px solid rgba(255, 255, 255, 0.85);
+            border-radius: 50%;
+            align-items: center; justify-content: center;
+            color: #fff;
+            z-index: 5;
+            pointer-events: none;
+            transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+            opacity: 0;
+        }
+        /* Show the empty checkbox on hover BEFORE selection mode is active,
+           so the user can click it to enter selection mode (mirrors video). */
+        .music-card:hover .music-card-select-mark { display: flex; opacity: 1; pointer-events: auto; }
+        .music-card.is-selectable .music-card-select-mark { display: flex; opacity: 1; pointer-events: auto; }
+        /* When the checkmark is visible, dim the NEW pill so the two don't
+           visually fight for the same top-left corner. */
+        .music-card:hover .music-card-new,
+        .music-card.is-selectable .music-card-new { opacity: 0.35; transition: opacity 0.12s; }
+        .music-card.is-selected .music-card-select-mark {
+            background: #3b82f6; border-color: #3b82f6;
+        }
+        .music-card.is-selected {
+            background: rgba(59, 130, 246, 0.10);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35), 0 8px 16px -4px rgba(0, 0, 0, 0.4);
+        }
+        .music-card.is-selected:hover { background: rgba(59, 130, 246, 0.13); }
+        .music-card-select-mark svg {
+            width: 12px; height: 12px;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+        .music-card.is-selected .music-card-select-mark svg { opacity: 1; }
+        /* Hide the on-hover play button while selection mode is on — the card
+           is now a selection target, not a play surface. */
+        body.in-music-selection-mode .music-card-play { display: none !important; }
         .music-card-art {
             width: 100%; aspect-ratio: 1;
             background: #1a1a1a; border-radius: 6px;
@@ -3626,6 +3681,10 @@
            "can barely see the cover"). 0.72 is the sweet spot. */
         .music-card.album-downloading .music-card-art img { opacity: 0.72; }
         .music-card.album-downloading .music-card-play { display: none; }
+        /* Hide the "Album · N tracks" pill while downloading — the centered
+           ring + % already conveys "this is an album in progress". Two pieces
+           of overlapping info on the same artwork read as visual noise. */
+        .music-card.album-downloading .music-card-album-pill { display: none; }
         .mcd-ring-wrap {
             position: absolute; inset: 0;
             display: none;
@@ -3762,6 +3821,29 @@
             font-size: 12.5px; color: #8a8a8a;
         }
         .mad-progress-note strong { color: #3b82f6; font-weight: 600; }
+        /* Aggregate progress bar across the action row — only visible while
+           the album is still downloading. Sits under the action buttons, full
+           width minus the same horizontal padding the action row uses, so it
+           reads as the action row's bottom edge while the album fills in.
+           Mirrors .playlist-progress-bar on the queue's playlist cards. */
+        .mad-progress-bar-wrap {
+            position: absolute;
+            left: 36px; right: 36px;
+            bottom: 0;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .mad-progress-bar-fill {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.3s;
+        }
+        .mad-actions[hidden] { display: none; }
+        .mad-actions.is-downloading { padding-bottom: 18px; }
         .mad-tracklist {
             padding: 12px 28px 32px;
         }
@@ -8862,7 +8944,7 @@
                         <div class="mab-actions">
                             <button class="mab-btn primary" id="mab-download-all" type="button">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                <span>Download all (<span id="mab-download-num">0</span>)</span>
+                                <span>Add to queue (<span id="mab-download-num">0</span>)</span>
                             </button>
                         </div>
                     </div>
@@ -9036,7 +9118,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="mad-actions">
+                    <div class="mad-actions" id="mad-actions" style="position:relative;">
                         <button class="mad-play-all" id="mad-play-all" title="Play album" aria-label="Play album">
                             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>
                         </button>
@@ -9047,6 +9129,9 @@
                             <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
                         </button>
                         <span class="mad-progress-note" id="mad-progress-note" hidden></span>
+                        <div class="mad-progress-bar-wrap" id="mad-progress-bar-wrap" hidden>
+                            <div class="mad-progress-bar-fill" id="mad-progress-bar-fill"></div>
+                        </div>
                     </div>
                     <div class="mad-tracklist">
                         <div class="mad-tracklist-head">
@@ -9144,6 +9229,35 @@
                 <button class="fix-modal-btn primary" id="fix-modal-submit">Update</button>
             </div>
         </div>
+    </div>
+
+    <!-- Music library selection action bar — same visual class as the video
+         selection-actionbar so the two feel identical. Bound by MusicSelection
+         module further down (right-click a music card OR click its checkbox
+         to enter selection mode). -->
+    <div class="selection-actionbar" id="music-selection-actionbar">
+        <div class="selection-actionbar-count" id="music-selection-actionbar-count">0 selected</div>
+        <button class="selection-actionbar-btn" id="music-selection-select-all-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span>Select all</span>
+        </button>
+        <div class="selection-actionbar-divider"></div>
+        <button class="selection-actionbar-btn" id="music-selection-hide-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            <span id="music-selection-hide-btn-label">Hide</span>
+        </button>
+        <button class="selection-actionbar-btn" id="music-selection-remove-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span>Remove from library</span>
+        </button>
+        <button class="selection-actionbar-btn danger" id="music-selection-delete-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
+            <span>Delete from disk</span>
+        </button>
+        <div class="selection-actionbar-divider"></div>
+        <button class="selection-actionbar-btn" id="music-selection-cancel-btn" data-tip="Esc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
     </div>
 
     <!-- Selection action bar — slides up from bottom when library items are selected.
@@ -18195,9 +18309,10 @@
                 const trackCountStr = `${total} track${total === 1 ? '' : 's'}`;
                 const cls = (isDownloading ? ' album-downloading' : '') + (hidden ? ' is-hidden' : '');
                 return `
-                    <div class="music-card${cls}" data-album-id="${esc(a.id)}" data-card-kind="album">
+                    <div class="music-card${cls}" data-album-id="${esc(a.id)}" data-music-card-id="${esc(a.id)}" data-card-kind="album">
                         <div class="music-card-art">
                             ${cover}
+                            <div class="music-card-select-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                             ${newPill}
                             ${hiddenBadge}
                             <span class="music-card-album-pill">Album · ${esc(trackCountStr)}</span>
@@ -18219,9 +18334,10 @@
                 const newPill = isNew ? '<span class="music-card-new">NEW</span>' : '';
                 const hiddenBadge = hidden ? '<span class="music-card-hidden-badge">Hidden</span>' : '';
                 return `
-                    <div class="music-card${cls}" data-track-id="${esc(t.id)}" data-card-kind="track">
+                    <div class="music-card${cls}" data-track-id="${esc(t.id)}" data-music-card-id="${esc(t.id)}" data-card-kind="track">
                         <div class="music-card-art">
                             ${thumb}
+                            <div class="music-card-select-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                             ${newPill}
                             ${hiddenBadge}
                             <div class="music-card-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg></div>
@@ -18235,13 +18351,33 @@
 
             // Single track click → play; right-click → context menu.
             grid.querySelectorAll('.music-card[data-card-kind="track"]').forEach(card => {
-                card.addEventListener('click', () => {
+                card.addEventListener('click', (e) => {
+                    // Click on the per-card checkmark → enter/toggle selection
+                    // (mirrors video library entry-via-checkbox path).
+                    if (e.target.closest('.music-card-select-mark')) {
+                        e.stopPropagation();
+                        MusicSelection.handleCheckboxClick(card.dataset.trackId);
+                        return;
+                    }
+                    // If selection mode is active, click toggles selection
+                    // rather than playing the track.
+                    if (MusicSelection.isActive()) {
+                        MusicSelection.toggle(card.dataset.trackId);
+                        return;
+                    }
                     const id = card.dataset.trackId;
                     const track = lib.find(x => x.id === id);
                     if (track) _playMusicTrack(track);
                 });
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
+                    // Right-click in selection mode → toggle the card into
+                    // selection (mirrors video library). Outside selection
+                    // mode, right-click opens the existing per-item ctx menu.
+                    if (MusicSelection.isActive()) {
+                        MusicSelection.toggle(card.dataset.trackId);
+                        return;
+                    }
                     const id = card.dataset.trackId;
                     const track = lib.find(x => x.id === id);
                     if (track) _showMlibCtx(e.clientX, e.clientY, { kind: 'track', track });
@@ -18255,19 +18391,324 @@
                 if (playBtn) {
                     playBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
+                        if (MusicSelection.isActive()) {
+                            MusicSelection.toggle(albumId);
+                            return;
+                        }
                         _playMusicAlbum(albumId, { shuffle: false });
                     });
                 }
-                card.addEventListener('click', () => {
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('.music-card-select-mark')) {
+                        e.stopPropagation();
+                        MusicSelection.handleCheckboxClick(albumId);
+                        return;
+                    }
+                    if (MusicSelection.isActive()) {
+                        MusicSelection.toggle(albumId);
+                        return;
+                    }
                     _openMusicAlbumDetail(albumId);
                 });
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
+                    if (MusicSelection.isActive()) {
+                        MusicSelection.toggle(albumId);
+                        return;
+                    }
                     const album = (_musicState.albums || []).find(a => a.id === albumId);
                     if (album) _showMlibCtx(e.clientX, e.clientY, { kind: 'album', album });
                 });
             });
+
+            // Re-apply selection visuals when the grid re-renders (e.g. after a
+            // background refresh). Without this the .is-selected class is lost.
+            MusicSelection.refreshAfterRender();
         }
+
+        // ================================================================
+        // MUSIC LIBRARY SELECTION MODE — mirror of the video Selection module
+        // ================================================================
+        // Per-card checkbox (top-left, hover or active) + right-click both
+        // enter selection mode. Cards with kind="album" expand to their
+        // member track_ids for the bulk hide/remove/delete actions so a
+        // single click selects the whole album. Esc cancels.
+        // Visuals: .is-selectable + .is-selected on .music-card (parallels
+        // .library-card.is-selectable / .is-selected). The action bar lives
+        // in #music-selection-actionbar (separate from the video one so the
+        // two never collide).
+        const MusicSelection = (() => {
+            let active = false;
+            // Stores card ids — either track ids OR album ids. We expand
+            // album ids to their constituent track ids only when invoking
+            // bulk operations (so the user can deselect a single album with
+            // one click even if it owns 12 tracks).
+            const selected = new Set();
+
+            function findAlbumById(id) {
+                return (_musicState.albums || []).find(a => a.id === id) || null;
+            }
+            function findTrackById(id) {
+                return (_musicState.library || []).find(t => t.id === id) || null;
+            }
+            function isAlbumId(id) {
+                return !!findAlbumById(id);
+            }
+            // Expand selection → flat set of track ids covered by it. Albums
+            // contribute all their owned track_ids; bare track ids pass through.
+            function expandedTrackIds() {
+                const out = new Set();
+                selected.forEach(id => {
+                    const album = findAlbumById(id);
+                    if (album) {
+                        for (const tid of (album.track_ids || [])) out.add(tid);
+                    } else {
+                        out.add(id);
+                    }
+                });
+                return Array.from(out);
+            }
+
+            function enter(initialId) {
+                active = true;
+                document.body.classList.add('in-music-selection-mode');
+                document.querySelectorAll('.music-card').forEach(card => card.classList.add('is-selectable'));
+                if (initialId) toggle(initialId);
+                else updateBar();
+            }
+            function exit() {
+                active = false;
+                selected.clear();
+                document.body.classList.remove('in-music-selection-mode');
+                document.querySelectorAll('.music-card').forEach(card => {
+                    card.classList.remove('is-selectable', 'is-selected');
+                });
+                hideBar();
+            }
+            function toggle(id) {
+                if (!id) return;
+                if (selected.has(id)) selected.delete(id);
+                else selected.add(id);
+                const card = document.querySelector(`.music-card[data-music-card-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`);
+                if (card) card.classList.toggle('is-selected', selected.has(id));
+                if (selected.size === 0) exit();
+                else updateBar();
+            }
+            function handleCheckboxClick(id) {
+                if (!active) enter(id);
+                else toggle(id);
+            }
+            function selectAll() {
+                document.querySelectorAll('.music-card').forEach(card => {
+                    const id = card.getAttribute('data-music-card-id');
+                    if (id) { selected.add(id); card.classList.add('is-selected'); }
+                });
+                updateBar();
+            }
+            function refreshAfterRender() {
+                if (!active) return;
+                document.querySelectorAll('.music-card').forEach(card => {
+                    card.classList.add('is-selectable');
+                    const id = card.getAttribute('data-music-card-id');
+                    if (id && selected.has(id)) card.classList.add('is-selected');
+                });
+            }
+            function updateBar() {
+                const bar = document.getElementById('music-selection-actionbar');
+                const countEl = document.getElementById('music-selection-actionbar-count');
+                if (!bar) return;
+                if (active && selected.size > 0) {
+                    countEl.textContent = `${selected.size} selected`;
+                    bar.classList.add('visible');
+                } else if (active) {
+                    countEl.textContent = '0 selected';
+                    bar.classList.add('visible');
+                } else {
+                    hideBar();
+                }
+                // Hide-button label: if every track covered by the selection
+                // is already hidden, the button unhides. Mirrors the video
+                // library's label logic.
+                const hideLabel = document.getElementById('music-selection-hide-btn-label');
+                if (hideLabel) {
+                    const tids = expandedTrackIds();
+                    if (tids.length > 0) {
+                        const lib = _musicState.library || [];
+                        const byId = new Map(lib.map(t => [t.id, t]));
+                        let allHidden = true;
+                        for (const tid of tids) {
+                            const t = byId.get(tid);
+                            if (!t || !t.hidden) { allHidden = false; break; }
+                        }
+                        hideLabel.textContent = allHidden ? 'Show' : 'Hide';
+                    } else {
+                        hideLabel.textContent = 'Hide';
+                    }
+                }
+            }
+            function hideBar() {
+                const bar = document.getElementById('music-selection-actionbar');
+                if (bar) bar.classList.remove('visible');
+            }
+
+            async function hideSelected() {
+                const tids = expandedTrackIds();
+                if (!tids.length) return;
+                const lib = _musicState.library || [];
+                const byId = new Map(lib.map(t => [t.id, t]));
+                let allHidden = true;
+                for (const tid of tids) {
+                    const t = byId.get(tid);
+                    if (!t || !t.hidden) { allHidden = false; break; }
+                }
+                const wantHidden = !allHidden;
+                // Optimistic
+                for (const tid of tids) {
+                    const t = byId.get(tid);
+                    if (!t) continue;
+                    if (wantHidden) t.hidden = true; else delete t.hidden;
+                }
+                _renderMusicLibrary();
+                try {
+                    await pywebview.api.bulk_hide_music_tracks(tids, wantHidden);
+                    const n = tids.length;
+                    showToast(`${wantHidden ? 'Hidden' : 'Shown'} ${n} track${n === 1 ? '' : 's'}`, 'Undo', async () => {
+                        try { await pywebview.api.bulk_hide_music_tracks(tids, !wantHidden); } catch (_) {}
+                        await _refreshMusicLibrary();
+                    });
+                } catch (_) {
+                    // Roll back
+                    for (const tid of tids) {
+                        const t = byId.get(tid);
+                        if (!t) continue;
+                        if (wantHidden) delete t.hidden; else t.hidden = true;
+                    }
+                    _renderMusicLibrary();
+                    showToast("Couldn't update hidden state", null, null);
+                    return;
+                }
+                exit();
+            }
+
+            async function removeSelected() {
+                // Albums in the selection: remove the whole album record
+                // (which also drops linked tracks from the library) via the
+                // existing delete_music_album(album_id, delete_files=False)
+                // path so the album card vanishes too. Tracks selected on
+                // their own go through bulk_remove_music_tracks.
+                const albumIds = [];
+                const looseTrackIds = [];
+                selected.forEach(id => {
+                    if (isAlbumId(id)) albumIds.push(id);
+                    else looseTrackIds.push(id);
+                });
+                if (!albumIds.length && !looseTrackIds.length) return;
+                const totalCount = albumIds.length + looseTrackIds.length;
+                let removedTracks = [];
+                try {
+                    if (looseTrackIds.length) {
+                        const res = await pywebview.api.bulk_remove_music_tracks(looseTrackIds);
+                        removedTracks = (res && res.removed) || [];
+                    }
+                    for (const aid of albumIds) {
+                        try { await pywebview.api.delete_music_album(aid, false); } catch (_) {}
+                    }
+                } catch (_) {
+                    showToast("Couldn't remove from library", null, null);
+                    return;
+                }
+                exit();
+                await _refreshMusicLibrary();
+                showToast(
+                    `Removed ${totalCount} item${totalCount === 1 ? '' : 's'} from library`,
+                    null, null
+                );
+            }
+
+            async function deleteSelected() {
+                const totalCount = selected.size;
+                const ok = await confirmDialog({
+                    title: `Delete ${totalCount} item${totalCount === 1 ? '' : 's'} from disk?`,
+                    body: `Audio files for the selected ${totalCount === 1 ? 'track / album' : 'tracks / albums'} will be deleted from disk. You'll need to re-download to listen again. This cannot be undone.`,
+                    confirmText: `Delete ${totalCount}`,
+                    cancelText: 'Cancel',
+                    danger: true,
+                });
+                if (!ok) return;
+
+                // Stop the dock if the now-playing track is in the kill list.
+                const tids = expandedTrackIds();
+                const curId = _musicPlayer.currentTrack?.id;
+                if (curId && tids.includes(curId) && _musicPlayer.audio) {
+                    try { _musicPlayer.audio.pause(); } catch (_) {}
+                }
+
+                const albumIds = [];
+                const looseTrackIds = [];
+                selected.forEach(id => {
+                    if (isAlbumId(id)) albumIds.push(id);
+                    else looseTrackIds.push(id);
+                });
+
+                let deleted = 0, errors = 0;
+                try {
+                    if (looseTrackIds.length) {
+                        const res = await pywebview.api.bulk_delete_music_tracks(looseTrackIds);
+                        deleted += (res?.deleted || 0);
+                        errors += (res?.errors || 0);
+                    }
+                    for (const aid of albumIds) {
+                        try {
+                            const res = await pywebview.api.delete_music_album(aid, true);
+                            if (res?.ok) deleted++;
+                            else errors++;
+                        } catch (_) {
+                            errors++;
+                        }
+                    }
+                } catch (_) {
+                    showToast('Bulk delete failed', null, null);
+                    return;
+                }
+                exit();
+                await _refreshMusicLibrary();
+                if (errors === 0) {
+                    showToast(`Deleted ${deleted} item${deleted === 1 ? '' : 's'}`, null, null);
+                } else {
+                    showToast(`Deleted ${deleted}, ${errors} failed (files locked?)`, null, null);
+                }
+            }
+
+            return {
+                isActive: () => active,
+                enter, exit, toggle, handleCheckboxClick, selectAll, refreshAfterRender,
+                hideSelected, removeSelected, deleteSelected,
+            };
+        })();
+
+        // Wire bar buttons + Esc once at module load.
+        (function _wireMusicSelectionChrome() {
+            const wire = (id, fn) => {
+                const el = document.getElementById(id);
+                if (el && !el._musSelWired) {
+                    el._musSelWired = true;
+                    el.addEventListener('click', fn);
+                }
+            };
+            wire('music-selection-cancel-btn', () => MusicSelection.exit());
+            wire('music-selection-delete-btn', () => MusicSelection.deleteSelected());
+            wire('music-selection-remove-btn', () => MusicSelection.removeSelected());
+            wire('music-selection-hide-btn', () => MusicSelection.hideSelected());
+            wire('music-selection-select-all-btn', () => MusicSelection.selectAll());
+            // Esc clears the selection — but only when no other higher-priority
+            // surface (video selection mode, panels, ctx menus) is open. We let
+            // the video Selection's Esc handler win when it's active.
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Escape') return;
+                if (!MusicSelection.isActive()) return;
+                MusicSelection.exit();
+            });
+        })();
 
         // ---- Music album detail view ----------------------------------- //
         // Opens the dedicated album page (Spotify-shaped). Switches the view
@@ -18338,6 +18779,10 @@
 
             // Progress note + button disable while downloading.
             const isDownloading = album.status === 'downloading' && downloaded < total;
+            const actionsEl = document.getElementById('mad-actions');
+            const progBarWrap = document.getElementById('mad-progress-bar-wrap');
+            const progBarFill = document.getElementById('mad-progress-bar-fill');
+            const aggPct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
             if (progressNote) {
                 if (isDownloading) {
                     progressNote.hidden = false;
@@ -18347,6 +18792,12 @@
                     progressNote.textContent = '';
                 }
             }
+            if (actionsEl) actionsEl.classList.toggle('is-downloading', isDownloading);
+            if (progBarWrap) {
+                if (isDownloading) progBarWrap.removeAttribute('hidden');
+                else progBarWrap.setAttribute('hidden', '');
+            }
+            if (progBarFill) progBarFill.style.width = `${aggPct}%`;
             // Disable Play All / Shuffle if nothing is downloaded yet (avoid no-op clicks).
             const anyPlayable = downloadedTracks.length > 0;
             if (playAllBtn) playAllBtn.disabled = !anyPlayable;
@@ -18360,10 +18811,11 @@
                     const isPlaying = t.id === currentId;
                     const pending = t.pending;
                     const cls = 'mad-row' + (isPlaying ? ' now-playing' : '') + (pending ? ' pending' : '');
-                    const indicator = isPlaying
+                    // One unified row-number indicator: playing → animated bars,
+                    // pending → spinner, otherwise → the index number.
+                    const numHtml = isPlaying
                         ? playingDot
-                        : (pending ? '<span class="mad-pending-spinner"></span>' : `<span class="mad-row-num-text">${idx + 1}</span>`);
-                    const numHtml = isPlaying || pending ? indicator : `<span>${idx + 1}</span>`;
+                        : (pending ? '<span class="mad-pending-spinner"></span>' : `<span>${idx + 1}</span>`);
                     const titleText = pending ? 'Downloading…' : (t.title || 'Untitled');
                     const dur = pending ? '' : (t.duration_string || '');
                     return `
@@ -19127,14 +19579,40 @@
             if (!bar || bar._bound) return; bar._bound = true;
             document.getElementById('mab-clear')?.addEventListener('click', _msClearSelection);
             document.getElementById('mab-download-all')?.addEventListener('click', () => {
+                // Mixed-kind dispatch: songs/videos go through add_music_track,
+                // album/artist/playlist rows go through add_music_collection.
+                // Mirrors the video search's "select results → push batch to
+                // queue" UX so a user can multi-select songs + albums and
+                // queue them all in one button press.
                 const ids = Array.from(_msSelection);
+                let songsQueued = 0, collectionsQueued = 0;
                 ids.forEach(id => {
-                    const row = document.querySelector(`.music-track-row[data-track-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`);
-                    if (row && !row.classList.contains('in-library') && !row.classList.contains('downloading')) {
-                        _addMusicTrackFromRow(row);
+                    const safe = (window.CSS && CSS.escape) ? CSS.escape(id) : id.replace(/"/g, '\\"');
+                    const row = document.querySelector(`.music-track-row[data-track-id="${safe}"]`);
+                    if (!row) return;
+                    const kind = row.dataset.trackKind;
+                    if (kind === 'album' || kind === 'artist' || kind === 'playlist') {
+                        if (!row.classList.contains('downloading')) {
+                            _bulkDownloadFromRow(row);
+                            collectionsQueued++;
+                        }
+                    } else {
+                        if (!row.classList.contains('in-library') && !row.classList.contains('downloading')) {
+                            _addMusicTrackFromRow(row);
+                            songsQueued++;
+                        }
                     }
                 });
                 _msClearSelection();
+                // Single aggregated toast — _addMusicTrackFromRow + _bulkDownloadFromRow
+                // each fire their own toasts for finer-grained per-item feedback,
+                // but a summary line helps when 10+ items were queued at once.
+                if (songsQueued + collectionsQueued > 1) {
+                    const parts = [];
+                    if (songsQueued) parts.push(`${songsQueued} track${songsQueued === 1 ? '' : 's'}`);
+                    if (collectionsQueued) parts.push(`${collectionsQueued} collection${collectionsQueued === 1 ? '' : 's'}`);
+                    showToast(`Queued ${parts.join(' + ')}`, null, null);
+                }
             });
         }
         function _msBindKeyboard() {
@@ -19305,16 +19783,15 @@
             _initMusicCtx();
 
             wrap.querySelectorAll('.music-track-row').forEach(row => {
-                // SINGLE-CLICK row body → toggle selection (for songs/videos)
-                // For album/artist/playlist rows, click → bulk download (those aren't selectable)
+                // SINGLE-CLICK row body → toggle selection. ALL kinds (song /
+                // album / artist / playlist) are selectable now; the action
+                // bar handles the mixed-kind dispatch on "Add to queue".
+                // (Previous behavior auto-downloaded albums/playlists on
+                // click; user said: "I told you select and push to the
+                // download queue not download instantly.")
                 row.addEventListener('click', (e) => {
                     if (e.target.closest('.mtr-add')) return;        // download btn has its own handler
                     if (e.target.closest('.mtr-play-overlay')) return; // play overlay handled below
-                    const kind = row.dataset.trackKind;
-                    if (kind === 'album' || kind === 'artist' || kind === 'playlist') {
-                        _bulkDownloadFromRow(row);
-                        return;
-                    }
                     if (row.classList.contains('in-library')) {
                         // Already in library → play it directly (small UX win — no point selecting)
                         const t = _musicState.library.find(x => x.id === row.dataset.trackId);
@@ -19337,7 +19814,10 @@
                     if (t) _playMusicTrack(t);
                 });
             });
-            // The + (download) button is now the EXPLICIT download action.
+            // The + (download) button is the EXPLICIT per-row immediate-enqueue
+            // action — works for songs OR collections (album/playlist/artist).
+            // Bulk + push-to-queue across many selected rows lives on the
+            // multi-select action bar's "Add to queue" button.
             wrap.querySelectorAll('.mtr-add').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -19481,7 +19961,34 @@
                 // there. No re-render needed.
             }
             // Update the detail view if it's currently showing this album.
+            // Surgically paint the progress bar + note + button-disabled state
+            // first (no DOM rebuild → no flicker, no scroll-jump, no lost
+            // focus). Only re-render the whole row list when total changes
+            // (a new track became downloaded, so a pending row needs to flip).
             if (_musicState.currentAlbumId === albumId && app.currentView === 'music-album-detail') {
+                const isDownloading = total > 0 && done < total;
+                const note = document.getElementById('mad-progress-note');
+                const barWrap = document.getElementById('mad-progress-bar-wrap');
+                const barFill = document.getElementById('mad-progress-bar-fill');
+                const actionsEl = document.getElementById('mad-actions');
+                if (note) {
+                    if (isDownloading) {
+                        note.hidden = false;
+                        note.innerHTML = `Downloading <strong>${done}</strong> of ${total} tracks…`;
+                    } else {
+                        note.hidden = true;
+                        note.textContent = '';
+                    }
+                }
+                if (actionsEl) actionsEl.classList.toggle('is-downloading', isDownloading);
+                if (barWrap) {
+                    if (isDownloading) barWrap.removeAttribute('hidden');
+                    else barWrap.setAttribute('hidden', '');
+                }
+                if (barFill) barFill.style.width = `${pct}%`;
+                // Re-render rows so newly-completed pending stubs flip to
+                // their real titles. This is the only thing that requires a
+                // rebuild — most updates change just the aggregate state.
                 _renderMusicAlbumDetail(albumId);
             }
         };

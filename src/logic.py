@@ -3846,6 +3846,53 @@ class API:
             self._save_settings()
         return {'ok': True, 'hidden': new_state, 'count': count}
 
+    def bulk_remove_music_tracks(self, track_ids):
+        """Drop many tracks from the library in one save. Files on disk are
+        preserved (mirrors the video library's 'Remove from library' bulk
+        action — the file stays so a re-import can restore the entry).
+        Returns the list of ids actually removed so the frontend can size its
+        Undo toast accurately."""
+        if not track_ids:
+            return {'ok': True, 'removed': [], 'count': 0}
+        ids = set(track_ids)
+        lib = self.settings.get('music_library', []) or []
+        removed = [t.get('id') for t in lib if t.get('id') in ids]
+        if not removed:
+            return {'ok': True, 'removed': [], 'count': 0}
+        self.settings['music_library'] = [t for t in lib if t.get('id') not in ids]
+        self._save_settings()
+        return {'ok': True, 'removed': removed, 'count': len(removed)}
+
+    def bulk_delete_music_tracks(self, track_ids):
+        """Drop many tracks AND delete their files on disk. One settings save.
+        Mirrors delete_music_track for each id but batched so the UI doesn't
+        block on per-track round-trips. Returns counts so the frontend can
+        report how many succeeded vs failed (locked files, etc.)."""
+        if not track_ids:
+            return {'ok': True, 'deleted': 0, 'errors': 0, 'count': 0}
+        ids = set(track_ids)
+        lib = self.settings.get('music_library', []) or []
+        deleted = 0
+        errors = 0
+        for t in lib:
+            if t.get('id') not in ids:
+                continue
+            fp = t.get('filepath') or ''
+            if fp and os.path.exists(fp):
+                try:
+                    os.remove(fp)
+                    deleted += 1
+                except OSError as e:
+                    errors += 1
+                    print(f'[ProTube/music] failed to delete {fp}: {e}')
+            else:
+                # No file on disk to delete, but still drop the entry — count
+                # it as deleted so the user sees the row vanish.
+                deleted += 1
+        self.settings['music_library'] = [t for t in lib if t.get('id') not in ids]
+        self._save_settings()
+        return {'ok': True, 'deleted': deleted, 'errors': errors, 'count': deleted + errors}
+
     # ----------------------------------------------------------------- #
     # Music albums (first-class library entity grouping multiple tracks) #
     # ----------------------------------------------------------------- #
