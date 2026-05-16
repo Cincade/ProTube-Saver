@@ -3187,106 +3187,343 @@
         }
         .music-subtab-badge[hidden] { display: none; }
 
-        /* Downloads pane (mdl- = music downloads list) */
-        .mdl-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-shrink: 0; }
-        .mdl-meta { color: #6e6e6e; font-size: 12px; }
-        .mdl-clear-done {
+        /* ============================================================
+           Music downloads queue (.mq-* — replaces the older .mdl-*).
+           Visually mirrors the video queue's .video-row chrome so the
+           two surfaces feel like one app. Adapts only for music-specific
+           bits: smaller (56×56) art, an album-grouped collapsible header,
+           and an inline error message on failed rows.
+           ============================================================ */
+        .mq-toolbar {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 14px; flex-shrink: 0;
+        }
+        .mq-meta { color: #737373; font-size: 12px; }
+        .mq-clear-done {
             margin-left: auto;
             background: transparent; border: 1px solid #2a2a2a;
             color: #c0c0c0; font-family: inherit; font-size: 12px; font-weight: 500;
             padding: 6px 12px; border-radius: 6px; cursor: pointer;
-            transition: border-color 0.12s, color 0.12s;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
         }
-        .mdl-clear-done:hover { border-color: #3b82f6; color: #3b82f6; }
-        .mdl-list { flex: 1; overflow-y: auto; padding-bottom: 24px; display: flex; flex-direction: column; gap: 4px; }
-        .mdl-list:empty { display: none; }
-        .mdl-empty {
-            flex: 1; display: flex; align-items: center; justify-content: center;
-            color: #6e6e6e; font-size: 14px; padding: 60px 20px; text-align: center;
+        .mq-clear-done:hover { border-color: #3b82f6; color: #3b82f6; }
+        .mq-clear-done[hidden] { display: none; }
+
+        .mq-list {
+            flex: 1; overflow-y: auto; padding-bottom: 24px;
+            display: flex; flex-direction: column;
+        }
+        .mq-list:empty { display: none; }
+
+        /* Empty state — copied verbatim from .queue-empty so the music
+           Downloads pane and the video queue's empty state feel identical. */
+        .mq-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .mq-empty > * { max-width: 420px; }
+        .mq-empty-icon {
+            width: 48px; height: 48px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            color: #3b82f6;
+            margin-bottom: 4px;
+        }
+        .mq-empty-icon svg { width: 22px; height: 22px; }
+        .mq-empty-title {
+            font-size: 15px; font-weight: 600;
+            color: #d4d4d4; letter-spacing: -0.01em;
+        }
+        .mq-empty-hint {
+            font-size: 12.5px;
+            color: #737373;
+            max-width: 280px;
+            line-height: 1.5;
         }
         /* Hide empty state when the list has rows */
-        #music-pane-downloads:has(.mdl-list:not(:empty)) #mdl-empty { display: none; }
+        #music-pane-downloads:has(.mq-list:not(:empty)) .mq-empty { display: none; }
 
-        /* Album group: collapsible header + nested rows. */
-        .mdl-album-group { background: #0f0f0f; border: 1px solid #1a1a1a; border-radius: 8px; overflow: hidden; }
-        .mdl-album-header {
-            display: grid; grid-template-columns: 40px 1fr auto auto; gap: 12px;
-            align-items: center; padding: 10px 12px; cursor: pointer;
-            background: transparent; border: none; width: 100%; text-align: left;
-            color: inherit; font-family: inherit;
-        }
-        .mdl-album-header:hover { background: #141414; }
-        .mdl-album-art {
-            width: 40px; height: 40px; border-radius: 5px; background: #1a1a1a;
-            overflow: hidden; position: relative;
-        }
-        .mdl-album-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .mdl-album-meta { min-width: 0; }
-        .mdl-album-title { color: #fff; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mdl-album-sub { color: #8a8a8a; font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mdl-album-progress { color: #c0c0c0; font-size: 12px; font-family: 'JetBrains Mono', monospace; min-width: 70px; text-align: right; }
-        .mdl-album-actions { display: flex; align-items: center; gap: 6px; }
-        .mdl-album-chev {
-            background: transparent; border: none; color: #8a8a8a; cursor: pointer;
-            padding: 4px; display: flex; align-items: center; justify-content: center;
-            border-radius: 50%; transition: color 0.12s, background 0.12s, transform 0.18s;
-        }
-        .mdl-album-chev:hover { color: #fff; background: rgba(255,255,255,0.06); }
-        .mdl-album-chev svg { width: 14px; height: 14px; }
-        .mdl-album-group.expanded .mdl-album-chev { transform: rotate(180deg); }
-        .mdl-album-body { display: none; padding: 0 4px 4px 4px; }
-        .mdl-album-group.expanded .mdl-album-body { display: block; }
-
-        /* Queue row */
-        .mdl-row {
-            display: grid; grid-template-columns: 40px 1fr auto auto; gap: 12px;
-            align-items: center; padding: 8px 12px; border-radius: 6px;
+        /* ----- Row chrome (mirrors .video-row) ----- */
+        .mq-row {
+            padding: 10px 12px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.15s;
+            background: #0f0f0f;
             position: relative;
+            cursor: pointer;
         }
-        .mdl-row:hover { background: #141414; }
-        .mdl-art {
-            width: 40px; height: 40px; border-radius: 5px; background: #1a1a1a;
-            overflow: hidden; flex-shrink: 0;
+        .mq-row:hover {
+            background: #141414;
+            border-color: #262626;
         }
-        .mdl-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .mdl-meta { min-width: 0; }
-        .mdl-title { color: #f5f5f5; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mdl-sub { color: #8a8a8a; font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mdl-status-pill {
-            font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
-            font-family: inherit; white-space: nowrap;
+
+        /* Status modifiers — same colour language as .video-row.is-error /
+           .video-row.is-done so the two queues read the same. */
+        .mq-row.is-downloading { border-color: rgba(59, 130, 246, 0.25); }
+        .mq-row.is-done { border-color: rgba(16, 185, 129, 0.18); }
+        .mq-row.is-done:hover { border-color: rgba(16, 185, 129, 0.30); }
+        .mq-row.is-failed { border-color: rgba(220, 38, 38, 0.30); }
+        .mq-row.is-failed:hover { border-color: rgba(220, 38, 38, 0.50); }
+        .mq-row.is-cancelled { opacity: 0.7; }
+
+        .mq-art {
+            position: relative;
+            width: 56px; height: 56px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
         }
-        .mdl-status-pill.queued { background: #1a1a1a; color: #8a8a8a; }
-        .mdl-status-pill.downloading { background: rgba(59,130,246,0.14); color: #3b82f6; }
-        .mdl-status-pill.done { background: rgba(16,185,129,0.14); color: #10b981; }
-        .mdl-status-pill.failed { background: rgba(220,38,38,0.14); color: #ef4444; }
-        .mdl-status-pill.cancelled { background: #1a1a1a; color: #6e6e6e; }
-        .mdl-action {
-            background: transparent; border: none; color: #c0c0c0; cursor: pointer;
-            padding: 6px; display: flex; align-items: center; justify-content: center;
-            border-radius: 50%;
-            transition: color 0.12s, background 0.12s;
+        .mq-art img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
         }
-        .mdl-action:hover { color: #fff; background: rgba(255,255,255,0.06); }
-        .mdl-action svg { width: 14px; height: 14px; display: block; }
-        .mdl-action.retry {
+
+        .mq-details {
+            flex: 1;
+            min-width: 0;
+        }
+        .mq-title {
+            font-size: 14px; font-weight: 600;
+            color: #f5f5f5;
+            margin-bottom: 3px;
+            line-height: 1.35;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mq-sub {
+            font-size: 12px;
+            color: #737373;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* Inline error — only visible on failed rows. Shown by default so the
+           user doesn't have to hover or open a panel to read it. */
+        .mq-error {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #dc2626;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .mq-row:not(.is-failed) .mq-error { display: none; }
+        /* Allow click-to-dismiss inline error so the user can collapse it */
+        .mq-row.is-failed.error-dismissed .mq-error { display: none; }
+
+        /* Status pill — mirror .status-badge sizing + colour tokens. */
+        .mq-status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .mq-status-pill.queued {
+            background: rgba(115, 115, 115, 0.12);
+            color: #a0a0a0;
+            border: 1px solid rgba(115, 115, 115, 0.3);
+        }
+        .mq-status-pill.downloading {
+            background: rgba(59, 130, 246, 0.12);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.30);
+        }
+        .mq-status-pill.done {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .mq-status-pill.failed {
+            background: rgba(220, 38, 38, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(220, 38, 38, 0.35);
+        }
+        .mq-status-pill.cancelled {
+            background: rgba(115, 115, 115, 0.12);
+            color: #a0a0a0;
+            border: 1px solid rgba(115, 115, 115, 0.3);
+        }
+
+        /* Cancel/retry icon button. Style #2 from the protube-ui skill
+           (outlined circle), with the per-state hover colours used by the
+           video queue's status-icon-btn. */
+        .mq-action {
             width: 28px; height: 28px;
+            background: transparent;
             border: 1px solid #2a2a2a;
             border-radius: 50%;
+            color: #a0a0a0;
+            cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
         }
-        .mdl-action.retry:hover { border-color: #3b82f6; color: #3b82f6; background: transparent; }
-        .mdl-progress {
-            grid-column: 1 / -1;
-            height: 3px; background: #1a1a1a; border-radius: 2px; overflow: hidden;
-            margin-top: 8px;
+        .mq-action:hover {
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.04);
         }
-        .mdl-progress-bar {
-            height: 100%; background: #3b82f6;
+        .mq-action.retry:hover {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.08);
+        }
+        .mq-action svg { width: 14px; height: 14px; display: block; }
+
+        /* Progress bar — pinned to the bottom edge of the row, same blue
+           accent + 4px height the video queue uses. Visible only while
+           downloading. */
+        .mq-progress {
+            position: absolute;
+            left: 12px; right: 12px;
+            bottom: 4px;
+            height: 3px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .mq-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
             transition: width 0.18s ease;
-            width: 0%;
         }
+
         /* Fade-out for completed rows */
-        .mdl-row.fading { opacity: 0; transition: opacity 0.4s ease; }
+        .mq-row.fading {
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        /* ----- Album group (the music-specific addition) ----- */
+        /* A fatter version of .mq-row that holds nested rows. Same border-radius,
+           same colour tokens; just wider art + an aggregate progress label +
+           a chevron. Default collapsed. */
+        .mq-album-group {
+            margin-bottom: 6px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            background: #0f0f0f;
+            overflow: hidden;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .mq-album-group:hover { border-color: #262626; }
+        .mq-album-group.expanded { background: #0c0c0c; }
+
+        .mq-album-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: left;
+            color: inherit;
+            font-family: inherit;
+            cursor: pointer;
+            position: relative;
+        }
+        .mq-album-header:hover { background: #141414; }
+
+        .mq-album-art {
+            position: relative;
+            width: 56px; height: 56px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        .mq-album-art img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+        .mq-album-details {
+            flex: 1; min-width: 0;
+        }
+        .mq-album-title {
+            font-size: 14px; font-weight: 600;
+            color: #fff;
+            margin-bottom: 3px;
+            line-height: 1.35;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mq-album-sub {
+            font-size: 12px;
+            color: #8a8a8a;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mq-album-progress-label {
+            color: #c0c0c0;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            min-width: 56px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .mq-album-actions {
+            display: flex; align-items: center; gap: 6px;
+            flex-shrink: 0;
+        }
+        .mq-album-chev {
+            background: transparent; border: none; color: #8a8a8a;
+            cursor: pointer;
+            padding: 4px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: color 0.15s, background 0.15s, transform 0.18s;
+            flex-shrink: 0;
+        }
+        .mq-album-chev:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .mq-album-chev svg { width: 14px; height: 14px; }
+        .mq-album-group.expanded .mq-album-chev { transform: rotate(180deg); }
+
+        /* Aggregate progress on the album header — same look as .mq-progress */
+        .mq-album-progress {
+            position: absolute;
+            left: 12px; right: 12px;
+            bottom: 4px;
+            height: 3px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .mq-album-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.18s ease;
+        }
+
+        .mq-album-body {
+            display: none;
+            padding: 4px 8px 8px 8px;
+            background: #0a0a0a;
+            border-top: 1px solid #1a1a1a;
+        }
+        .mq-album-group.expanded .mq-album-body { display: block; }
+        /* Nested rows under an album header sit a touch tighter visually. */
+        .mq-album-body .mq-row { background: #0d0d0d; }
+        .mq-album-body .mq-row:hover { background: #131313; }
 
         /* Library pane */
         .music-lib-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-shrink: 0; }
@@ -8626,12 +8863,22 @@
                      shows art + meta + status pill + cancel/retry. Album-grouped
                      when multiple queued tracks share an album_id. -->
                 <div class="music-pane" id="music-pane-downloads">
-                    <div class="mdl-toolbar">
-                        <span class="mdl-meta" id="mdl-meta"></span>
-                        <button class="mdl-clear-done" id="mdl-clear-done" type="button" hidden>Clear completed</button>
+                    <div class="mq-toolbar">
+                        <span class="mq-meta" id="mq-meta"></span>
+                        <button class="mq-clear-done" id="mq-clear-done" type="button" hidden>Clear completed</button>
                     </div>
-                    <div class="mdl-list" id="mdl-list"></div>
-                    <div class="mdl-empty" id="mdl-empty">Your download queue is empty.</div>
+                    <div class="mq-list" id="mq-list"></div>
+                    <div class="mq-empty" id="mq-empty">
+                        <div class="mq-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                        </div>
+                        <div class="mq-empty-title">Your download queue is empty</div>
+                        <div class="mq-empty-hint">Click + on a song or album to add it here.</div>
+                    </div>
                 </div>
 
                 <!-- Music track detail panel — slides in from the right when a music
@@ -19297,9 +19544,9 @@
         }
 
         function _renderMusicQueue() {
-            const list = document.getElementById('mdl-list');
-            const clearBtn = document.getElementById('mdl-clear-done');
-            const meta = document.getElementById('mdl-meta');
+            const list = document.getElementById('mq-list');
+            const clearBtn = document.getElementById('mq-clear-done');
+            const meta = document.getElementById('mq-meta');
             if (!list) return;
             const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
@@ -19338,6 +19585,13 @@
             };
             singles.sort(sortFn);
 
+            // SVG icon templates — kept inline so we don't pay an extra DOM
+            // lookup for every row. Same chrome the video queue's status-icon-btn
+            // uses, just with our .mq-action wrapper.
+            const cancelSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            const retrySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+            const chevSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
             const rowHtml = (e) => {
                 const status = e.status || 'queued';
                 const pct = Math.max(0, Math.min(100, Math.round(e.progress || 0)));
@@ -19349,35 +19603,37 @@
                 else if (status === 'cancelled') pillText = 'Cancelled';
                 else pillText = status;
 
-                const cancelSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-                const retrySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
-
                 let action = '';
                 if (status === 'queued' || status === 'downloading') {
-                    action = `<button class="mdl-action mdl-cancel" data-mdl-cancel="${esc(e.id)}" title="Cancel">${cancelSvg}</button>`;
-                } else if (status === 'failed') {
-                    action = `<button class="mdl-action retry mdl-retry" data-mdl-retry="${esc(e.id)}" title="Retry">${retrySvg}</button>`;
-                } else if (status === 'cancelled') {
-                    action = `<button class="mdl-action retry mdl-retry" data-mdl-retry="${esc(e.id)}" title="Retry">${retrySvg}</button>`;
+                    action = `<button class="mq-action cancel" data-mq-cancel="${esc(e.id)}" title="Cancel">${cancelSvg}</button>`;
+                } else if (status === 'failed' || status === 'cancelled') {
+                    action = `<button class="mq-action retry" data-mq-retry="${esc(e.id)}" title="Retry">${retrySvg}</button>`;
                 }
                 const progressStrip = status === 'downloading'
-                    ? `<div class="mdl-progress"><div class="mdl-progress-bar" style="width:${pct}%"></div></div>`
+                    ? `<div class="mq-progress"><div class="mq-progress-bar" style="width:${pct}%"></div></div>`
                     : '';
                 const art = e.thumbnail
                     ? `<img src="${esc(e.thumbnail)}" loading="lazy" />`
                     : '';
                 const sub = e.album
                     ? `${esc(e.artist || 'Unknown')} · ${esc(e.album)}`
-                    : esc(e.artist || '');
+                    : esc(e.artist || 'Unknown');
+                // Inline error: only rendered for failed rows. Click on the row
+                // toggles .error-dismissed so the user can collapse it; retry
+                // re-renders the row fresh.
+                const errorRow = status === 'failed'
+                    ? `<div class="mq-error" title="${esc(e.error || 'Download failed')}">${esc(e.error || 'Download failed — click retry to try again.')}</div>`
+                    : '';
                 return `
-                    <div class="mdl-row mdl-row-${status}" data-mdl-id="${esc(e.id)}">
-                        <div class="mdl-art">${art}</div>
-                        <div class="mdl-meta">
-                            <div class="mdl-title">${esc(e.title || 'Loading…')}</div>
-                            <div class="mdl-sub">${sub}</div>
+                    <div class="mq-row is-${status}" data-mq-id="${esc(e.id)}">
+                        <div class="mq-art">${art}</div>
+                        <div class="mq-details">
+                            <div class="mq-title">${esc(e.title || 'Loading…')}</div>
+                            <div class="mq-sub">${sub}</div>
+                            ${errorRow}
                         </div>
-                        <span class="mdl-status-pill ${status}">${esc(pillText)}</span>
-                        ${action || '<span></span>'}
+                        <span class="mq-status-pill ${status}">${esc(pillText)}</span>
+                        ${action}
                         ${progressStrip}
                     </div>`;
             };
@@ -19387,6 +19643,7 @@
                 const total = entries.length;
                 const done = entries.filter(e => e.status === 'done').length;
                 const dlInFlight = entries.filter(e => e.status === 'downloading').length;
+                const queuedCount = entries.filter(e => e.status === 'queued').length;
                 const failed = entries.filter(e => e.status === 'failed').length;
                 const totalProgress = entries.reduce((acc, e) => acc + (e.status === 'done' ? 100 : (e.progress || 0)), 0);
                 const aggPct = total ? Math.round(totalProgress / total) : 0;
@@ -19394,26 +19651,34 @@
                 const albumArtist = entries[0].artist || '';
                 const cover = entries.find(e => e.thumbnail)?.thumbnail || '';
                 const allDone = done === total;
-                const cancelSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-                const chevSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-                const cancelAllBtn = (dlInFlight + (total - done - failed - dlInFlight)) > 0
-                    ? `<button class="mdl-action mdl-cancel-album" data-mdl-cancel-album="${esc(g.album_id)}" title="Cancel remaining">${cancelSvg}</button>`
+                const inFlightOrQueued = dlInFlight + queuedCount;
+                const cancelAllBtn = inFlightOrQueued > 0
+                    ? `<button class="mq-action cancel" data-mq-cancel-album="${esc(g.album_id)}" title="Cancel remaining">${cancelSvg}</button>`
+                    : '';
+                const progressLabel = allDone
+                    ? 'Complete'
+                    : (inFlightOrQueued > 0 ? `${aggPct}%` : `${done}/${total}`);
+                // Aggregate progress bar on the header (only while there's work
+                // in flight or queued). Same look as a regular .mq-row progress.
+                const aggProgressStrip = (inFlightOrQueued > 0)
+                    ? `<div class="mq-album-progress"><div class="mq-album-progress-bar" style="width:${aggPct}%"></div></div>`
                     : '';
                 return `
-                    <div class="mdl-album-group" data-mdl-group="${esc(g.album_id)}">
-                        <button class="mdl-album-header" type="button" data-mdl-toggle-group="${esc(g.album_id)}">
-                            <div class="mdl-album-art">${cover ? `<img src="${esc(cover)}" loading="lazy" />` : ''}</div>
-                            <div class="mdl-album-meta">
-                                <div class="mdl-album-title">${esc(albumTitle)}</div>
-                                <div class="mdl-album-sub">${esc(albumArtist)} · ${done}/${total} downloaded${failed ? ' · ' + failed + ' failed' : ''}</div>
+                    <div class="mq-album-group" data-mq-group="${esc(g.album_id)}">
+                        <button class="mq-album-header" type="button" data-mq-toggle-group="${esc(g.album_id)}">
+                            <div class="mq-album-art">${cover ? `<img src="${esc(cover)}" loading="lazy" />` : ''}</div>
+                            <div class="mq-album-details">
+                                <div class="mq-album-title">${esc(albumTitle)}</div>
+                                <div class="mq-album-sub">${esc(albumArtist)} · ${done}/${total} downloaded${failed ? ' · ' + failed + ' failed' : ''}</div>
                             </div>
-                            <span class="mdl-album-progress">${allDone ? 'Complete' : aggPct + '%'}</span>
-                            <div class="mdl-album-actions">
+                            <span class="mq-album-progress-label">${progressLabel}</span>
+                            <div class="mq-album-actions">
                                 ${cancelAllBtn}
-                                <span class="mdl-album-chev">${chevSvg}</span>
+                                <span class="mq-album-chev">${chevSvg}</span>
                             </div>
+                            ${aggProgressStrip}
                         </button>
-                        <div class="mdl-album-body">
+                        <div class="mq-album-body">
                             ${entries.map(rowHtml).join('')}
                         </div>
                     </div>`;
@@ -19421,16 +19686,28 @@
 
             // Persist which album groups are expanded across re-renders.
             const expanded = new Set();
-            list.querySelectorAll('.mdl-album-group.expanded').forEach(el => {
-                expanded.add(el.getAttribute('data-mdl-group'));
+            list.querySelectorAll('.mq-album-group.expanded').forEach(el => {
+                expanded.add(el.getAttribute('data-mq-group'));
+            });
+            // Also persist which failed rows the user has dismissed the
+            // inline error on, so a re-render doesn't keep popping it back.
+            const dismissed = new Set();
+            list.querySelectorAll('.mq-row.error-dismissed').forEach(el => {
+                dismissed.add(el.getAttribute('data-mq-id'));
             });
 
             list.innerHTML = albumGroups.map(groupHtml).join('') + singles.map(rowHtml).join('');
 
             // Restore expanded state
-            list.querySelectorAll('.mdl-album-group').forEach(el => {
-                if (expanded.has(el.getAttribute('data-mdl-group'))) {
+            list.querySelectorAll('.mq-album-group').forEach(el => {
+                if (expanded.has(el.getAttribute('data-mq-group'))) {
                     el.classList.add('expanded');
+                }
+            });
+            // Restore dismissed-error state
+            list.querySelectorAll('.mq-row.is-failed').forEach(el => {
+                if (dismissed.has(el.getAttribute('data-mq-id'))) {
+                    el.classList.add('error-dismissed');
                 }
             });
 
@@ -19453,10 +19730,10 @@
             }
 
             // Wire row actions
-            list.querySelectorAll('[data-mdl-cancel]').forEach(btn => {
+            list.querySelectorAll('[data-mq-cancel]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const id = btn.getAttribute('data-mdl-cancel');
+                    const id = btn.getAttribute('data-mq-cancel');
                     if (!id) return;
                     // Optimistic: remove from local list if queued (will re-render
                     // from backend on the event); downloading stays until backend
@@ -19464,28 +19741,41 @@
                     try { pywebview.api.cancel_music_queue_item(id); } catch (_) {}
                 });
             });
-            list.querySelectorAll('[data-mdl-retry]').forEach(btn => {
+            list.querySelectorAll('[data-mq-retry]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const id = btn.getAttribute('data-mdl-retry');
+                    const id = btn.getAttribute('data-mq-retry');
                     if (!id) return;
+                    // Clear the dismissed-error marker so a future failure shows
+                    // a fresh inline error.
+                    const row = btn.closest('.mq-row');
+                    if (row) row.classList.remove('error-dismissed');
                     try { pywebview.api.retry_music_queue_item(id); } catch (_) {}
                 });
             });
-            list.querySelectorAll('[data-mdl-cancel-album]').forEach(btn => {
+            list.querySelectorAll('[data-mq-cancel-album]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const aid = btn.getAttribute('data-mdl-cancel-album');
+                    const aid = btn.getAttribute('data-mq-cancel-album');
                     if (!aid) return;
                     try { pywebview.api.cancel_music_album_queued(aid); } catch (_) {}
                 });
             });
-            list.querySelectorAll('[data-mdl-toggle-group]').forEach(btn => {
+            list.querySelectorAll('[data-mq-toggle-group]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    // Don't toggle if user clicked an action button inside the header
-                    if (e.target.closest('.mdl-action')) return;
-                    const group = btn.closest('.mdl-album-group');
+                    // Don't toggle if the user clicked an action button inside
+                    // the header (cancel-all, etc.)
+                    if (e.target.closest('.mq-action')) return;
+                    const group = btn.closest('.mq-album-group');
                     if (group) group.classList.toggle('expanded');
+                });
+            });
+            // Click anywhere on a failed row body to collapse the inline error.
+            // Excludes the action button so retry still fires.
+            list.querySelectorAll('.mq-row.is-failed').forEach(row => {
+                row.addEventListener('click', (e) => {
+                    if (e.target.closest('.mq-action')) return;
+                    row.classList.toggle('error-dismissed');
                 });
             });
         }
@@ -19493,9 +19783,9 @@
         // Wire "Clear completed" + prime the badge on app start. The script
         // block evaluates after the HTML is parsed (script at end of body),
         // so the elements exist now. Defer slightly so pywebview.api is up.
-        (function _mdlInit() {
+        (function _mqInit() {
             const wire = () => {
-                const clearBtn = document.getElementById('mdl-clear-done');
+                const clearBtn = document.getElementById('mq-clear-done');
                 if (clearBtn && !clearBtn._wired) {
                     clearBtn._wired = true;
                     clearBtn.addEventListener('click', () => {
@@ -19514,6 +19804,26 @@
                 setTimeout(wire, 1000);
             }
         })();
+
+        // Backend → frontend bridge fired when _music_collection_worker fails
+        // to resolve an album/playlist/artist URL (or finds zero tracks). Today
+        // the search row's .downloading visual would stay forever because no
+        // per-track event ever fires for a failed resolve. Clear it here + toast.
+        window.updateMusicCollectionResolveError = function(collectionId, errorMsg) {
+            try {
+                if (collectionId) {
+                    const safe = (window.CSS && CSS.escape) ? CSS.escape(collectionId) : String(collectionId).replace(/"/g, '\\"');
+                    document.querySelectorAll(`.music-track-row[data-track-id="${safe}"]`).forEach(row => {
+                        row.classList.remove('downloading');
+                    });
+                    if (_musicState && _musicState.downloading) {
+                        _musicState.downloading.delete(collectionId);
+                    }
+                }
+                const msg = errorMsg ? String(errorMsg) : 'Resolve failed';
+                showToast('Couldn’t resolve this — ' + msg, null, null);
+            } catch (_) {}
+        };
 
         // ----- Dock + audio playback -----
         // --- Pointer-capture drag helper for any horizontal slider track ---

@@ -1,4 +1,4 @@
-import os, threading, webview, re, json, sys, time, subprocess, shutil, importlib.metadata
+import os, threading, webview, re, json, sys, time, subprocess, shutil, importlib.metadata, traceback
 
 # Defense-in-depth UTF-8 reconfigure (main.py also does this). Belongs here too
 # so logic.py is safe to import even when launched via paths that don't run our
@@ -3051,6 +3051,15 @@ class API:
                     video_ids.append(vid)
             if not video_ids:
                 self._send_to_js('showToast', f'No tracks found in this {kind}.', None, None)
+                # Also clear any search-row spinner waiting on this collection.
+                try:
+                    self._send_to_js(
+                        'updateMusicCollectionResolveError',
+                        collection_id or '',
+                        f'No tracks found in this {kind}.',
+                    )
+                except Exception:
+                    pass
                 return
             # Cap artist downloads at 25 tracks so we don't accidentally grab a whole channel
             if kind == 'artist' and len(video_ids) > 25:
@@ -3230,8 +3239,24 @@ class API:
             if kind == 'album' and queued == 0:
                 self._mark_album_complete_if_done(album_id)
         except Exception as e:
-            print(f'[ProTube/music] collection download failed: {e}')
+            # Log full traceback to protube.log; print() under pythonw is dropped.
+            tb = traceback.format_exc()
+            self._log_to_protube_log(
+                f'[ProTube/music-collection] failed: {kind} {url}: {e}\n{tb}'
+            )
             self._send_to_js('showToast', f'{kind.title()} download failed: {e}', None, None)
+            # Tell the frontend the collection resolve failed so any search-row
+            # that's been spinning on this collection_id can clear its
+            # .downloading state — otherwise it sits forever (no per-track
+            # event ever fires for an empty/erroring resolve).
+            try:
+                self._send_to_js(
+                    'updateMusicCollectionResolveError',
+                    collection_id or '',
+                    str(e),
+                )
+            except Exception:
+                pass
 
     def _music_download_worker(self, url, album_id=None, queue_id=None):
         """Background worker: extract metadata, download audio, embed tags + art,
@@ -3428,7 +3453,13 @@ class API:
                 pass
             self._finalize_cancelled(queue_id)
         except Exception as e:
-            print(f'[ProTube/music] download failed: {e}')
+            # Persist the full traceback to data/protube.log so the user can
+            # see why a track failed after the fact. The toast is transient
+            # and `print()` under pythonw is discarded.
+            tb = traceback.format_exc()
+            self._log_to_protube_log(
+                f'[ProTube/music-dl] failed: {url}: {e}\n{tb}'
+            )
             self._send_to_js('showToast', f'Music download failed: {e}', None, None)
             if queue_id:
                 self._update_music_queue_entry(
@@ -7099,3 +7130,19 @@ class API:
     
     def _send_to_js(self, func, *args):
         if webview.windows: webview.windows[0].evaluate_js(f"{func}({', '.join(json.dumps(a) for a in args)})")
+
+    def _log_to_protube_log(self, msg):
+        """Append a line to data/protube.log so failures are visible after the
+        fact. pythonw discards stdout, so plain print() vanishes; this is the
+        same file main.py's _log_diag writes to. Best-effort, never raises."""
+        try:
+            from app_paths import data_dir
+            log_path = os.path.join(data_dir(), 'protube.log')
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(msg.rstrip('\n') + '\n')
+        except Exception:
+            pass
+        try:
+            print(msg)
+        except Exception:
+            pass
