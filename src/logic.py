@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -5160,16 +5160,47 @@ class API:
         tag = str(gh.get('tag_name') or '').strip()
         latest = tag[1:] if tag.lower().startswith('v') else tag
 
+        # Pick the right asset for the platform we're running on. The original
+        # filter was `.exe`-only, which left downloadUrl empty for Mac users
+        # (their release asset is a .zip) so the in-app Download button did
+        # nothing. Match by extension AND a platform keyword so Mac doesn't
+        # accidentally grab a Windows zip when both are attached to one release.
+        # Two-pass: keyword+ext required first, ext-only as fallback for legacy
+        # releases (v1.0.0–v1.2.0 named the .exe without a 'windows' keyword).
+        if sys.platform == 'darwin':
+            kw, exts = ('mac', 'osx', 'darwin'), ('.dmg', '.zip')
+        elif sys.platform == 'win32':
+            kw, exts = ('win',), ('.exe', '.msi', '.zip')
+        else:
+            kw, exts = ('linux',), ('.appimage', '.deb', '.tar.gz', '.zip')
+
+        assets = gh.get('assets') or []
+        picked = None
+        for ext in exts:
+            for asset in assets:
+                name = (asset.get('name') or '').lower()
+                if name.endswith(ext) and any(k in name for k in kw):
+                    picked = asset
+                    break
+            if picked:
+                break
+        if not picked:
+            for ext in exts:
+                for asset in assets:
+                    name = (asset.get('name') or '').lower()
+                    if name.endswith(ext):
+                        picked = asset
+                        break
+                if picked:
+                    break
+
         download_url = ''
         download_size_mb = None
-        for asset in (gh.get('assets') or []):
-            name = (asset.get('name') or '').lower()
-            if name.endswith('.exe'):
-                download_url = asset.get('browser_download_url') or ''
-                size_bytes = asset.get('size') or 0
-                if size_bytes:
-                    download_size_mb = round(size_bytes / (1024 * 1024), 1)
-                break
+        if picked:
+            download_url = picked.get('browser_download_url') or ''
+            size_bytes = picked.get('size') or 0
+            if size_bytes:
+                download_size_mb = round(size_bytes / (1024 * 1024), 1)
 
         return None, {
             'latest': latest or '0.0.0',

@@ -18,6 +18,12 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.3.2 — 2026-05-17 (hotfix)
+
+- Fixes: **In-app update Download button did nothing on Mac.** The GitHub-releases asset picker filtered for `.exe` only, so on Mac (where the release asset is a `.zip`) the resolved `downloadUrl` came back empty — the update pill would fire and the modal would open, but clicking Download was a no-op. Now platform-aware: matches `.dmg`/`.zip` (Mac), `.exe`/`.msi`/`.zip` (Windows), or `.AppImage`/`.deb`/`.tar.gz`/`.zip` (Linux), and disambiguates with a platform keyword (`mac`/`win`/`linux`) in the asset name so a Mac install doesn't accidentally grab the Windows zip when both are attached to one release. Existing Mac users on v1.3.0 or v1.3.1 need one manual update to v1.3.2 from the GitHub Releases page — after that, in-app auto-update works for every release going forward.
+
+---
+
 ## v1.3.1 — 2026-05-17 (hotfix)
 
 - Fixes: **2K / 4K downloads silently saved as 1080p.** The format selector preferred AVC1 (H.264) MP4 first for maximum device compatibility — but YouTube only serves AVC1 up to 1080p. At 1440p / 2160p the streams are AV1-in-MP4 or VP9-in-WebM, so the AVC1-preferred selector quietly resolved to the 1080p AVC1 stream even when you'd picked 2K or 4K. Above 1080p we now skip the AVC1 filter and take AV1-in-MP4 (or VP9 as a fallback); the in-app player already decodes both natively, so playback is unchanged. ≤1080p selection is untouched (still AVC1-preferred for Smart-TV-grade compatibility).
