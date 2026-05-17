@@ -23,6 +23,9 @@ __pycache__/
 # pyinstaller. icon.ico is small and stays committed.
 assets/ffmpeg.exe
 assets/ffprobe.exe
+# Mac equivalents — grab static universal2 builds from evermeet.cx.
+assets/mac/ffmpeg
+assets/mac/ffprobe
 
 # --- DEV/TEST SCREENSHOTS ---
 # May contain personal library/queue contents. Not source.

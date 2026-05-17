@@ -1,4 +1,4 @@
-import os, threading, webview, re, json, sys, time, subprocess, shutil, importlib.metadata, traceback
+import os, threading, webview, re, json, sys, time, subprocess, shutil, importlib.metadata, traceback, contextlib
 
 # Defense-in-depth UTF-8 reconfigure (main.py also does this). Belongs here too
 # so logic.py is safe to import even when launched via paths that don't run our
@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -60,15 +60,21 @@ GITHUB_RELEASES_URL_DEFAULT = 'https://api.github.com/repos/Cincade/ProTube-Save
 
 def _resolve_ffmpeg_location():
     """
-    Locate ffmpeg. When running as a PyInstaller bundle, ffmpeg.exe and ffprobe.exe
-    are packed next to the executable in sys._MEIPASS. During development, yt-dlp
-    will fall back to whatever's on PATH if this returns None.
+    Locate ffmpeg. When running as a PyInstaller bundle, ffmpeg(.exe) and
+    ffprobe(.exe) are packed next to the executable in sys._MEIPASS. During
+    development on Mac we also look in assets/mac/. Windows dev falls through
+    to PATH (yt-dlp handles that).
     """
+    _exe = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
     if hasattr(sys, '_MEIPASS'):
-        # PyInstaller bundle — ffmpeg lives in the temp extraction dir
-        bundled = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
+        bundled = os.path.join(sys._MEIPASS, _exe)
         if os.path.exists(bundled):
             return sys._MEIPASS  # yt-dlp wants the DIRECTORY, not the exe path
+    if sys.platform == 'darwin':
+        _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _mac_dir = os.path.join(_root, 'assets', 'mac')
+        if os.path.isfile(os.path.join(_mac_dir, 'ffmpeg')):
+            return _mac_dir
     return None  # Dev mode — let yt-dlp use PATH
 
 
@@ -158,6 +164,9 @@ class API:
         self._music_queue_event = threading.Event()
         self._music_queue_active = 0   # in-flight worker count
         self._music_queue_cancelled_ids = set()   # ids the user asked to cancel mid-flight
+        # Last integer % we emitted per queue id — used to throttle progress
+        # events to whole-percent changes only (avoids ~10/sec re-render spam).
+        self._music_queue_last_pct = {}
         self._sanitize_music_queue_on_startup()
         threading.Thread(target=self._music_queue_processor, daemon=True).start()
 
@@ -1867,7 +1876,16 @@ class API:
     def _save_settings(self):
         """Atomic write: dump to a temp file, then rename. On any OS, the rename is atomic
         within the same directory — so readers never see a half-written file. If the write
-        fails mid-way, the original settings.json stays intact."""
+        fails mid-way, the original settings.json stays intact.
+
+        When inside a `_deferred_save()` context, the actual write is skipped
+        and the dirty flag is set instead — the context manager flushes once
+        on exit. Used to coalesce the 4 writes/track on the album download
+        hot path (library add + album bump + cover ensure + queue patch) down
+        to a single write per track."""
+        if getattr(self, '_save_deferred', False):
+            self._save_dirty = True
+            return
         tmp = self.settings_file + '.tmp'
         try:
             with open(tmp, 'w', encoding='utf-8') as f:
@@ -1884,6 +1902,26 @@ class API:
             except OSError:
                 pass
             print(f'[ProTube] settings save failed: {e}')
+
+    @contextlib.contextmanager
+    def _deferred_save(self):
+        """Coalesce multiple _save_settings calls into a single write at
+        context exit. Re-entrant — nested deferrals flush only at the outer-
+        most exit. Use on hot paths that mutate settings several times in
+        succession (album download finalize, batch repair, etc.)."""
+        if getattr(self, '_save_deferred', False):
+            # Already deferring (nested) — just yield, outer scope flushes.
+            yield
+            return
+        self._save_deferred = True
+        self._save_dirty = False
+        try:
+            yield
+        finally:
+            self._save_deferred = False
+            if self._save_dirty:
+                self._save_dirty = False
+                self._save_settings()
     def on_dom_ready(self): pass
     def choose_folder(self):
         result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
@@ -2643,6 +2681,168 @@ class API:
         except Exception as e:
             return {'error': str(e)}
 
+    def record_video_search(self, query):
+        """Same as record_music_search but for the video Search tab."""
+        try:
+            q = (query or '').strip()
+            if not q:
+                return {'ok': True}
+            lst = self.settings.get('video_recent_searches', []) or []
+            lst = [x for x in lst if x.lower() != q.lower()]
+            lst.insert(0, q)
+            self.settings['video_recent_searches'] = lst[:12]
+            self._save_settings()
+            return {'ok': True}
+        except Exception as e:
+            return {'error': str(e)}
+
+    def get_video_for_you(self):
+        """Video-search landing data — direct parallel of `get_music_for_you()`.
+        Returns the same 6-row shape so the Search view's empty state feels
+        identical to the Music tab's:
+
+          {
+            recent_searches: [str, ...]      # cap 8
+            recent_library:  [video, ...]    # last 8 added
+            top_uploader:    str|None        # most-represented uploader in library
+            because_you:     [search-result, ...]  # 6 videos by top_uploader (cached)
+            trending:        [search-result, ...]  # 6 trending YT videos (cached)
+            shuffled_lib:    [video, ...]    # 6 random library videos
+          }
+        All sub-arrays may be empty; frontend hides empty rows."""
+        import random
+        result = {
+            'recent_searches': [],
+            'recent_library': [],
+            'top_uploader': None,
+            'because_you': [],
+            'trending': [],
+            'shuffled_lib': [],
+        }
+        try:
+            result['recent_searches'] = (self.settings.get('video_recent_searches', []) or [])[:8]
+
+            lib = list(self.settings.get('library', []) or [])
+            def _proj(v):
+                return {
+                    'id': v.get('id') or '',
+                    'title': v.get('title') or 'Untitled',
+                    'uploader': v.get('uploader') or '',
+                    'thumbnail': v.get('thumbnail') or '',
+                    'type': v.get('type') or 'video',
+                }
+            if lib:
+                # Last 8 added — by added_at desc.
+                lib_sorted = sorted(lib, key=lambda v: int(v.get('added_at') or 0), reverse=True)
+                result['recent_library'] = [_proj(v) for v in lib_sorted[:8]]
+                # Top uploader by count.
+                counts = {}
+                for v in lib:
+                    u = (v.get('uploader') or '').strip()
+                    if u:
+                        counts[u] = counts.get(u, 0) + 1
+                if counts:
+                    result['top_uploader'] = max(counts.items(), key=lambda kv: kv[1])[0]
+                # Shuffled — prefer entries NOT by the top uploader so the row
+                # feels different from "Because you have X". Falls back to the
+                # whole library if there aren't enough non-top-uploader items.
+                pool = [v for v in lib if (v.get('uploader') or '') != result['top_uploader']]
+                if len(pool) < 6:
+                    pool = lib
+                random.shuffle(pool)
+                result['shuffled_lib'] = [_proj(v) for v in pool[:6]]
+
+            # "Because you have [Top Uploader]" — search YouTube for that
+            # uploader's videos. Cached 24h to avoid hitting Innertube every
+            # mount. Filter out library dupes so the row offers genuinely
+            # new content.
+            if result['top_uploader']:
+                cached_key = f'video_because_you_cache_{result["top_uploader"]}'
+                cached = self.settings.get(cached_key)
+                if cached and (int(time.time()) - cached.get('at', 0)) < 86400:
+                    result['because_you'] = cached.get('items', [])
+                else:
+                    try:
+                        sr = self.search_youtube(result['top_uploader'], count=12, kind='videos')
+                        items = (sr or {}).get('results', []) or []
+                        dedup = self._build_dedup_sets()
+                        lib_ids = dedup.get('library_ids', set()) if isinstance(dedup, dict) else set()
+                        items = [i for i in items if isinstance(i, dict) and i.get('type') == 'video' and i.get('id') not in lib_ids][:6]
+                        result['because_you'] = items
+                        self.settings[cached_key] = {'at': int(time.time()), 'items': items}
+                        self._save_settings()
+                    except Exception:
+                        pass
+
+            # Trending — YouTube's daily trending feed via Innertube browse.
+            # 24h cache. Same pattern as music's _fetch_yt_music_trending.
+            cached_trend = self.settings.get('video_trending_cache')
+            if cached_trend and (int(time.time()) - cached_trend.get('at', 0)) < 86400:
+                result['trending'] = cached_trend.get('items', [])
+            else:
+                try:
+                    result['trending'] = self._fetch_yt_trending()
+                    self.settings['video_trending_cache'] = {'at': int(time.time()), 'items': result['trending']}
+                    self._save_settings()
+                except Exception:
+                    pass
+
+            return result
+        except Exception as e:
+            print(f'[ProTube] video for-you build failed: {e}')
+            return result
+
+    def _fetch_yt_trending(self):
+        """Hit YouTube's trending feed (browseId=FEtrending) via Innertube
+        and pluck 6 trending videos. Mirrors _fetch_yt_music_trending."""
+        body = {
+            'context': {'client': dict(self._INNERTUBE_CLIENT)},
+            'browseId': 'FEtrending',
+        }
+        sess = self._get_innertube_session()
+        try:
+            resp = sess.post('https://www.youtube.com/youtubei/v1/browse',
+                             params={'prettyPrint': 'false'}, json=body, timeout=15)
+        except requests.RequestException:
+            return []
+        if resp.status_code != 200:
+            return []
+        try:
+            data = resp.json()
+        except ValueError:
+            return []
+        # Walk the response for any videoRenderer items (the trending tab
+        # nests them several levels deep under sectionListRenderer →
+        # itemSectionRenderer → contents → shelfRenderer → content →
+        # expandedShelfContentsRenderer → items; recurse to keep it simple).
+        items = []
+        dedup = self._build_dedup_sets()
+        def walk(node):
+            if not isinstance(node, (dict, list)) or len(items) >= 6:
+                return
+            if isinstance(node, dict):
+                if 'videoRenderer' in node:
+                    parsed = self._innertube_parse_item({'videoRenderer': node['videoRenderer']}, dedup)
+                    if parsed and parsed.get('type') == 'video':
+                        if not any(p.get('id') == parsed.get('id') for p in items):
+                            items.append(parsed)
+                    return
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+        walk(data)
+        return items[:6]
+
+    def clear_video_recent_searches(self):
+        try:
+            self.settings['video_recent_searches'] = []
+            self._save_settings()
+            return {'ok': True}
+        except Exception as e:
+            return {'error': str(e)}
+
     def get_music_for_you(self):
         """Build the 'For You' search-empty landing rows. Returns:
           {
@@ -2813,6 +3013,7 @@ class API:
 
             music_lib_ids = self._build_music_library_id_set()
             results = []
+            continuation = ''
             for s in sections:
                 shelf = s.get('musicShelfRenderer')
                 if not shelf:
@@ -2824,11 +3025,83 @@ class API:
                     parsed = self._parse_music_shelf_item(item, kind, music_lib_ids)
                     if parsed:
                         results.append(parsed)
+                # YT Music puts the "next page" token on the shelf itself. Only
+                # the FIRST shelf we hit gets its continuation captured (other
+                # shelves would represent a different kind, which we don't mix
+                # across pages).
+                if not continuation:
+                    continuation = self._extract_music_continuation(shelf)
 
-            return {'results': results, 'kind': kind, 'count': len(results)}
+            return {'results': results, 'kind': kind, 'count': len(results),
+                    'continuation': continuation}
         except Exception as exc:
             print(f'[ProTube] music search failed: {exc}')
             return {'error': f'Music search failed: {exc}'}
+
+    @staticmethod
+    def _extract_music_continuation(shelf):
+        """Pull the continuation token out of a musicShelfRenderer or
+        musicShelfContinuation. Returns '' when there's no next page."""
+        try:
+            conts = shelf.get('continuations') or []
+            for c in conts:
+                tok = (c.get('nextContinuationData') or {}).get('continuation')
+                if tok:
+                    return tok
+                # InnerTube sometimes wraps the same token under reloadContinuationData
+                tok = (c.get('reloadContinuationData') or {}).get('continuation')
+                if tok:
+                    return tok
+        except Exception:
+            pass
+        return ''
+
+    def search_youtube_music_continuation(self, continuation, kind='songs'):
+        """Fetch the next page of music search results. Frontend calls this
+        when the user scrolls near the bottom of the results list. Returns
+        the same shape as search_youtube_music — { results, kind, continuation }.
+        Empty continuation in the response means we've hit the end."""
+        try:
+            tok = (continuation or '').strip()
+            if not tok:
+                return {'results': [], 'kind': kind, 'continuation': ''}
+            body = {
+                'context': {'client': dict(self._MUSIC_INNERTUBE_CLIENT)},
+            }
+            sess = self._get_music_innertube_session()
+            try:
+                resp = sess.post(
+                    self._MUSIC_INNERTUBE_URL,
+                    params={'prettyPrint': 'false', 'continuation': tok},
+                    json=body,
+                    timeout=15,
+                )
+            except requests.RequestException as exc:
+                return {'error': f'Network error: {exc}'}
+            if resp.status_code != 200:
+                return {'error': f'YT Music HTTP {resp.status_code}'}
+            try:
+                data = resp.json()
+            except ValueError:
+                return {'error': 'YT Music returned non-JSON'}
+
+            # Continuation response: continuationContents.musicShelfContinuation
+            cont = (data.get('continuationContents') or {}).get('musicShelfContinuation') or {}
+            music_lib_ids = self._build_music_library_id_set()
+            results = []
+            for c in (cont.get('contents') or []):
+                item = c.get('musicResponsiveListItemRenderer')
+                if not item:
+                    continue
+                parsed = self._parse_music_shelf_item(item, kind, music_lib_ids)
+                if parsed:
+                    results.append(parsed)
+            next_token = self._extract_music_continuation(cont)
+            return {'results': results, 'kind': kind, 'count': len(results),
+                    'continuation': next_token}
+        except Exception as exc:
+            print(f'[ProTube] music search continuation failed: {exc}')
+            return {'error': f'Music search continuation failed: {exc}'}
 
     def _parse_music_shelf_item(self, mrlir, kind, lib_ids):
         """Convert a musicResponsiveListItemRenderer into a clean result dict.
@@ -2932,21 +3205,42 @@ class API:
 
     @staticmethod
     def _resolve_album_artist(info):
-        """YT Music returns the artist on the `artist` field for album browse
-        pages. Fall back chain: artist → creator → uploader (with the auto-
-        topic-channel " - Topic" suffix stripped) → channel → Unknown Artist.
-        Without the Topic strip, Drake's album would read 'Drake - Topic'."""
+        """Resolve an album's artist. YT Music sometimes leaves the top-level
+        `artist`/`uploader` fields empty on browse pages, so we also walk the
+        playlist's child entries and pick the most common artist (excluding
+        'Various Artists' style placeholders). Fall back chain:
+        info-level artist/creator/uploader/channel → entry-level most-common
+        artist → playlist_uploader → 'Unknown Artist'.
+        Without the ' - Topic' strip, Drake's album would read 'Drake - Topic'."""
+        def _strip_topic(v):
+            v = (v or '').strip()
+            if v.endswith(' - Topic'):
+                v = v[:-len(' - Topic')]
+            return v
         for key in ('artist', 'creator'):
             v = info.get(key)
             if v:
                 return v
         for key in ('uploader', 'channel'):
-            v = info.get(key) or ''
+            v = _strip_topic(info.get(key))
             if v:
-                # YT auto-generates per-artist 'X - Topic' channels for music
-                if v.endswith(' - Topic'):
-                    v = v[:-len(' - Topic')]
                 return v
+        # Walk the album's tracks — most YT Music album tracks carry artist.
+        entries = info.get('entries') or []
+        from collections import Counter
+        counts = Counter()
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            a = e.get('artist') or e.get('creator') or _strip_topic(e.get('uploader') or e.get('channel'))
+            if a and a.lower() not in ('various artists', 'various', ''):
+                counts[a] += 1
+        if counts:
+            return counts.most_common(1)[0][0]
+        # Last-ditch: playlist_uploader from the YT extractor
+        v = _strip_topic(info.get('playlist_uploader'))
+        if v:
+            return v
         return 'Unknown Artist'
 
     @staticmethod
@@ -3408,10 +3702,25 @@ class API:
                     total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
                     if total:
                         pct = (d.get('downloaded_bytes') or 0) * 100 / total
-                    pct_r = round(pct, 1)
-                    self._send_to_js('updateMusicDownload', vid, pct_r)
+                    pct_i = int(round(pct))
+                    # Throttle: only emit on whole-percent change. Avoids the
+                    # ~10x/sec progress-hook spam from yt-dlp causing the queue
+                    # to flicker through full re-renders.
+                    if queue_id and pct_i == self._music_queue_last_pct.get(queue_id):
+                        return
                     if queue_id:
-                        self._update_music_queue_entry(queue_id, {'progress': pct_r})
+                        self._music_queue_last_pct[queue_id] = pct_i
+                    self._send_to_js('updateMusicDownload', vid, pct_i)
+                    # In-memory only — don't persist progress to disk on every
+                    # tick (was triggering settings-write + full queue refresh).
+                    # Frontend updates the row in place via updateMusicDownload.
+                    if queue_id:
+                        with self._music_queue_lock:
+                            q = self.settings.get('music_queue', []) or []
+                            for entry in q:
+                                if entry.get('id') == queue_id:
+                                    entry['progress'] = pct_i
+                                    break
 
             def pp_hook(d):
                 if d.get('status') == 'finished':
@@ -3450,6 +3759,16 @@ class API:
                     local_thumb = cand
                     break
 
+            # Per-track thumbnail = the YouTube video thumb for this song.
+            # Cache it locally via _cache_thumbnail (returns a 'pt:thumb:' marker)
+            # so the album-detail view + player view render instantly instead of
+            # waiting on i.ytimg.com over the network on every paint. Falls back
+            # to the remote URL if the cache attempt fails.
+            remote_thumb = info.get('thumbnail') or ''
+            if not remote_thumb and vid:
+                remote_thumb = f'https://i.ytimg.com/vi/{vid}/hqdefault.jpg'
+            thumb = self._cache_thumbnail(remote_thumb, vid) if (remote_thumb and vid) else remote_thumb
+
             # Build library entry.
             entry = {
                 'id': vid,
@@ -3461,7 +3780,7 @@ class API:
                 'duration_string': self._format_duration(duration_s),
                 'duration_seconds': int(duration_s) if duration_s else 0,
                 'filepath': final_path,
-                'thumbnail': info.get('thumbnail') or '',
+                'thumbnail': thumb,
                 'local_thumbnail': local_thumb,
                 'url': url,
                 'added_at': int(time.time()),
@@ -3470,25 +3789,51 @@ class API:
             # first paint of the music library grid.
             if album_id:
                 entry['album_id'] = album_id
-            self.add_to_music_library(entry)
-            # Increment the album's downloaded_count + emit progress so the card
-            # ring + detail-view counter both update.
-            if album_id:
-                self._bump_album_progress(album_id)
+            # Wrap the post-download finalize in a single deferred-save context.
+            # Previously each of add_to_music_library / _bump_album_progress /
+            # _ensure_album_cover_local / _update_music_queue_entry triggered
+            # its own settings.json write — 4 atomic writes per track. For a
+            # 50-track album that's 200 writes; visible delay before the
+            # library reflects "done". Now: 1 write per track.
+            new_cover_marker = ''
+            with self._deferred_save():
+                self.add_to_music_library(entry)
+                if album_id:
+                    self._bump_album_progress(album_id)
+                    # Extract album cover from the just-downloaded track
+                    # immediately so the library card has real art on first
+                    # paint instead of a placeholder.
+                    try:
+                        albums = self.settings.get('music_albums', []) or []
+                        alb = next((a for a in albums if a.get('id') == album_id), None)
+                        if alb and not (alb.get('cover_url') or '').startswith('pt:thumb:'):
+                            new_cover = self._ensure_album_cover_local(alb)
+                            if new_cover and new_cover != alb.get('cover_url'):
+                                alb['cover_url'] = new_cover
+                                self.settings['music_albums'] = albums
+                                self._save_settings()  # buffered by deferred ctx
+                                new_cover_marker = new_cover
+                    except Exception:
+                        pass
+                if queue_id:
+                    self._update_music_queue_entry(
+                        queue_id,
+                        {
+                            'status': 'done',
+                            'progress': 100,
+                            'completed_at': int(time.time()),
+                            'title': title,
+                            'artist': artist,
+                            'album': album,
+                            'thumbnail': thumb,
+                        },
+                    )
+            # Emit JS events AFTER the single flush — frontend reads from
+            # persistent state next refresh and we don't want the inflight
+            # write to race with the load_music_library callback.
+            if album_id and new_cover_marker:
+                self._send_to_js('musicAlbumCoverResolved', album_id, new_cover_marker)
             self._send_to_js('musicDownloadDone', entry)
-            if queue_id:
-                self._update_music_queue_entry(
-                    queue_id,
-                    {
-                        'status': 'done',
-                        'progress': 100,
-                        'completed_at': int(time.time()),
-                        'title': title,
-                        'artist': artist,
-                        'album': album,
-                        'thumbnail': info.get('thumbnail') or '',
-                    },
-                )
         except _MusicDownloadCancelled:
             # User cancelled while ydl.download() was running. Clean up any
             # partial file the download left behind so a retry starts fresh.
@@ -3749,7 +4094,162 @@ class API:
 
     def load_music_library(self):
         """Frontend reads this on the Music view's mount."""
+        self._repair_music_thumbnails_from_album_cover()
+        self._repair_album_artists_from_tracks()
+        # Background-cache remote per-track thumbnails so album-view rows render
+        # instantly. Async so the Music tab opens immediately; the swaps land
+        # row-by-row as caches complete.
+        try:
+            t = threading.Thread(target=self._backfill_track_thumb_cache, daemon=True)
+            t.start()
+        except Exception:
+            pass
         return self.settings.get('music_library', []) or []
+
+    def _backfill_track_thumb_cache(self):
+        """For every music_library track whose thumbnail is a remote URL,
+        download + cache locally so subsequent renders use pt:thumb: markers
+        (resolved from disk, no network)."""
+        try:
+            lib = self.settings.get('music_library', []) or []
+            changed = False
+            for t in lib:
+                tb = t.get('thumbnail') or ''
+                vid = t.get('id') or ''
+                if not vid or not tb or tb.startswith('pt:thumb:'):
+                    continue
+                marker = self._cache_thumbnail(tb, vid)
+                if marker.startswith('pt:thumb:'):
+                    t['thumbnail'] = marker
+                    changed = True
+            if changed:
+                with self._music_queue_lock:
+                    self.settings['music_library'] = lib
+                    self._save_settings()
+        except Exception:
+            pass
+
+    def _extract_embedded_art(self, audio_path, dest_path):
+        """Pull the embedded album-art image out of an audio file via ffmpeg.
+        Returns True on success. We try this because YouTube's i9.ytimg.com
+        album-cover URLs frequently 404 even with the signed query params
+        yt-dlp captures, so the remote URL can't be trusted as a thumbnail
+        source. The embedded art always works (yt-dlp puts it there)."""
+        try:
+            ffmpeg = self._find_ffmpeg_exe()
+            if not ffmpeg or not os.path.isfile(audio_path):
+                return False
+            r = subprocess.run(
+                [ffmpeg, '-y', '-i', audio_path, '-an', '-vcodec', 'copy', dest_path],
+                capture_output=True, timeout=15,
+                creationflags=(0x08000000 if sys.platform == 'win32' else 0),
+            )
+            return r.returncode == 0 and os.path.isfile(dest_path) and os.path.getsize(dest_path) > 100
+        except Exception:
+            return False
+
+    def _ensure_album_cover_local(self, album):
+        """If an album's cover_url is a remote URL (or absent), try to extract
+        the embedded art from any downloaded track and rewrite cover_url to a
+        local 'pt:thumb:' marker. Returns the new marker, or the existing
+        cover_url if extraction wasn't possible."""
+        if not album:
+            return ''
+        cur = album.get('cover_url') or ''
+        if cur.startswith('pt:thumb:'):
+            return cur
+        aid = album.get('id') or ''
+        if not aid:
+            return cur
+        safe_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', f'alb_{aid}')[:80]
+        local_path = os.path.join(self.thumbnail_cache_dir, f'{safe_id}.jpg')
+        if not os.path.isfile(local_path) or os.path.getsize(local_path) <= 100:
+            lib = self.settings.get('music_library', []) or []
+            src = None
+            for t in lib:
+                if t.get('album_id') == aid and t.get('filepath') and os.path.isfile(t['filepath']):
+                    src = t['filepath']
+                    break
+            if not src:
+                return cur
+            if not self._extract_embedded_art(src, local_path):
+                return cur
+        return f'pt:thumb:{safe_id}.jpg'
+
+    def _repair_album_artists_from_tracks(self):
+        """Existing albums saved before _resolve_album_artist had its track-
+        derived fallback may show 'Unknown Artist'. Fix by walking the album's
+        downloaded tracks and picking the most-common artist. Cheap — only
+        touches albums whose artist is empty or literally 'Unknown Artist'."""
+        try:
+            albums = self.settings.get('music_albums', []) or []
+            if not albums:
+                return
+            lib = self.settings.get('music_library', []) or []
+            from collections import Counter
+            changed = False
+            for a in albums:
+                cur = (a.get('artist') or '').strip()
+                if cur and cur.lower() not in ('unknown artist', 'unknown'):
+                    continue
+                aid = a.get('id')
+                if not aid:
+                    continue
+                tracks = [t for t in lib if t.get('album_id') == aid]
+                counts = Counter()
+                for t in tracks:
+                    artist = (t.get('artist') or '').strip()
+                    if artist and artist.lower() not in ('unknown artist', 'unknown', 'various artists', 'various'):
+                        counts[artist] += 1
+                if counts:
+                    a['artist'] = counts.most_common(1)[0][0]
+                    changed = True
+            if changed:
+                self.settings['music_albums'] = albums
+                self._save_settings()
+        except Exception:
+            pass
+
+    def _repair_music_thumbnails_from_album_cover(self):
+        """Cheap-to-run repair: ensure every album has a local cover (extracted
+        from a downloaded track's embedded art) and undo an earlier mistake
+        where I overwrote per-track thumbnails with the album cover marker.
+        Tracks should keep their own YouTube video thumbnail — that's what
+        renders next to each song in the album detail view and in the player
+        view; the album cover is only for the album card."""
+        try:
+            albums = self.settings.get('music_albums', []) or []
+            if not albums:
+                return
+            changed_albums = False
+            for a in albums:
+                aid = a.get('id')
+                if not aid:
+                    continue
+                new_cover = self._ensure_album_cover_local(a)
+                if new_cover and new_cover != a.get('cover_url'):
+                    a['cover_url'] = new_cover
+                    changed_albums = True
+            lib = self.settings.get('music_library', []) or []
+            changed_lib = False
+            for t in lib:
+                # Undo the earlier wrong rewrite: if a track's thumbnail points
+                # at an album cover marker (pt:thumb:alb_*), restore it to the
+                # YouTube video thumb derived from the video id. i.ytimg.com's
+                # hqdefault.jpg is reliable for any public YT video id.
+                tb = t.get('thumbnail') or ''
+                vid = t.get('id') or ''
+                if vid and tb.startswith('pt:thumb:alb_'):
+                    t['thumbnail'] = f'https://i.ytimg.com/vi/{vid}/hqdefault.jpg'
+                    changed_lib = True
+            if changed_albums:
+                self.settings['music_albums'] = albums
+            if changed_lib:
+                self.settings['music_library'] = lib
+            if changed_albums or changed_lib:
+                self._save_settings()
+        except Exception:
+            pass
 
     def add_to_music_library(self, track):
         """Append/replace a track in the music library. Dedup by id (latest wins)."""
@@ -6557,14 +7057,18 @@ class API:
 
     def _find_ffprobe(self):
         """Locate ffprobe similar to how _resolve_ffmpeg_location handles ffmpeg."""
+        exe = 'ffprobe.exe' if sys.platform == 'win32' else 'ffprobe'
         if hasattr(sys, '_MEIPASS'):
-            bundled = os.path.join(sys._MEIPASS, 'ffprobe.exe')
+            bundled = os.path.join(sys._MEIPASS, exe)
             if os.path.exists(bundled):
                 return bundled
-        # Dev mode: try PATH
-        ext = '.exe' if sys.platform == 'win32' else ''
+        if sys.platform == 'darwin':
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            local = os.path.join(root, 'assets', 'mac', 'ffprobe')
+            if os.path.isfile(local):
+                return local
         for path_dir in os.environ.get('PATH', '').split(os.pathsep):
-            candidate = os.path.join(path_dir, 'ffprobe' + ext)
+            candidate = os.path.join(path_dir, exe)
             if os.path.isfile(candidate):
                 return candidate
         return None
@@ -6572,14 +7076,19 @@ class API:
     def _find_ffmpeg_exe(self):
         """Locate the ffmpeg executable. self.ffmpeg_location stores a directory
         (yt-dlp wants a directory), but for direct invocation we need the actual
-        ffmpeg.exe path."""
+        ffmpeg(.exe) path."""
+        exe = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
         if hasattr(sys, '_MEIPASS'):
-            bundled = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
+            bundled = os.path.join(sys._MEIPASS, exe)
             if os.path.exists(bundled):
                 return bundled
-        ext = '.exe' if sys.platform == 'win32' else ''
+        if sys.platform == 'darwin':
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            local = os.path.join(root, 'assets', 'mac', 'ffmpeg')
+            if os.path.isfile(local):
+                return local
         for path_dir in os.environ.get('PATH', '').split(os.pathsep):
-            candidate = os.path.join(path_dir, 'ffmpeg' + ext)
+            candidate = os.path.join(path_dir, exe)
             if os.path.isfile(candidate):
                 return candidate
         return None

@@ -240,14 +240,25 @@
         .rail-header {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 4px 6px;
+            /* Padding-left is set so the LOGO's HORIZONTAL CENTER lines up
+               with the nav-icon center below (not the left edge). Rail-item
+               has padding-left 10 + icon 16 → icon center at 18px from rail
+               edge. Logo is 28×28, so its center sits at padding-left + 14.
+               Setting padding-left to 4 puts the logo center at 18 = icon
+               center. The brand label drifts a touch left as a side effect;
+               acceptable for the user's "icons + logo aligned" requirement. */
+            gap: 11px;
+            padding: 4px 4px 4px 4px;
             margin-bottom: 16px;
             min-height: 32px;
         }
 
         .cockpit.rail-collapsed .rail-header {
             justify-content: center;
+            /* gap: 0 in collapsed mode so the (hidden) brand-text + (hidden)
+               collapse-btn don't push the logo off-center via their flex gap.
+               Matches the same fix on .rail-item in collapsed mode. */
+            gap: 0;
             padding: 4px 0;
         }
 
@@ -2976,6 +2987,17 @@
             padding: 3px 9px; border-radius: 4px;
         }
         .sr-already svg { width: 12px; height: 12px; }
+        /* Pending state shown between "click + to add" and backend confirming
+           the video actually landed in the queue. Subtler than .sr-already
+           (no green checkmark) so the user can tell at a glance it's still
+           in flight. */
+        .sr-pending {
+            font-size: 12px; font-weight: 600;
+            color: #8a8a8a;
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(115, 115, 115, 0.12);
+            padding: 3px 9px; border-radius: 4px;
+        }
         /* Channel result — distinct from video/playlist:
            - circular avatar (smaller, vertically centered with text)
            - title slightly heavier
@@ -3082,19 +3104,8 @@
             pointer-events: none;
         }
         .search-result-card { position: relative; }
-        .search-result-card.selected .sr-thumb::after {
-            content: '';
-            position: absolute;
-            top: 6px; right: 6px;
-            width: 22px; height: 22px;
-            background: #3b82f6;
-            border-radius: 50%;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>");
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: 14px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-        }
+        /* Selected checkmark badge removed — the row's blue border + tint at
+           .search-result-card.selected (above) is enough to convey selection. */
 
         /* Bottom action bar — slides up from bottom of search view when items are selected. */
         .search-action-bar {
@@ -3260,6 +3271,7 @@
             margin-bottom: 6px;
             display: flex;
             align-items: center;
+            flex-wrap: nowrap;
             gap: 12px;
             transition: all 0.15s;
             background: #0f0f0f;
@@ -3361,6 +3373,19 @@
             color: #a0a0a0;
             border: 1px solid rgba(115, 115, 115, 0.3);
         }
+        /* Green check badge — same visual identity as .mtr-add.in-library
+           "already in library" indicator. Used in place of a "Done" pill so
+           done-state reads as the same primitive across search + queue. */
+        .mq-done-check {
+            width: 28px; height: 28px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #10b981;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .mq-done-check svg { width: 14px; height: 14px; display: block; }
 
         /* Cancel/retry icon button — mirrors .status-icon-btn from the video
            queue (square 22×22, border-radius 5px, same hover token language).
@@ -3390,18 +3415,27 @@
         }
         .mq-action svg { width: 12px; height: 12px; display: block; }
 
-        /* Progress bar — pinned to the bottom edge of the row, same blue
-           accent + 4px height as .progress-bar-bg in the video queue.
-           Visible only while downloading. */
+        /* Progress group — text + bar stacked, mirrors the video queue's
+           .progress-container which shows percent above the fill bar. Inline
+           below the title/sub instead of floating at the row edge. */
         .mq-progress {
-            position: absolute;
-            left: 12px; right: 12px;
-            bottom: 4px;
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 100%;
+        }
+        .mq-progress-text {
+            font-size: 10px;
+            font-weight: 600;
+            color: #3b82f6;
+            font-variant-numeric: tabular-nums;
+        }
+        .mq-progress-bar-bg {
             height: 4px;
             background: #1a1a1a;
             border-radius: 10px;
             overflow: hidden;
-            pointer-events: none;
         }
         .mq-progress-bar {
             height: 100%;
@@ -3434,6 +3468,7 @@
         .mq-album-header {
             display: flex;
             align-items: center;
+            flex-wrap: nowrap;
             gap: 12px;
             padding: 10px 12px;
             background: transparent;
@@ -3498,16 +3533,16 @@
         .mq-album-chev svg { width: 14px; height: 14px; }
         .mq-album-group.expanded .mq-album-chev { transform: rotate(180deg); }
 
-        /* Aggregate progress on the album header — same look as .mq-progress */
+        /* Aggregate progress on the album header — same 4px height as the
+           per-row .mq-progress-bar-bg so the two read consistently. */
         .mq-album-progress {
-            position: absolute;
-            left: 12px; right: 12px;
-            bottom: 4px;
+            margin-top: 6px;
             height: 4px;
             background: #1a1a1a;
             border-radius: 10px;
             overflow: hidden;
             pointer-events: none;
+            width: 100%;
         }
         .mq-album-progress-bar {
             height: 100%;
@@ -3523,6 +3558,27 @@
             border-top: 1px solid #1a1a1a;
         }
         .mq-album-group.expanded .mq-album-body { display: block; }
+        /* New album-row primitive uses .playlist-row classes; body sits as the
+           next sibling after the row, shown when the row has .expanded. */
+        .mq-album-pl-row + .mq-album-body { display: none; }
+        .mq-album-pl-row.expanded + .mq-album-body { display: block; }
+        /* Square 68px album cover — sized to match playlist-thumb-stack height
+           so it lines up visually with video playlist rows. */
+        .mq-album-pl-thumb {
+            width: 68px; height: 68px;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .mq-album-pl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        /* Cancel-all stays visible (this row IS the "cancel target" signal),
+           not the usual hover-only .remove-btn behavior on .playlist-row. */
+        .mq-album-pl-row .mq-album-cancel-all { opacity: 1; }
+        /* Expand chevron rotates when row is expanded. Reuse .playlist-open-hint
+           for hover/layout but show only the chevron (no "Open" text). */
+        .mq-album-toggle svg { transition: transform 0.2s; width: 14px; height: 14px; }
+        .mq-album-pl-row.expanded .mq-album-toggle svg { transform: rotate(180deg); }
         /* Nested rows under an album header sit a touch tighter visually. */
         .mq-album-body .mq-row { background: #0d0d0d; }
         .mq-album-body .mq-row:hover { background: #131313; }
@@ -3545,8 +3601,20 @@
             align-content: start;
         }
         .music-grid:empty { display: none; }
-        .music-card { cursor: pointer; padding: 10px; border-radius: 9px; transition: background 0.12s ease; position: relative; }
-        .music-card:hover { background: #141414; }
+        /* Mirror .library-card hover treatment: subtle blue-outline on hover,
+           tiny press-down on active. Keeps the music grid visually consistent
+           with the video library. */
+        .music-card {
+            cursor: pointer; padding: 10px; border-radius: 9px;
+            border: 1px solid transparent;
+            transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+            position: relative;
+        }
+        .music-card:hover {
+            background: #161616;
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        .music-card:active { transform: scale(0.995); transition: transform 0.05s; }
 
         /* ----- Music library selection mode (mirrors .library-card.is-selectable / .is-selected) -----
            Activation: right-click a music card OR click the per-card checkbox
@@ -3575,13 +3643,13 @@
             transition: background 0.12s, border-color 0.12s, opacity 0.12s;
             opacity: 0;
         }
-        /* Show the empty checkbox on hover BEFORE selection mode is active,
-           so the user can click it to enter selection mode (mirrors video). */
-        .music-card:hover .music-card-select-mark { display: flex; opacity: 1; pointer-events: auto; }
+        /* Selection mark is hidden until selection mode is active. Entering
+           selection mode happens via right-click → Select (same as the video
+           library card). This avoids the always-on hover checkbox the user
+           flagged as inconsistent with the video side. */
         .music-card.is-selectable .music-card-select-mark { display: flex; opacity: 1; pointer-events: auto; }
         /* When the checkmark is visible, dim the NEW pill so the two don't
            visually fight for the same top-left corner. */
-        .music-card:hover .music-card-new,
         .music-card.is-selectable .music-card-new { opacity: 0.35; transition: opacity 0.12s; }
         .music-card.is-selected .music-card-select-mark {
             background: #3b82f6; border-color: #3b82f6;
@@ -3692,16 +3760,16 @@
             pointer-events: none;
         }
         .music-card.album-downloading .mcd-ring-wrap { display: flex; }
-        .mcd-ring-wrap svg { width: 64%; height: 64%; transform: rotate(-90deg); }
-        .mcd-ring-wrap .ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.15); stroke-width: 5; }
+        .mcd-ring-wrap svg { width: 28%; height: 28%; transform: rotate(-90deg); }
+        .mcd-ring-wrap .ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 10; }
         .mcd-ring-wrap .ring-fg {
-            fill: none; stroke: #3b82f6; stroke-width: 5; stroke-linecap: round;
+            fill: none; stroke: #3b82f6; stroke-width: 10; stroke-linecap: round;
             transition: stroke-dashoffset 0.25s ease;
         }
         .mcd-ring-pct {
             position: absolute;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
-            font-size: 18px; font-weight: 600; color: #fff;
+            font-size: 11px; font-weight: 600; color: #fff;
             text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
         }
         /* ---- Music Album Detail view (mad-*) ----
@@ -3849,7 +3917,7 @@
         }
         .mad-tracklist-head {
             display: grid;
-            grid-template-columns: 40px 1fr 80px;
+            grid-template-columns: 32px 48px 1fr 80px;
             gap: 14px;
             padding: 0 12px 8px;
             border-bottom: 1px solid #1f1f1f;
@@ -3865,15 +3933,27 @@
         .mad-tracklist-head-dur { text-align: right; }
         .mad-row {
             display: grid;
-            grid-template-columns: 40px 1fr 80px;
+            grid-template-columns: 32px 48px 1fr 80px;
             gap: 14px;
             align-items: center;
-            height: 48px;
+            height: 56px;
             padding: 0 12px;
             border-radius: 4px;
             cursor: pointer;
             color: #c0c0c0;
             transition: background 0.1s;
+        }
+        .mad-row-thumb {
+            width: 44px; height: 44px;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .mad-row-thumb img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
         }
         .mad-row:hover { background: rgba(255, 255, 255, 0.04); color: #fff; }
         .mad-row:hover .mad-row-num { color: #fff; }
@@ -4006,15 +4086,33 @@
            Collapse it via :empty so For-You floats up directly under the chips.
            Same pattern as .music-foryou:empty below. */
         .music-results:empty { display: none; }
+        /* Mirror .mq-row / .video-row chrome — border, background, border-radius
+           — so search results read as the same primitive as queue rows. The
+           internal grid shape stays (search rows have plays/duration columns
+           that queue rows don't). */
         .music-track-row {
             display: grid;
             grid-template-columns: 56px 1fr auto auto auto;
             gap: 14px; align-items: center;
-            padding: 8px 12px; border-radius: 6px;
+            padding: 10px 12px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            background: #0f0f0f;
             cursor: pointer;
-            transition: background 0.12s ease;
+            transition: border-color 0.15s, background 0.15s;
         }
-        .music-track-row:hover { background: rgba(255, 255, 255, 0.04); }
+        .music-track-row:hover {
+            background: #141414;
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        .music-track-row.selected {
+            background: rgba(59, 130, 246, 0.06);
+            border-color: #3b82f6;
+        }
+        .music-track-row.selected:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
         /* Artwork lives inside a slightly larger wrapper so the progress ring has
            room to draw OUTSIDE the artwork bounds. The ring + percent overlay
            appear when the row is .downloading; play overlay shows on hover otherwise. */
@@ -4105,7 +4203,16 @@
         }
         .music-foryou[hidden] { display: none; }
         .music-foryou:empty { display: none; }
-        .myf-section {}
+        /* Video For-You uses the same .myf-* layout as music. Container is
+           block by default so multi-section content stacks vertically. */
+        .video-foryou { display: block; padding: 8px 0 24px; }
+        .video-foryou[hidden] { display: none; }
+        .video-foryou:empty { display: none; }
+        /* When For-You is shown, hide the centered "search empty" status
+           text — the For-You IS our empty state now. */
+        .video-foryou:not(:empty) ~ .search-status .search-empty-default { display: none; }
+        .myf-section { margin-bottom: 28px; }
+        .myf-section:last-child { margin-bottom: 0; }
         .myf-head { display: flex; align-items: baseline; margin-bottom: 12px; }
         .myf-head h3 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: #f5f5f5; }
         .myf-head .myf-sub { font-size: 12px; color: #8a8a8a; margin-left: 10px; font-weight: 500; }
@@ -4166,22 +4273,12 @@
 
         /* ===== Click contract: row selection + checkbox + context menu + action bar ===== */
         .music-track-row { position: relative; }
-        .mtr-check {
-            position: absolute; top: 50%; left: -2px; transform: translateY(-50%);
-            width: 18px; height: 18px; border-radius: 4px;
-            border: 1.5px solid #2a2a2a; background: transparent;
-            display: flex; align-items: center; justify-content: center;
-            color: transparent;
-            opacity: 0; transition: opacity 0.12s;
-            pointer-events: none;
-        }
-        .music-track-row:hover .mtr-check,
-        .music-track-row.selected .mtr-check { opacity: 1; }
-        .music-track-row.selected .mtr-check {
-            background: #3b82f6; border-color: #3b82f6; color: #fff;
-        }
-        .mtr-check svg { width: 12px; height: 12px; }
-        .music-track-row.selected { background: rgba(59, 130, 246, 0.10); outline: 1px solid rgba(59, 130, 246, 0.35); }
+        /* Checkbox removed — selection state is conveyed entirely by the row's
+           blue border + tint (.music-track-row.selected). Keeping the .mtr-check
+           element hidden so JS click handlers still find it without rendering. */
+        .mtr-check { display: none; }
+        /* Selected state now uses the .mq-row / .video-row selected pattern
+           (blue border + faint blue tint), defined above at .music-track-row.selected. */
         /* Hover-reveal download button (only visible on hover or selection) */
         .music-track-row .mtr-add { opacity: 0; transition: opacity 0.12s, border-color 0.12s, color 0.12s, background 0.12s; }
         .music-track-row:hover .mtr-add,
@@ -4190,16 +4287,27 @@
         .music-track-row.downloading .mtr-add { opacity: 1; }
 
         /* Multi-select bottom action bar */
+        /* Mirror .search-action-bar styling so the music selection bar reads
+           as the same primitive as the video search bar. Bottom offset is
+           bumped to 96px when the music player dock is visible (78px dock +
+           18px breathing room) so the bar doesn't sit underneath it. */
         .music-actionbar {
             position: absolute;
-            left: 24px; right: 24px; bottom: 18px;
-            background: #1a1a1a; border: 1px solid #2a2a2a;
-            border-radius: 12px; padding: 12px 18px;
-            display: flex; align-items: center; gap: 16px;
-            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+            left: 24px; right: 24px; bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: rgba(20, 20, 20, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid #2a2a2a;
+            border-radius: 11px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
             z-index: 30;
             animation: mab-slide-up 0.18s ease;
         }
+        body.music-dock-visible .music-actionbar { bottom: 106px; }
         .music-actionbar[hidden] { display: none; }
         @keyframes mab-slide-up {
             from { transform: translateY(10px); opacity: 0; }
@@ -4398,15 +4506,19 @@
            Three rules: collapse the rail's grid column to 0, hide the rail's
            contents, and force the music-player view to stay visible (defensive
            !important so no other rule can hide it during the OS resize). */
-        body.music-player-fullscreen .cockpit {
-            grid-template-columns: 0 minmax(0, 1fr);
-            transition: none;
+        /* Music-player fullscreen: keep the cockpit's own grid-template-columns
+           alone (so there's no animated grid change when entering/exiting),
+           hide the rail, and span cockpit-main across both grid tracks so
+           it fills the viewport. Tried changing grid-template-columns
+           directly — but the .cockpit base style has a `transition:
+           grid-template-columns 0.22s` that produced a broken animation on
+           EXIT (1fr → 220px+1fr). Span-via-grid-column has no transition
+           and reverts instantly when the class is removed. */
+        body.music-player-fullscreen .rail { display: none; }
+        body.music-player-fullscreen .cockpit-main {
+            grid-column: 1 / -1;
+            padding: 0;
         }
-        body.music-player-fullscreen .rail {
-            overflow: hidden;
-            pointer-events: none;
-        }
-        body.music-player-fullscreen .cockpit-main { padding: 0; }
         body.music-player-fullscreen .music-dock { display: none !important; }
         body.music-player-fullscreen #music-player-view { display: block !important; }
         .mp-stage {
@@ -4598,7 +4710,10 @@
            Does not move when the panel opens; pill sits over the panel via z-index. */
         .mp-panel-handle {
             position: absolute;
-            bottom: 16px; left: 50%;
+            /* Lifted slightly (was 16px) so the pill sits roughly in the row
+               above the side-rail's settings button instead of being flush at
+               the very bottom of the viewport — user-requested nudge upward. */
+            bottom: 52px; left: 50%;
             transform: translateX(-50%);
             z-index: 12;
             display: flex; align-items: center; gap: 8px;
@@ -4672,7 +4787,9 @@
             bottom: 0;
             left: var(--rail-width, 220px);
             right: 0;
-            height: 78px;
+            /* Was 78px — user-requested slight bump (still not the full Spotify
+               90px to avoid the dock feeling heavy on small screens). */
+            height: 88px;
             background: #0f0f0f;
             border-top: 1px solid #1f1f1f;
             display: none;       /* hidden until first track plays */
@@ -4683,7 +4800,13 @@
             transition: left 0.24s cubic-bezier(0.32, 0.72, 0, 1);
         }
         body.music-dock-visible .music-dock { display: flex; }
-        body.music-dock-visible .cockpit-main { padding-bottom: 96px; }
+        /* Bumped from 96 (78+18) → 106 (88+18) to match the taller dock. */
+        body.music-dock-visible .cockpit-main { padding-bottom: 106px; }
+        /* When the user is on the full music-player view, hide the dock —
+           the player view has its own transport controls and the dock just
+           creates wasted layout space at the bottom (the user reported this). */
+        body.music-player-open .music-dock { display: none !important; }
+        body.music-player-open.music-dock-visible .cockpit-main { padding-bottom: 0; }
         body.player-is-fullscreen .music-dock { display: none; }   /* hide during fullscreen video */
         .music-dock audio { display: none; }   /* native audio element is invisible; we render our own UI */
         .music-dock-art { width: 56px; height: 56px; border-radius: 5px; background: #1a1a1a; flex-shrink: 0; overflow: hidden; }
@@ -8352,10 +8475,11 @@
             border-radius: 12px;
             padding: 16px 20px;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 16px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
             min-width: 320px;
+            max-width: 540px;
             animation: slideUp 0.3s ease-out;
         }
 
@@ -8397,6 +8521,10 @@
             font-size: 14px;
             font-weight: 500;
             color: #d4d4d4;
+            /* Allow long error messages (download failures with full yt-dlp
+               text) to wrap instead of overflowing or being truncated. */
+            word-break: break-word;
+            line-height: 1.4;
         }
 
         .toast-action {
@@ -8848,6 +8976,10 @@
                     <span class="search-meta" id="search-meta"></span>
                 </div>
                 <div class="search-results-wrap" id="search-results-wrap">
+                    <!-- For-You landing — direct parallel of #music-foryou.
+                         Block layout (not the centered flex .search-status
+                         had), so multi-section content stacks cleanly. -->
+                    <div class="video-foryou" id="video-foryou"></div>
                     <div class="search-results" id="search-results"></div>
                     <div class="search-status" id="search-status">
                         <div class="search-empty-default">Search YouTube to find videos, channels, or playlists to download.</div>
@@ -9069,6 +9201,14 @@
                                     <div class="mp-vol-fill" id="mp-vol-fill"></div>
                                     <div class="mp-vol-thumb" id="mp-vol-thumb"></div>
                                 </div>
+                                <!-- Fullscreen toggle: enters the in-view
+                                     immersive mode (hides rail + dock, the
+                                     player takes the whole viewport). Same
+                                     thing the F key triggers — button just
+                                     makes the feature discoverable. -->
+                                <button id="mp-fullscreen" class="mp-vol-btn" title="Fullscreen (F)" aria-label="Fullscreen">
+                                    <svg id="mp-fullscreen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="4" y1="20" x2="11" y2="13"/><line x1="20" y1="4" x2="13" y2="11"/></svg>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -9136,6 +9276,7 @@
                     <div class="mad-tracklist">
                         <div class="mad-tracklist-head">
                             <span class="mad-tracklist-head-num">#</span>
+                            <span></span>
                             <span>Title</span>
                             <span class="mad-tracklist-head-dur">Duration</span>
                         </div>
@@ -10180,6 +10321,21 @@
                     }).catch(() => {});
                 }
 
+                // Leaving the music player view? Exit immersive fullscreen so
+                // the body class doesn't persist into Library/Queue/etc — that
+                // was forcing `#music-player-view { display: block !important }`
+                // on top of whatever view the user navigated to, producing
+                // overlapping content (user 2026-05-17 screenshot).
+                if (this.currentView === 'music-player' && view !== 'music-player') {
+                    if (typeof _musicFsActive !== 'undefined' && _musicFsActive) {
+                        try { _musicToggleFs(); } catch (_) {
+                            // Defensive: at minimum, scrub the class so the
+                            // overlap can't happen even if the toggle errors.
+                            document.body.classList.remove('music-player-fullscreen');
+                        }
+                    }
+                }
+
                 this.currentView = view;
 
                 // If we're entering player, auto-collapse the rail so video gets the canvas.
@@ -10234,6 +10390,13 @@
                 if (view === 'search') {
                     setTimeout(() => document.getElementById('search-input')?.focus(), 50);
                     if (typeof initSearchView === 'function') initSearchView();
+                    // Refresh the For-You landing every time the user lands
+                    // on Search (so recent_searches + recent_library reflect
+                    // any new activity). Only when there's no active query.
+                    const _siv = document.getElementById('search-input');
+                    if (typeof _renderVideoForYou === 'function' && (!_siv || !_siv.value)) {
+                        _renderVideoForYou();
+                    }
                 } else {
                     // Leaving search → make sure the autocomplete dropdown isn't left
                     // dangling, otherwise it'd be the first thing the user sees on return.
@@ -12741,6 +12904,24 @@
             const newItems = videos.filter(v => !app.videosInQueue.some(ev => ev.id === v.id));
             app.videosInQueue.push(...newItems);
 
+            // Flip any search cards that were marked "Adding…" to the final
+            // "Already in your queue" state, now that we have backend
+            // confirmation that the video actually landed. Matches by id so
+            // a stuck/failed fetch doesn't silently leave the card claiming
+            // it succeeded.
+            for (const v of videos) {
+                if (!v || !v.id) continue;
+                const safeId = (window.CSS && CSS.escape) ? CSS.escape(v.id) : String(v.id).replace(/"/g, '\\"');
+                document.querySelectorAll(`.search-result-card[data-result-id="${safeId}"][data-adding-pending="1"]`).forEach(card => {
+                    card.dataset.inQueue = '1';
+                    delete card.dataset.addingPending;
+                    const actionEl = card.querySelector('.sr-action');
+                    if (actionEl) {
+                        actionEl.innerHTML = '<span class="sr-already"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Already in your queue</span>';
+                    }
+                });
+            }
+
             // Clear the URL input so the user can paste the next one immediately
             app.elements.mainUrlInput.value = '';
 
@@ -14640,6 +14821,15 @@
                     // User pressed play — release the end-of-video bar pin so
                     // updateProgress can drive the seek bar normally again.
                     _videoEndedPinned = false;
+                    // Audio focus: video starts → pause the music player so
+                    // both don't blast through the speakers at once. Mirror
+                    // listener on _musicPlayer.audio pauses the video on
+                    // music play. Standard "audio focus" desktop behavior.
+                    try {
+                        if (_musicPlayer && _musicPlayer.audio && !_musicPlayer.audio.paused) {
+                            _musicPlayer.audio.pause();
+                        }
+                    } catch (_) {}
                 });
                 video.addEventListener('seeking', () => {
                     // Any user-initiated seek also releases the pin.
@@ -16113,12 +16303,21 @@
                 _fsMask.style.opacity = '0';
             }
 
+            // Mac: skip the pywebview OS-fullscreen toggle (NSWindow
+            // toggleFullScreen: animates to a separate Space and clashes with
+            // our in-view immersive mode). The CSS class alone gives the
+            // borderless feel inside the existing window. Users who want true
+            // OS fullscreen still have the green button / Cmd+Ctrl+F.
+            const _isMacUA = (navigator.platform || '').toLowerCase().includes('mac');
+
             function enterPlayerFullscreen() {
                 if (isPlayerFullscreen) return;
                 isPlayerFullscreen = true;
                 _showFsMask();
                 document.body.classList.add('player-is-fullscreen');
-                try { pywebview.api.set_fullscreen(true); } catch(_) {}
+                if (!_isMacUA) {
+                    try { pywebview.api.set_fullscreen(true); } catch(_) {}
+                }
                 setTimeout(_hideFsMask, 550);
             }
 
@@ -16134,7 +16333,9 @@
                 const cockpit = document.querySelector('.cockpit');
                 if (cockpit) cockpit.style.transition = 'none';
                 document.body.classList.remove('player-is-fullscreen');
-                try { pywebview.api.set_fullscreen(false); } catch(_) {}
+                if (!_isMacUA) {
+                    try { pywebview.api.set_fullscreen(false); } catch(_) {}
+                }
                 setTimeout(() => {
                     if (cockpit) cockpit.style.transition = '';
                     _hideFsMask();
@@ -17406,8 +17607,15 @@
             }
             createToast(message, actionText, onAction);
 
-            // Reset auto-hide timer. Give toasts with actions more time to be seen/clicked.
-            const lifetime = actionText ? 8000 : 4000;
+            // Reset auto-hide timer. Give toasts with actions more time to be
+            // seen/clicked. Also give error-shaped toasts longer (failed
+            // downloads can have multi-line yt-dlp output the user needs to
+            // read). Detection is lowercase substring match — fragile, but
+            // every error/failed/can't toast text in the codebase contains
+            // one of these tokens, so it's reliable enough.
+            const m = (message || '').toLowerCase();
+            const isError = m.includes('fail') || m.includes('error') || m.includes("can't");
+            const lifetime = actionText ? 8000 : (isError ? 10000 : 4000);
             toastTimer = setTimeout(() => {
                 hideToast();
             }, lifetime);
@@ -17976,15 +18184,24 @@
         //     at the end of _initMusicPlayerView). Module-level so they're reusable
         //     if we ever wire dock-side shortcuts. ---
         let _musicFsActive = false;
+        const _IS_MAC = (navigator.platform || '').toLowerCase().includes('mac');
         function _musicToggleFs() {
             // Use a MUSIC-SPECIFIC body class — NOT the video's player-is-fullscreen.
             // Reusing the video class previously caused the music-player view to
-            // disappear after pressing F (user 2026-05-16 reported landing on the
-            // library after F). The music-player-fullscreen class below has its
+            // disappear after pressing F. The music-player-fullscreen class has its
             // own rules that explicitly KEEP the music-player view visible.
             _musicFsActive = !_musicFsActive;
             document.body.classList.toggle('music-player-fullscreen', _musicFsActive);
-            try { pywebview.api.set_fullscreen(_musicFsActive); } catch (_) {}
+            // On macOS, skip the pywebview OS-fullscreen toggle — Cocoa's
+            // `NSWindow toggleFullScreen:` moves the window to a separate
+            // Space and animates, which clashes with our in-view immersive
+            // mode (user 2026-05-16). The CSS class alone gives the
+            // borderless feel within the existing window; users who want
+            // true OS fullscreen can still use the green window button or
+            // Cmd+Ctrl+F.
+            if (!_IS_MAC) {
+                try { pywebview.api.set_fullscreen(_musicFsActive); } catch (_) {}
+            }
         }
         function _musicSeekBy(seconds) {
             const a = _musicPlayer.audio;
@@ -18133,7 +18350,12 @@
                             input.value = q;
                             paintClear();
                         }
+                        // Cancel pending suggestion fetch + clear list so the
+                        // debounced timer can't re-show the dropdown after Enter.
+                        if (_msSuggTimer) { clearTimeout(_msSuggTimer); _msSuggTimer = null; }
+                        _msSuggList = [];
                         hideSugg();
+                        input.blur();
                         if (q) _runMusicSearch(q, _musicState.searchKind);
                     } else if (e.key === 'Escape') {
                         if (visible) { hideSugg(); }
@@ -18261,7 +18483,24 @@
                 }
                 return true;
             };
-            const visibleAlbums = showHidden ? albums : albums.filter(a => !albumIsHidden(a));
+            // Album is "library-ready" when: every track downloaded, cover is
+            // a local pt:thumb: marker (extracted from embedded art, not a
+            // placeholder/remote URL that might 404), AND artist isn't the
+            // 'Unknown Artist' placeholder. Mirrors the video-library policy
+            // where items only appear once the download fully completes — no
+            // skeleton/placeholder states in the library grid.
+            const albumIsLibraryReady = (a) => {
+                const total = a.total_tracks || (a.track_ids || []).length || 0;
+                const done = a.downloaded_count || 0;
+                if (total === 0 || done < total) return false;
+                const cover = a.cover_url || '';
+                if (!cover.startsWith('pt:thumb:')) return false;
+                const artist = (a.artist || '').trim().toLowerCase();
+                if (!artist || artist === 'unknown artist' || artist === 'unknown') return false;
+                return true;
+            };
+            const readyAlbums = albums.filter(albumIsLibraryReady);
+            const visibleAlbums = showHidden ? readyAlbums : readyAlbums.filter(a => !albumIsHidden(a));
             const visibleSingles = showHidden ? singles : singles.filter(t => !t.hidden);
             if (!visibleAlbums.length && !visibleSingles.length) {
                 grid.innerHTML = '';
@@ -18284,9 +18523,22 @@
             const currentId = _musicPlayer.currentTrack?.id || '';
             const nowSec = Date.now() / 1000;
 
+            // Album cover URLs may be local 'pt:thumb:' markers (extracted from
+            // embedded MP3 art) or remote URLs. Markers need backend resolution
+            // via get_thumbnail_data; emit them as data-thumb-marker placeholders
+            // and resolve below — same scheme the video library uses.
+            const coverAttrs = (url) => {
+                if (!url) return '';
+                if (typeof url === 'string' && url.startsWith('pt:thumb:')) {
+                    return `data-thumb-marker="${esc(url)}"`;
+                }
+                return `src="${esc(url)}"`;
+            };
+
             // --- Album cards first ---
             const albumHtml = visibleAlbums.map(a => {
-                const cover = a.cover_url ? `<img src="${esc(a.cover_url)}" loading="lazy" />` : '';
+                const cv = coverAttrs(a.cover_url);
+                const cover = cv ? `<img ${cv} loading="lazy" alt="" />` : '';
                 const total = a.total_tracks || (a.track_ids || []).length || 0;
                 const done = a.downloaded_count || 0;
                 const isDownloading = a.status === 'downloading' && done < total;
@@ -18315,7 +18567,7 @@
                             <div class="music-card-select-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                             ${newPill}
                             ${hiddenBadge}
-                            <span class="music-card-album-pill">Album · ${esc(trackCountStr)}</span>
+                            <span class="music-card-album-pill">Album</span>
                             <div class="music-card-play" title="Play album"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg></div>
                             ${ring}
                         </div>
@@ -18326,7 +18578,11 @@
 
             // --- Singles (tracks with no album_id) ---
             const singleHtml = visibleSingles.map(t => {
-                const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy" />` : '';
+                // pt:thumb: markers need to go through _musicThumbAttrs, not
+                // straight into src="". Hardcoding src="${t.thumbnail}" broke
+                // singles + dock + player after the local-cache rollout.
+                const tAttrs = _musicThumbAttrs(t.thumbnail);
+                const thumb = tAttrs ? `<img ${tAttrs} loading="lazy" />` : '';
                 const playing = t.id === currentId ? ' now-playing' : '';
                 const hidden = !!t.hidden;
                 const cls = playing + (hidden ? ' is-hidden' : '');
@@ -18408,7 +18664,26 @@
                         MusicSelection.toggle(albumId);
                         return;
                     }
-                    _openMusicAlbumDetail(albumId);
+                    // Debounce single-click so a dblclick can preempt — matches
+                    // the video library's openLibraryDetail/openLibraryItemDirect
+                    // pattern. Single = open the detail view; double = play.
+                    if (card._musicClickTimer) {
+                        clearTimeout(card._musicClickTimer);
+                        card._musicClickTimer = null;
+                    }
+                    card._musicClickTimer = setTimeout(() => {
+                        card._musicClickTimer = null;
+                        _openMusicAlbumDetail(albumId);
+                    }, 230);
+                });
+                card.addEventListener('dblclick', (e) => {
+                    if (e.target.closest('.music-card-select-mark')) return;
+                    if (MusicSelection.isActive()) return;
+                    if (card._musicClickTimer) {
+                        clearTimeout(card._musicClickTimer);
+                        card._musicClickTimer = null;
+                    }
+                    try { _playMusicAlbum(albumId, { startIndex: 0 }); } catch (_) {}
                 });
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
@@ -18421,9 +18696,104 @@
                 });
             });
 
+            // Resolve any pt:thumb: cover markers via the backend, same as the
+            // video library's _resolvePendingThumbnails. We do this here (vs.
+            // reusing that method) because the music view has no access to it.
+            _resolveMusicThumbMarkers();
+
             // Re-apply selection visuals when the grid re-renders (e.g. after a
             // background refresh). Without this the .is-selected class is lost.
             MusicSelection.refreshAfterRender();
+        }
+
+        // Walk every img[data-thumb-marker] currently in the music view and
+        // ask the backend to hand back base64 image bytes. Cached so repeated
+        // re-renders don't refetch. Mirrors the library-side resolver — kept
+        // separate only because the two views don't share scope today.
+        const _musicThumbCache = {};
+        const _musicThumbInflight = new Set();
+        // Build <img> attrs for a thumbnail value: handles both remote URLs
+        // and pt:thumb: markers (the latter resolved via the backend). Must
+        // be used everywhere we render a track's thumbnail or singles + dock
+        // + player will silently break when the thumbnail is a local marker.
+        function _musicThumbAttrs(thumb) {
+            const _esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            if (!thumb) return '';
+            if (typeof thumb === 'string' && thumb.startsWith('pt:thumb:')) {
+                if (_musicThumbCache[thumb]) return `src="${_musicThumbCache[thumb]}"`;
+                return `data-thumb-marker="${_esc(thumb)}"`;
+            }
+            return `src="${_esc(thumb)}"`;
+        }
+        // Imperative variant for code paths that already have an <img> element
+        // and need to set its src. Drop-in for `imgEl.src = thumb`.
+        function _setMusicArt(imgEl, thumb) {
+            if (!imgEl) return;
+            if (!thumb) { imgEl.removeAttribute('src'); return; }
+            if (typeof thumb === 'string' && thumb.startsWith('pt:thumb:')) {
+                if (_musicThumbCache[thumb]) {
+                    imgEl.src = _musicThumbCache[thumb];
+                    return;
+                }
+                imgEl.removeAttribute('src');
+                if (typeof pywebview === 'undefined' || !pywebview.api) return;
+                if (_musicThumbInflight.has(thumb)) return;
+                _musicThumbInflight.add(thumb);
+                pywebview.api.get_thumbnail_data(thumb).then(dataUrl => {
+                    _musicThumbInflight.delete(thumb);
+                    if (!dataUrl) return;
+                    _musicThumbCache[thumb] = dataUrl;
+                    imgEl.src = dataUrl;
+                }).catch(() => { _musicThumbInflight.delete(thumb); });
+                return;
+            }
+            imgEl.src = thumb;
+        }
+        // Same idea, for background-image (used by player backdrop).
+        function _setMusicBackdrop(el, thumb) {
+            if (!el) return;
+            const apply = (url) => {
+                if (!url) { el.style.backgroundImage = ''; el.classList.remove('has-art'); return; }
+                el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+                el.classList.add('has-art');
+            };
+            if (!thumb) { apply(''); return; }
+            if (typeof thumb === 'string' && thumb.startsWith('pt:thumb:')) {
+                if (_musicThumbCache[thumb]) { apply(_musicThumbCache[thumb]); return; }
+                apply('');
+                if (typeof pywebview === 'undefined' || !pywebview.api) return;
+                pywebview.api.get_thumbnail_data(thumb).then(dataUrl => {
+                    if (!dataUrl) return;
+                    _musicThumbCache[thumb] = dataUrl;
+                    apply(dataUrl);
+                }).catch(() => {});
+                return;
+            }
+            apply(thumb);
+        }
+        async function _resolveMusicThumbMarkers() {
+            if (typeof pywebview === 'undefined' || !pywebview.api) return;
+            const imgs = document.querySelectorAll('img[data-thumb-marker]');
+            for (const img of imgs) {
+                const marker = img.getAttribute('data-thumb-marker');
+                if (!marker || !marker.startsWith('pt:thumb:')) continue;
+                if (_musicThumbCache[marker]) {
+                    img.src = _musicThumbCache[marker];
+                    img.removeAttribute('data-thumb-marker');
+                    continue;
+                }
+                if (_musicThumbInflight.has(marker)) continue;
+                _musicThumbInflight.add(marker);
+                pywebview.api.get_thumbnail_data(marker).then(dataUrl => {
+                    _musicThumbInflight.delete(marker);
+                    if (!dataUrl) return;
+                    _musicThumbCache[marker] = dataUrl;
+                    document.querySelectorAll(`img[data-thumb-marker="${marker}"]`).forEach(el => {
+                        el.src = dataUrl;
+                        el.removeAttribute('data-thumb-marker');
+                    });
+                }).catch(() => { _musicThumbInflight.delete(marker); });
+            }
         }
 
         // ================================================================
@@ -18752,12 +19122,36 @@
 
             const cover = album.cover_url || '';
             if (titleEl) titleEl.textContent = album.title || 'Untitled Album';
-            if (artImg) {
-                artImg.src = cover || '';
-                artImg.alt = album.title || '';
-            }
-            if (backdrop) {
-                backdrop.style.backgroundImage = cover ? `url("${cover.replace(/"/g, '\\"')}")` : '';
+            // Cover may be a 'pt:thumb:' marker (local) or a remote URL. For
+            // markers, ask the backend for the data URL and apply it to both
+            // the hero <img> and the backdrop background. For remote URLs, use
+            // as-is.
+            const applyCover = (resolvedUrl) => {
+                if (artImg) {
+                    artImg.src = resolvedUrl;
+                    artImg.alt = album.title || '';
+                }
+                if (backdrop) {
+                    backdrop.style.backgroundImage = resolvedUrl
+                        ? `url("${resolvedUrl.replace(/"/g, '\\"')}")` : '';
+                }
+            };
+            if (cover.startsWith('pt:thumb:')) {
+                if (_musicThumbCache[cover]) {
+                    applyCover(_musicThumbCache[cover]);
+                } else {
+                    applyCover('');
+                    if (typeof pywebview !== 'undefined' && pywebview.api) {
+                        pywebview.api.get_thumbnail_data(cover).then(dataUrl => {
+                            if (dataUrl) {
+                                _musicThumbCache[cover] = dataUrl;
+                                applyCover(dataUrl);
+                            }
+                        }).catch(() => {});
+                    }
+                }
+            } else {
+                applyCover(cover);
             }
             // Submeta line: Artist · Year · N tracks · total duration
             const tracks = album.tracks || [];
@@ -18818,9 +19212,22 @@
                         : (pending ? '<span class="mad-pending-spinner"></span>' : `<span>${idx + 1}</span>`);
                     const titleText = pending ? 'Downloading…' : (t.title || 'Untitled');
                     const dur = pending ? '' : (t.duration_string || '');
+                    // Per-track thumb: prefer the track's own YT video thumb
+                    // (downloaded singles look distinct), fall back to album cover
+                    // for pending tracks where we don't have a video thumb yet.
+                    const tThumb = (t.thumbnail || '') || (album.cover_url || '');
+                    let thumbHtml = '<div class="mad-row-thumb"></div>';
+                    if (tThumb) {
+                        if (tThumb.startsWith('pt:thumb:')) {
+                            thumbHtml = `<div class="mad-row-thumb"><img data-thumb-marker="${esc(tThumb)}" alt=""></div>`;
+                        } else {
+                            thumbHtml = `<div class="mad-row-thumb"><img src="${esc(tThumb)}" loading="lazy" alt=""></div>`;
+                        }
+                    }
                     return `
                         <div class="${cls}" data-track-id="${esc(t.id)}" data-track-idx="${idx}">
                             <span class="mad-row-num">${numHtml}</span>
+                            ${thumbHtml}
                             <span class="mad-row-title">${esc(titleText)}</span>
                             <span class="mad-row-duration">${esc(dur)}</span>
                         </div>`;
@@ -18837,6 +19244,10 @@
                         _showMadCtx(e.clientX, e.clientY, row, albumId);
                     });
                 });
+                // Any per-track thumbs that landed as pt:thumb: markers (rare —
+                // happens if a track's thumbnail was cached locally) need backend
+                // resolution. Same scheme as the music library covers above.
+                _resolveMusicThumbMarkers();
             }
         }
 
@@ -19382,11 +19793,33 @@
             return `${b.toFixed(b < 10 ? 1 : 0)} ${units[i]}`;
         }
 
+        // Tracks pagination for the current music search. Reset on every new
+        // query so a stale continuation token doesn't leak across searches.
+        let _musicSearchContinuation = '';
+        let _musicSearchCurrentKind = 'songs';
+        let _musicSearchLoadingMore = false;
         async function _runMusicSearch(query, kind) {
             _musicState.searchToken++;
             const token = _musicState.searchToken;
             _musicState.loading = true;
+            _musicSearchContinuation = '';
+            _musicSearchCurrentKind = kind || 'songs';
+            _musicSearchLoadingMore = false;
             _msClearSelection(); // any pending selection from prior search is dropped
+            // Foolproof suggestion dismiss — every code path that runs a
+            // search (Enter, Search button click, chip click, programmatic)
+            // funnels through here, so closing the dropdown at this single
+            // point fixes "suggestions stay open after pressing Enter".
+            // Belt-and-suspenders: re-hide a few times in case a debounced
+            // suggestion fetch or focus handler tries to re-open it
+            // milliseconds after we hide (the bug we kept chasing).
+            const _sb = document.getElementById('music-search-suggestions');
+            if (_sb) {
+                _sb.setAttribute('hidden', '');
+                setTimeout(() => _sb.setAttribute('hidden', ''), 100);
+                setTimeout(() => _sb.setAttribute('hidden', ''), 300);
+                setTimeout(() => _sb.setAttribute('hidden', ''), 600);
+            }
             const status = document.getElementById('music-search-status');
             const results = document.getElementById('music-results');
             const foryou = document.getElementById('music-foryou');
@@ -19415,12 +19848,75 @@
                 }
                 if (status) status.setAttribute('hidden', '');
                 if (meta) meta.textContent = `${list.length} result${list.length === 1 ? '' : 's'}`;
+                _musicSearchContinuation = res.continuation || '';
                 _renderMusicResults(list);
+                _ensureMusicSearchInfiniteScroll();
             } catch (e) {
                 if (status) status.innerHTML = '<div style="color:#dc2626;">Search failed.</div>';
             } finally {
                 if (token === _musicState.searchToken) _musicState.loading = false;
             }
+        }
+
+        // Append a "loading more" sentinel + IntersectionObserver below the
+        // results list so we fetch the next continuation page when the user
+        // scrolls near the bottom. Idempotent — safe to call after every
+        // render that updates _musicSearchContinuation.
+        let _musicSearchScrollObserver = null;
+        function _ensureMusicSearchInfiniteScroll() {
+            const results = document.getElementById('music-results');
+            if (!results) return;
+            let sentinel = results.querySelector('.music-search-sentinel');
+            if (!_musicSearchContinuation) {
+                // No more pages — drop the sentinel if present and disconnect.
+                if (sentinel) sentinel.remove();
+                if (_musicSearchScrollObserver) { _musicSearchScrollObserver.disconnect(); _musicSearchScrollObserver = null; }
+                return;
+            }
+            if (!sentinel) {
+                sentinel = document.createElement('div');
+                sentinel.className = 'music-search-sentinel';
+                sentinel.style.cssText = 'height: 24px; display: flex; align-items: center; justify-content: center; color: #6e6e6e; font-size: 12px;';
+                results.appendChild(sentinel);
+            } else {
+                // Move sentinel back to the bottom in case it got displaced.
+                results.appendChild(sentinel);
+            }
+            if (_musicSearchScrollObserver) _musicSearchScrollObserver.disconnect();
+            _musicSearchScrollObserver = new IntersectionObserver(async (entries) => {
+                if (!entries.some(e => e.isIntersecting)) return;
+                if (_musicSearchLoadingMore || !_musicSearchContinuation) return;
+                _musicSearchLoadingMore = true;
+                sentinel.textContent = 'Loading more…';
+                const myToken = _musicState.searchToken;
+                try {
+                    const res = await pywebview.api.search_youtube_music_continuation(
+                        _musicSearchContinuation, _musicSearchCurrentKind);
+                    if (myToken !== _musicState.searchToken) return;   // user typed a new query
+                    if (!res || res.error) {
+                        sentinel.textContent = res?.error ? `Error: ${res.error}` : 'Failed to load more.';
+                        return;
+                    }
+                    const list = res.results || [];
+                    _musicSearchContinuation = res.continuation || '';
+                    if (list.length) {
+                        _renderMusicResults(list, /* append */ true);
+                    }
+                    if (!_musicSearchContinuation) {
+                        sentinel.remove();
+                        if (_musicSearchScrollObserver) { _musicSearchScrollObserver.disconnect(); _musicSearchScrollObserver = null; }
+                    } else {
+                        sentinel.textContent = '';
+                        // Move sentinel back to the bottom after rendering more rows.
+                        results.appendChild(sentinel);
+                    }
+                } catch (e) {
+                    sentinel.textContent = 'Failed to load more.';
+                } finally {
+                    _musicSearchLoadingMore = false;
+                }
+            }, { root: results, rootMargin: '300px' });
+            _musicSearchScrollObserver.observe(sentinel);
         }
 
         // Show the For-You landing (called when the search pane mounts with no active query).
@@ -19449,7 +19945,8 @@
             if (data.recent_library && data.recent_library.length) {
                 html += '<div class="myf-section"><div class="myf-head"><h3>Pick up where you left off</h3><span class="myf-sub">from your library</span></div><div class="myf-grid">';
                 html += data.recent_library.map(t => {
-                    const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy">` : '';
+                    const tAttrs = _musicThumbAttrs(t.thumbnail);
+                    const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
                     return `<div class="myf-card" data-myf-lib-id="${esc(t.id)}">
                         <div class="myf-card-art">${thumb}<span class="myf-badge">OWNED</span><div class="myf-card-play">${playSvg}</div></div>
                         <div class="myf-card-title">${esc(t.title || 'Untitled')}</div>
@@ -19463,7 +19960,8 @@
             if (data.top_artist && data.because_you && data.because_you.length) {
                 html += `<div class="myf-section"><div class="myf-head"><h3>Because you have ${esc(data.top_artist)}</h3></div><div class="myf-grid">`;
                 html += data.because_you.map(t => {
-                    const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy">` : '';
+                    const tAttrs = _musicThumbAttrs(t.thumbnail);
+                    const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
                     return `<div class="myf-card" data-myf-search-id="${esc(t.id)}" data-myf-search-kind="${esc(t.kind || 'song')}">
                         <div class="myf-card-art">${thumb}<div class="myf-card-play">${playSvg}</div></div>
                         <div class="myf-card-title">${esc(t.title || 'Untitled')}</div>
@@ -19477,7 +19975,8 @@
             if (data.trending && data.trending.length) {
                 html += '<div class="myf-section"><div class="myf-head"><h3>Trending on YouTube Music</h3><span class="myf-sub">Updated daily</span></div><div class="myf-grid">';
                 html += data.trending.map(t => {
-                    const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy">` : '';
+                    const tAttrs = _musicThumbAttrs(t.thumbnail);
+                    const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
                     return `<div class="myf-card" data-myf-search-id="${esc(t.id)}" data-myf-search-kind="${esc(t.kind || 'song')}">
                         <div class="myf-card-art">${thumb}<div class="myf-card-play">${playSvg}</div></div>
                         <div class="myf-card-title">${esc(t.title || 'Untitled')}</div>
@@ -19491,7 +19990,8 @@
             if (data.shuffled_lib && data.shuffled_lib.length) {
                 html += '<div class="myf-section"><div class="myf-head"><h3>From your library</h3><span class="myf-sub">shuffled</span></div><div class="myf-grid">';
                 html += data.shuffled_lib.map(t => {
-                    const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy">` : '';
+                    const tAttrs = _musicThumbAttrs(t.thumbnail);
+                    const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
                     return `<div class="myf-card" data-myf-lib-id="${esc(t.id)}">
                         <div class="myf-card-art">${thumb}<span class="myf-badge">OWNED</span><div class="myf-card-play">${playSvg}</div></div>
                         <div class="myf-card-title">${esc(t.title || 'Untitled')}</div>
@@ -19505,6 +20005,10 @@
                 html = '<div class="music-search-status" style="padding:60px 20px;"><div>Search YouTube Music to find tracks to download.</div></div>';
             }
             wrap.innerHTML = html;
+            // Resolve any pt:thumb: markers (library thumbnails are stored as
+            // local-cache markers, not URLs) so the OWNED cards actually show
+            // their cover instead of the gray placeholder.
+            _resolveMusicThumbMarkers();
 
             // Wire chip clicks → run that search
             wrap.querySelectorAll('[data-myf-query]').forEach(el => {
@@ -19713,7 +20217,7 @@
             // don't visibly progress past 0%.
         }
 
-        function _renderMusicResults(list) {
+        function _renderMusicResults(list, append) {
             const wrap = document.getElementById('music-results');
             if (!wrap) return;
             const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -19728,7 +20232,7 @@
                     <circle class="ring-fg" cx="28" cy="28" r="26" stroke-dasharray="163.36" stroke-dashoffset="163.36"/>
                 </svg>
                 <span class="mtr-art-pct">0%</span>`;
-            wrap.innerHTML = list.map(r => {
+            const rowsHtml = list.map(r => {
                 const isSong = r.kind === 'song' || r.kind === 'video';
                 const inLib = r.in_library;
                 const downloading = _musicState.downloading.has(r.id);
@@ -19771,6 +20275,15 @@
                         </button>
                     </div>`;
             }).join('');
+            if (append) {
+                // Strip the sentinel (we re-append it after) and add new rows
+                // without clearing the existing results. Used by infinite scroll.
+                const oldSentinel = wrap.querySelector('.music-search-sentinel');
+                if (oldSentinel) oldSentinel.remove();
+                wrap.insertAdjacentHTML('beforeend', rowsHtml);
+            } else {
+                wrap.innerHTML = rowsHtml;
+            }
             // Re-apply in-flight progress to any row whose track is currently downloading.
             wrap.querySelectorAll('.music-track-row.downloading').forEach(row => {
                 const pct = _musicDownloadProgress.get(row.dataset.trackId);
@@ -19891,11 +20404,64 @@
         let _musicDownloadProgress = new Map();
 
         window.updateMusicDownload = function(videoId, pct) {
-            _musicDownloadProgress.set(videoId, Math.round(pct));
+            const pctRound = Math.round(pct);
+            _musicDownloadProgress.set(videoId, pctRound);
             const safe = (window.CSS && CSS.escape) ? CSS.escape(videoId) : videoId.replace(/"/g, '\\"');
+            // Search row progress (the ring around the cover)
             document.querySelectorAll(`.music-track-row[data-track-id="${safe}"]`).forEach(row => {
                 _setRowProgress(row, pct);
             });
+            // Queue row progress — surgical in-place update so we don't trigger
+            // a full _renderMusicQueue() on every tick (was the source of the
+            // flicker the user reported). Update text + bar width only.
+            document.querySelectorAll(`.mq-row[data-mq-id="${safe}"]`).forEach(row => {
+                const txt = row.querySelector('.mq-progress-text');
+                if (txt) txt.textContent = `${pctRound}%`;
+                const bar = row.querySelector('.mq-progress-bar');
+                if (bar) bar.style.width = `${pctRound}%`;
+                // Also keep the in-memory cache fresh so a later full render
+                // doesn't snap back to 0%.
+                for (const e of _musicQueueCache) {
+                    if (e.id === videoId) { e.progress = pctRound; break; }
+                }
+            });
+            // Album header aggregate (sum / average across this album's tracks)
+            for (const e of _musicQueueCache) {
+                if (e.id !== videoId || !e.album_id) continue;
+                const albumEntries = _musicQueueCache.filter(x => x.album_id === e.album_id);
+                if (albumEntries.length < 2) break;
+                const total = albumEntries.length;
+                const totalProgress = albumEntries.reduce(
+                    (acc, x) => acc + (x.status === 'done' ? 100 : (x.progress || 0)), 0);
+                const aggPct = Math.round(totalProgress / total);
+                const aidSafe = (window.CSS && CSS.escape) ? CSS.escape(e.album_id) : e.album_id.replace(/"/g, '\\"');
+                document.querySelectorAll(`.mq-album-pl-row[data-mq-group="${aidSafe}"]`).forEach(albRow => {
+                    const albBar = albRow.querySelector('.playlist-progress-bar');
+                    if (albBar) albBar.style.width = `${aggPct}%`;
+                });
+                break;
+            }
+        };
+
+        // Dedup set so an album that "completes" multiple times in one session
+        // (e.g. user re-downloads, or events fire twice) only toasts once.
+        const _albumToastFired = new Set();
+
+        // Cover resolved event — fires right after the first track of an album
+        // finishes downloading and ffmpeg extracts the embedded art. Updates
+        // local state + repaints the library so the placeholder is replaced
+        // with the real cover ASAP, not on next load.
+        window.musicAlbumCoverResolved = function(albumId, coverMarker) {
+            if (!albumId || !coverMarker) return;
+            if (_musicState.albums) {
+                for (const a of _musicState.albums) {
+                    if (a.id === albumId) {
+                        a.cover_url = coverMarker;
+                        break;
+                    }
+                }
+            }
+            _renderMusicLibrary();
         };
 
         // Aggregate album progress event from the backend. Fired on each per-track
@@ -19953,6 +20519,16 @@
                 if (ringPct) ringPct.textContent = `${pct}%`;
                 if (total > 0 && done >= total) {
                     card.classList.remove('album-downloading');
+                    // One toast per completed album (replaces the per-track
+                    // toasts that were spamming for 50-track albums). Use the
+                    // album's title from local state so the message reads
+                    // 'Album added: <title>' instead of just the album_id.
+                    const finishedAlbum = (_musicState.albums || []).find(a => a.id === albumId);
+                    const albName = finishedAlbum && finishedAlbum.title ? finishedAlbum.title : 'Album';
+                    if (!_albumToastFired.has(albumId)) {
+                        _albumToastFired.add(albumId);
+                        showToast(`Album added: ${albName}`, null, null);
+                    }
                 }
             } else {
                 // We know about the album but it's not in the DOM (e.g. user is
@@ -19995,6 +20571,10 @@
 
         window.musicDownloadDone = function(entry) {
             if (!entry || !entry.id) return;
+            // Stamp the surgical-update timestamp BEFORE doing the patch so
+            // any updateMusicQueue event that arrives concurrently from the
+            // backend gets skipped (avoids the album-body thumbnail flicker).
+            if (typeof window._markMqSurgical === 'function') window._markMqSurgical();
             _musicState.downloading.delete(entry.id);
             _musicDownloadProgress.delete(entry.id);
             const existing = _musicState.library.findIndex(t => t.id === entry.id);
@@ -20002,6 +20582,7 @@
             else _musicState.library.unshift(entry);
             _renderMusicLibrary();
             const safe = (window.CSS && CSS.escape) ? CSS.escape(entry.id) : entry.id.replace(/"/g, '\\"');
+            // Search-row flip (unchanged).
             document.querySelectorAll(`.music-track-row[data-track-id="${safe}"]`).forEach(row => {
                 row.classList.remove('downloading');
                 row.classList.add('in-library');
@@ -20011,9 +20592,74 @@
                     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
                 }
             });
-            showToast(`Added: ${entry.title}`, null, null);
-            // Queue side also needs to re-render (entry just flipped to 'done').
-            _refreshMusicQueue();
+            // Only toast individual tracks. Album tracks are silent here —
+            // the per-album toast fires once when the whole album finishes.
+            if (!entry.album_id) {
+                showToast(`Added: ${entry.title}`, null, null);
+            }
+            // Surgical queue update — was previously a full _refreshMusicQueue
+            // call which rebuilt every <img> in the list and caused the album
+            // cover to flicker on each track completion. Now we patch only
+            // the affected row + recompute the album header aggregate in place.
+            for (const e of _musicQueueCache) {
+                if (e.id === entry.id) {
+                    e.status = 'done';
+                    e.progress = 100;
+                    e.thumbnail = entry.thumbnail || e.thumbnail;
+                    break;
+                }
+            }
+            const mqRow = document.querySelector(`.mq-row[data-mq-id="${safe}"]`);
+            if (mqRow) {
+                // Strip the .is-downloading / .is-queued state markers, add done.
+                mqRow.classList.remove('is-downloading', 'is-queued', 'is-failed', 'is-cancelled');
+                mqRow.classList.add('is-done');
+                // Remove inline progress strip.
+                const prog = mqRow.querySelector('.mq-progress');
+                if (prog) prog.remove();
+                // Remove cancel/retry action button.
+                const act = mqRow.querySelector('.mq-action');
+                if (act) act.remove();
+                // Replace the pill (Downloading/Queued/etc.) with the green
+                // check badge, matching the done-state visual rendered by
+                // rowHtml() so a later full render is consistent.
+                const pill = mqRow.querySelector('.mq-status-pill');
+                if (pill && !mqRow.querySelector('.mq-done-check')) {
+                    const check = document.createElement('span');
+                    check.className = 'mq-done-check';
+                    check.title = 'Downloaded';
+                    check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                    pill.replaceWith(check);
+                } else if (!pill && !mqRow.querySelector('.mq-done-check')) {
+                    // Defensive: if there was no pill, append the check at the end.
+                    const check = document.createElement('span');
+                    check.className = 'mq-done-check';
+                    check.title = 'Downloaded';
+                    check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                    mqRow.appendChild(check);
+                }
+            }
+            // Update the parent album header's aggregate text + progress bar.
+            if (entry.album_id) {
+                const albumEntries = _musicQueueCache.filter(x => x.album_id === entry.album_id);
+                const total = albumEntries.length;
+                const done = albumEntries.filter(x => x.status === 'done').length;
+                const aggPct = total ? Math.round((done / total) * 100) : 0;
+                const aidSafe = (window.CSS && CSS.escape) ? CSS.escape(entry.album_id) : entry.album_id.replace(/"/g, '\\"');
+                document.querySelectorAll(`.mq-album-pl-row[data-mq-group="${aidSafe}"]`).forEach(albRow => {
+                    const albBar = albRow.querySelector('.playlist-progress-bar');
+                    if (albBar) albBar.style.width = `${aggPct}%`;
+                    const albText = albRow.querySelector('.playlist-progress-text');
+                    if (albText) albText.textContent = done >= total ? '' : `${done} of ${total} done`;
+                    // Update the "downloaded" count in the subtitle line.
+                    const sub = albRow.querySelector('.video-meta-line');
+                    if (sub) {
+                        sub.textContent = sub.textContent.replace(/\d+\/\d+ downloaded/, `${done}/${total} downloaded`);
+                    }
+                });
+            }
+            // Refresh the badge count on the Downloads sub-tab.
+            _paintMusicQueueBadge();
         };
 
         // ----- Music download queue (Downloads sub-tab) -----
@@ -20067,10 +20713,20 @@
             } catch (_) {}
         }
 
-        // Push event from backend on every queue mutation. Just re-fetch.
+        // Push event from backend on every queue mutation. Skip the full
+        // re-render if a musicDownloadDone surgical update fired in the last
+        // 400ms — the DOM is already current, and a duplicate full re-render
+        // is exactly what was causing the album-body thumbnail flash on each
+        // track completion (every <img> being recreated → browser flicker).
+        // User-visible cancellations / failures still trigger updates because
+        // they go through this path with no recent surgical update.
+        let _mqLastSurgicalAt = 0;
         window.updateMusicQueue = function() {
+            if (Date.now() - _mqLastSurgicalAt < 400) return;
             _refreshMusicQueue();
         };
+        // Expose a setter the musicDownloadDone handler can stamp.
+        window._markMqSurgical = function() { _mqLastSurgicalAt = Date.now(); };
 
         function _paintMusicQueueBadge() {
             const badge = document.getElementById('music-tab-downloads-badge');
@@ -20132,17 +20788,28 @@
             const cancelSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             const retrySvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
             const chevSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+            const doneCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
             const rowHtml = (e) => {
                 const status = e.status || 'queued';
                 const pct = Math.max(0, Math.min(100, Math.round(e.progress || 0)));
+                // Pill text is stable-width for downloading (no live %) so the
+                // row layout doesn't reflow on every progress tick. The actual
+                // percentage lives in .mq-progress-text below.
                 let pillText;
-                if (status === 'downloading') pillText = `Downloading ${pct}%`;
+                if (status === 'downloading') pillText = 'Downloading';
                 else if (status === 'queued') pillText = 'Queued';
-                else if (status === 'done') pillText = 'Done';
+                else if (status === 'done') pillText = '';   // replaced by check badge
                 else if (status === 'failed') pillText = 'Failed';
                 else if (status === 'cancelled') pillText = 'Cancelled';
                 else pillText = status;
+
+                // Done state uses a green check badge instead of a pill — matches
+                // the .mtr-add.in-library "already in library" visual the user
+                // liked in search results.
+                const statusEl = status === 'done'
+                    ? `<span class="mq-done-check" title="Downloaded">${doneCheckSvg}</span>`
+                    : `<span class="mq-status-pill ${status}">${esc(pillText)}</span>`;
 
                 let action = '';
                 if (status === 'queued' || status === 'downloading') {
@@ -20151,11 +20818,13 @@
                     action = `<button class="mq-action retry" data-mq-retry="${esc(e.id)}" title="Retry">${retrySvg}</button>`;
                 }
                 const progressStrip = status === 'downloading'
-                    ? `<div class="mq-progress"><div class="mq-progress-bar" style="width:${pct}%"></div></div>`
+                    ? `<div class="mq-progress">
+                        <div class="mq-progress-text">${pct}%</div>
+                        <div class="mq-progress-bar-bg"><div class="mq-progress-bar" style="width:${pct}%"></div></div>
+                      </div>`
                     : '';
-                const art = e.thumbnail
-                    ? `<img src="${esc(e.thumbnail)}" loading="lazy" />`
-                    : '';
+                const artAttrs = _musicThumbAttrs(e.thumbnail);
+                const art = artAttrs ? `<img ${artAttrs} loading="lazy" />` : '';
                 const sub = e.album
                     ? `${esc(e.artist || 'Unknown')} · ${esc(e.album)}`
                     : esc(e.artist || 'Unknown');
@@ -20172,10 +20841,10 @@
                             <div class="mq-title">${esc(e.title || 'Loading…')}</div>
                             <div class="mq-sub">${sub}</div>
                             ${errorRow}
+                            ${progressStrip}
                         </div>
-                        <span class="mq-status-pill ${status}">${esc(pillText)}</span>
+                        ${statusEl}
                         ${action}
-                        ${progressStrip}
                     </div>`;
             };
 
@@ -20193,41 +20862,53 @@
                 const cover = entries.find(e => e.thumbnail)?.thumbnail || '';
                 const allDone = done === total;
                 const inFlightOrQueued = dlInFlight + queuedCount;
+                // Build a video-playlist-row-shaped album header so it inherits
+                // the working `.playlist-row` layout (no flex-wrap bug, blue
+                // hover state, right-side controls) instead of a bespoke
+                // `.mq-album-header` that diverged. Cancel uses `.remove-btn`
+                // and the expand toggle uses `.playlist-open-hint` styling.
                 const cancelAllBtn = inFlightOrQueued > 0
-                    ? `<button class="mq-action cancel" data-mq-cancel-album="${esc(g.album_id)}" title="Cancel remaining">${cancelSvg}</button>`
+                    ? `<button type="button" class="remove-btn mq-album-cancel-all" data-mq-cancel-album="${esc(g.album_id)}" title="Cancel remaining">
+                         <svg fill="currentColor" viewBox="0 0 20 20"><path d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg>
+                       </button>`
                     : '';
-                const progressLabel = allDone
-                    ? 'Complete'
-                    : (inFlightOrQueued > 0 ? `${aggPct}%` : `${done}/${total}`);
-                // Aggregate progress bar on the header (only while there's work
-                // in flight or queued). Same look as a regular .mq-row progress.
-                const aggProgressStrip = (inFlightOrQueued > 0)
-                    ? `<div class="mq-album-progress"><div class="mq-album-progress-bar" style="width:${aggPct}%"></div></div>`
+                // Stable progress text (no live %): in-progress shows "X of N",
+                // complete shows nothing (the green check badge below replaces it).
+                const progressText = allDone
+                    ? ''
+                    : (inFlightOrQueued > 0 ? `${done} of ${total} done` : `${done}/${total} done`);
+                // Green check badge for complete albums — matches the per-row
+                // .mq-done-check visual so single-tracks and albums read the same.
+                const albumDoneCheck = allDone
+                    ? `<span class="mq-done-check" title="Downloaded">${doneCheckSvg}</span>`
                     : '';
                 return `
-                    <div class="mq-album-group" data-mq-group="${esc(g.album_id)}">
-                        <button class="mq-album-header" type="button" data-mq-toggle-group="${esc(g.album_id)}">
-                            <div class="mq-album-art">${cover ? `<img src="${esc(cover)}" loading="lazy" />` : ''}</div>
-                            <div class="mq-album-details">
-                                <div class="mq-album-title">${esc(albumTitle)}</div>
-                                <div class="mq-album-sub">${esc(albumArtist)} · ${done}/${total} downloaded${failed ? ' · ' + failed + ' failed' : ''}</div>
-                            </div>
-                            <span class="mq-album-progress-label">${progressLabel}</span>
-                            <div class="mq-album-actions">
-                                ${cancelAllBtn}
-                                <span class="mq-album-chev">${chevSvg}</span>
-                            </div>
-                            ${aggProgressStrip}
-                        </button>
-                        <div class="mq-album-body">
-                            ${entries.map(rowHtml).join('')}
+                    <div class="playlist-row mq-album-pl-row" data-mq-group="${esc(g.album_id)}" data-mq-toggle-group="${esc(g.album_id)}">
+                        <div class="mq-album-pl-thumb">${(() => { const a = _musicThumbAttrs(cover); return a ? `<img ${a} loading="lazy" alt="">` : ''; })()}</div>
+                        <div class="video-details">
+                            <div class="video-heading">${esc(albumTitle)}</div>
+                            <div class="video-meta-line">${esc(albumArtist)} · ${done}/${total} downloaded${failed ? ' · ' + failed + ' failed' : ''}</div>
                         </div>
+                        <div class="playlist-progress-wrap${allDone ? '' : ' visible'}">
+                            <div class="playlist-progress-text">${esc(progressText)}</div>
+                            <div class="playlist-progress-bar-bg">
+                                <div class="playlist-progress-bar" style="width:${aggPct}%"></div>
+                            </div>
+                        </div>
+                        ${albumDoneCheck}
+                        <div class="playlist-open-hint mq-album-toggle" data-tip-right="Expand">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                        ${cancelAllBtn}
+                    </div>
+                    <div class="mq-album-body" data-mq-body="${esc(g.album_id)}">
+                        ${entries.map(rowHtml).join('')}
                     </div>`;
             };
 
             // Persist which album groups are expanded across re-renders.
             const expanded = new Set();
-            list.querySelectorAll('.mq-album-group.expanded').forEach(el => {
+            list.querySelectorAll('.mq-album-pl-row.expanded').forEach(el => {
                 expanded.add(el.getAttribute('data-mq-group'));
             });
             // Also persist which failed rows the user has dismissed the
@@ -20240,7 +20921,7 @@
             list.innerHTML = albumGroups.map(groupHtml).join('') + singles.map(rowHtml).join('');
 
             // Restore expanded state
-            list.querySelectorAll('.mq-album-group').forEach(el => {
+            list.querySelectorAll('.mq-album-pl-row').forEach(el => {
                 if (expanded.has(el.getAttribute('data-mq-group'))) {
                     el.classList.add('expanded');
                 }
@@ -20305,10 +20986,9 @@
             list.querySelectorAll('[data-mq-toggle-group]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     // Don't toggle if the user clicked an action button inside
-                    // the header (cancel-all, etc.)
-                    if (e.target.closest('.mq-action')) return;
-                    const group = btn.closest('.mq-album-group');
-                    if (group) group.classList.toggle('expanded');
+                    // the row (cancel-all, etc.) — those have their own handler.
+                    if (e.target.closest('.remove-btn, .mq-action')) return;
+                    btn.classList.toggle('expanded');
                 });
             });
             // Click anywhere on a failed row body to collapse the inline error.
@@ -20484,6 +21164,13 @@
                 _musicPlayer.playing = true;
                 _paintAllPlayIcons(true);
                 _startMusicProgressLoop();   // rAF takes over from timeupdate for smooth visuals
+                // Audio focus: pause the video player when music starts so
+                // both don't play at once. Symmetric with the video <video>
+                // element's `play` listener which pauses the music.
+                try {
+                    const v = document.getElementById('player-video');
+                    if (v && !v.paused) v.pause();
+                } catch (_) {}
             });
             audio.addEventListener('pause', () => {
                 _musicPlayer.playing = false;
@@ -20610,6 +21297,30 @@
             if (dockPrev) dockPrev.addEventListener('click', (e) => { e.stopPropagation(); _musicGoAdjacent(-1); });
             if (dockNext) dockNext.addEventListener('click', (e) => { e.stopPropagation(); _musicGoAdjacent(1); });
 
+            // Fullscreen toggle — same action as F key, with an enter/exit
+            // icon swap so the button reflects current state.
+            const fsBtn = document.getElementById('mp-fullscreen');
+            const fsIcon = document.getElementById('mp-fullscreen-icon');
+            const _enterIcon = '<polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="4" y1="20" x2="11" y2="13"/><line x1="20" y1="4" x2="13" y2="11"/>';
+            const _exitIcon = '<polyline points="4 10 4 4 10 4"/><polyline points="20 14 20 20 14 20"/><line x1="4" y1="4" x2="11" y2="11"/><line x1="20" y1="20" x2="13" y2="13"/>';
+            const paintFsIcon = () => {
+                if (fsIcon) fsIcon.innerHTML = _musicFsActive ? _exitIcon : _enterIcon;
+                if (fsBtn) fsBtn.title = _musicFsActive ? 'Exit fullscreen (F)' : 'Fullscreen (F)';
+            };
+            if (fsBtn) {
+                fsBtn.addEventListener('click', () => {
+                    _musicToggleFs();
+                    paintFsIcon();
+                });
+            }
+            // Keep icon in sync when F is pressed instead of clicked.
+            document.addEventListener('keydown', (e) => {
+                const k = e.key;
+                if ((k === 'f' || k === 'F' || k === 'Escape') && app.currentView === 'music-player') {
+                    setTimeout(paintFsIcon, 0);
+                }
+            });
+
             // Player-view volume — same drag pattern as the dock, plus wheel + mute toggle
             const volTrack = document.getElementById('mp-vol-track');
             _bindHorizontalDrag(volTrack, (pct) => _applyMusicVolume(pct, true));
@@ -20655,7 +21366,9 @@
             // Input-field guard is mandatory — without it, typing 'n' in a URL box
             // would skip a track. Same trap docs/agents flagged.
             document.addEventListener('keydown', (e) => {
-                if (app.currentView !== 'music-player') return;
+                const onFullPlayer = app.currentView === 'music-player';
+                const dockVisible = document.body.classList.contains('music-dock-visible');
+                if (!onFullPlayer && !dockVisible) return;
                 const t = e.target;
                 if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
 
@@ -20664,9 +21377,14 @@
                 const k = e.key;
 
                 // Play / pause — Space (universal) and K (YouTube alias).
+                // Spacebar works whenever the dock is visible (any view); the
+                // other shortcuts (seek, volume, next/prev, etc.) only fire on
+                // the full music-player view to avoid stealing keys from other
+                // surfaces during browsing.
                 if (((k === ' ' || e.code === 'Space') || ((k === 'k' || k === 'K') && !ctrl && !shift))) {
                     e.preventDefault(); _musicTogglePlay(); return;
                 }
+                if (!onFullPlayer) return;   // remaining bindings are player-view-only
                 // Seek ±5s — arrows. ±10s — J / L (YouTube power-user aliases).
                 if (k === 'ArrowLeft'  && !ctrl) { e.preventDefault(); _musicSeekBy(-5);  return; }
                 if (k === 'ArrowRight' && !ctrl) { e.preventDefault(); _musicSeekBy( 5);  return; }
@@ -20937,10 +21655,9 @@
             const artImg = document.getElementById('music-dock-art-img');
             if (titleEl) titleEl.textContent = track.title || 'Untitled';
             if (artistEl) artistEl.textContent = [track.artist, track.album].filter(Boolean).join(' · ');
-            if (artImg) {
-                if (track.thumbnail) artImg.src = track.thumbnail;
-                else artImg.removeAttribute('src');
-            }
+            // pt:thumb: markers require backend resolution; can't be assigned
+            // straight to src. _setMusicArt handles both URL + marker cases.
+            _setMusicArt(artImg, track.thumbnail);
         }
 
         function _paintFullPlayerTrackInfo(track) {
@@ -20952,19 +21669,8 @@
             if (title) title.textContent = track.title || 'Untitled';
             if (artist) artist.textContent = track.artist || '';
             if (album) album.textContent = track.album || '';
-            if (art) {
-                if (track.thumbnail) art.src = track.thumbnail;
-                else art.removeAttribute('src');
-            }
-            if (backdrop) {
-                if (track.thumbnail) {
-                    backdrop.style.backgroundImage = `url("${track.thumbnail.replace(/"/g, '\\"')}")`;
-                    backdrop.classList.add('has-art');
-                } else {
-                    backdrop.classList.remove('has-art');
-                    backdrop.style.backgroundImage = '';
-                }
-            }
+            _setMusicArt(art, track.thumbnail);
+            _setMusicBackdrop(backdrop, track.thumbnail);
             _paintMpPanel();
         }
 
@@ -21044,7 +21750,8 @@
                     }
                 }
                 body.innerHTML = '<div class="mp-upnext">' + queue.map(t => {
-                    const thumb = t.thumbnail ? `<img src="${esc(t.thumbnail)}" loading="lazy" />` : '';
+                    const tAttrs = _musicThumbAttrs(t.thumbnail);
+                    const thumb = tAttrs ? `<img ${tAttrs} loading="lazy" />` : '';
                     const dur = (() => {
                         if (t.duration_string) return t.duration_string;
                         if (t.duration) { const s = Math.floor(t.duration); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
@@ -21059,6 +21766,7 @@
                         <div class="mp-mini-dur">${esc(dur)}</div>
                     </div>`;
                 }).join('') + '</div>';
+                _resolveMusicThumbMarkers();
                 if (meta) meta.textContent = `${queue.length} up next${_musicPlayer.shuffle ? ' · shuffle' : ''}${_musicPlayer.repeat !== 'off' ? ' · repeat ' + _musicPlayer.repeat : ''}`;
                 body.querySelectorAll('.mp-mini-card').forEach(card => {
                     card.addEventListener('click', () => {
@@ -21198,6 +21906,10 @@
                     paintInputClear();
                     suggBox.setAttribute('hidden', '');
                     _searchState.currentSuggestions = [];
+                    // Mirror music-search: X also resets to the For-You-style
+                    // landing (recent searches + empty placeholder) so the
+                    // user can pick a previous query without retyping.
+                    _renderVideoForYou();
                     input.focus();
                 });
             }
@@ -21232,7 +21944,15 @@
                         q = _searchState.currentSuggestions[_searchState.highlightedSuggIdx];
                         input.value = q;
                     }
+                    // Also cancel any in-flight suggestion debounce so it doesn't
+                    // re-show suggestions 150ms after Enter dismissed them.
+                    if (_searchState.suggestionsTimer) {
+                        clearTimeout(_searchState.suggestionsTimer);
+                        _searchState.suggestionsTimer = null;
+                    }
+                    _searchState.currentSuggestions = [];
                     suggBox.setAttribute('hidden', '');
+                    input.blur();
                     if (q) runSearch(q, _searchState.kind);
                 }
             });
@@ -21328,6 +22048,154 @@
             items.forEach((el, i) => el.classList.toggle('hover', i === _searchState.highlightedSuggIdx));
         }
 
+        // Video-search landing — mirror of _renderMusicForYou but intentionally
+        // limited to data driven by the user's own activity (recent searches
+        // + recently-added library items). No algorithmic recommendations.
+        // Called on initial search-view mount and on the X clear button.
+        async function _renderVideoForYou() {
+            // Renders into the dedicated #video-foryou container — NOT the
+            // .search-status flex-center box (which squashed multi-section
+            // content into a jumbled centered layout). The For-You IS the
+            // empty state, so hide the standard "Search YouTube to find…"
+            // status block while it's visible.
+            const wrap = document.getElementById('video-foryou');
+            const status = document.getElementById('search-status');
+            const results = document.getElementById('search-results');
+            if (results) results.innerHTML = '';
+            if (status) status.setAttribute('hidden', '');
+            if (!wrap) return;
+            wrap.removeAttribute('hidden');
+            wrap.innerHTML = '<div class="search-status" style="padding:24px;"><div>Loading…</div></div>';
+            let data;
+            try { data = await pywebview.api.get_video_for_you(); }
+            catch (_) { data = null; }
+            const recents = (data && data.recent_searches) || [];
+            const recentLib = (data && data.recent_library) || [];
+            const topUploader = (data && data.top_uploader) || '';
+            const becauseYou = (data && data.because_you) || [];
+            const trending = (data && data.trending) || [];
+            const shuffledLib = (data && data.shuffled_lib) || [];
+            const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const clockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+            const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>';
+            // OWNED card — for library-derived rows (Pick up / From your library).
+            const ownedCardHtml = (v) => {
+                const tAttrs = _musicThumbAttrs(v.thumbnail);
+                const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
+                return `<div class="myf-card" data-vfy-lib-id="${esc(v.id)}">
+                    <div class="myf-card-art">${thumb}<span class="myf-badge">OWNED</span><div class="myf-card-play">${playSvg}</div></div>
+                    <div class="myf-card-title">${esc(v.title)}</div>
+                    <div class="myf-card-sub">${esc(v.uploader)}</div>
+                </div>`;
+            };
+            // Search-source card — for "Because you have" / "Trending" rows.
+            // Click runs a search for the card's title+uploader (mirrors music's
+            // [data-myf-search-id] behavior — keeps the click contract honest:
+            // download is an explicit weighty action, click previews/explores).
+            const searchCardHtml = (r) => {
+                // Search results' thumbnail is typically a plain remote URL,
+                // but be defensive and use _musicThumbAttrs in case it's a
+                // marker for any reason.
+                const tAttrs = _musicThumbAttrs(r.thumbnail);
+                const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
+                return `<div class="myf-card" data-vfy-search-id="${esc(r.id)}">
+                    <div class="myf-card-art">${thumb}<div class="myf-card-play">${playSvg}</div></div>
+                    <div class="myf-card-title">${esc(r.title || 'Untitled')}</div>
+                    <div class="myf-card-sub">${esc(r.uploader || r.channel || '')}</div>
+                </div>`;
+            };
+            let html = '';
+            // Row 1: Recent searches chips
+            if (recents.length) {
+                html += '<div class="myf-section"><div class="myf-head"><h3>Recent searches</h3></div><div class="myf-chips">';
+                html += recents.map(q => `<button class="myf-chip" data-vfy-query="${esc(q)}">${clockSvg}${esc(q)}</button>`).join('');
+                html += '</div></div>';
+            }
+            // Row 2: Pick up where you left off (most-recent library items)
+            if (recentLib.length) {
+                html += '<div class="myf-section"><div class="myf-head"><h3>Pick up where you left off</h3><span class="myf-sub">from your library</span></div><div class="myf-grid">';
+                html += recentLib.map(ownedCardHtml).join('');
+                html += '</div></div>';
+            }
+            // Row 3: Because you have [Top Uploader] — search results for the
+            // user's most-represented uploader (capped at 6, library dupes
+            // filtered server-side). 24h cached.
+            if (topUploader && becauseYou.length) {
+                html += `<div class="myf-section"><div class="myf-head"><h3>Because you have ${esc(topUploader)}</h3></div><div class="myf-grid">`;
+                html += becauseYou.map(searchCardHtml).join('');
+                html += '</div></div>';
+            }
+            // Row 4: Trending on YouTube — via FEtrending Innertube browse.
+            if (trending.length) {
+                html += '<div class="myf-section"><div class="myf-head"><h3>Trending on YouTube</h3><span class="myf-sub">Updated daily</span></div><div class="myf-grid">';
+                html += trending.map(searchCardHtml).join('');
+                html += '</div></div>';
+            }
+            // Row 5: From your library (shuffled).
+            if (shuffledLib.length) {
+                html += '<div class="myf-section"><div class="myf-head"><h3>From your library</h3><span class="myf-sub">shuffled</span></div><div class="myf-grid">';
+                html += shuffledLib.map(ownedCardHtml).join('');
+                html += '</div></div>';
+            }
+            if (!html) {
+                // No history + no library + no recommendations → show the
+                // bare-empty prompt in the status box (not the For-You wrap).
+                wrap.innerHTML = '';
+                wrap.setAttribute('hidden', '');
+                if (status) {
+                    status.removeAttribute('hidden');
+                    status.innerHTML = '<div class="search-empty-default">Search YouTube to find videos, channels, or playlists to download.</div>';
+                }
+                return;
+            }
+            wrap.innerHTML = html;
+            // Resolve pt:thumb: markers on the OWNED cards (same path the
+            // music For-You uses — backend hands back base64 data URLs).
+            if (typeof _resolveMusicThumbMarkers === 'function') {
+                _resolveMusicThumbMarkers();
+            }
+            wrap.querySelectorAll('[data-vfy-query]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const q = el.getAttribute('data-vfy-query');
+                    const input = document.getElementById('search-input');
+                    if (input) {
+                        input.value = q;
+                        const cb = document.getElementById('search-clear-btn');
+                        if (cb) cb.classList.toggle('visible', !!q);
+                    }
+                    runSearch(q, _searchState.kind);
+                });
+            });
+            // Click an OWNED card → open that library entry's detail panel,
+            // same flow as clicking the card in the Library view.
+            wrap.querySelectorAll('[data-vfy-lib-id]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const id = el.getAttribute('data-vfy-lib-id');
+                    if (!id) return;
+                    try { app.switchView('library'); } catch (_) {}
+                    try { openLibraryDetail(id); } catch (_) {}
+                });
+            });
+            // Because-you / trending cards → run a search seeded by the card's
+            // title + uploader. Same click contract as the music side:
+            // download is explicit (button), click previews/explores.
+            wrap.querySelectorAll('[data-vfy-search-id]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const t = el.querySelector('.myf-card-title')?.textContent || '';
+                    const a = el.querySelector('.myf-card-sub')?.textContent || '';
+                    const q = (t + ' ' + a).trim();
+                    if (!q) return;
+                    const input = document.getElementById('search-input');
+                    if (input) {
+                        input.value = q;
+                        const cb = document.getElementById('search-clear-btn');
+                        if (cb) cb.classList.toggle('visible', !!q);
+                    }
+                    runSearch(q, _searchState.kind || 'all');
+                });
+            });
+        }
+
         async function runSearch(query, kind) {
             _searchState.query = query;
             _searchState.kind = kind || 'all';
@@ -21337,6 +22205,37 @@
             _searchState.selectedIds.clear();
             _searchState.seenIds.clear();
             updateSelectionBar();
+            // Record this query for the For-You "Recent searches" chips. Mirrors
+            // _runMusicSearch's record_music_search call — without this, the
+            // video For-You's chips row never had any data to render.
+            try { pywebview.api.record_video_search(query); } catch (_) {}
+            // Foolproof suggestion dismiss — see _runMusicSearch for rationale.
+            // Re-hide a few times to defeat any debounced/focus-driven re-open.
+            const _sb = document.getElementById('search-suggestions');
+            if (_sb) {
+                _sb.setAttribute('hidden', '');
+                setTimeout(() => _sb.setAttribute('hidden', ''), 100);
+                setTimeout(() => _sb.setAttribute('hidden', ''), 300);
+                setTimeout(() => _sb.setAttribute('hidden', ''), 600);
+            }
+            // Also cancel any pending suggestion debounce so it doesn't re-show
+            // 150ms after we dismiss.
+            if (_searchState.suggestionsTimer) {
+                clearTimeout(_searchState.suggestionsTimer);
+                _searchState.suggestionsTimer = null;
+            }
+            // Wipe + hide the For-You landing so its OWNED / Recent / Because-you
+            // sections don't bleed into the search-results layout while results
+            // are coming in (the bug that caused the jumbled side-by-side
+            // layout the user flagged).
+            const _vfy = document.getElementById('video-foryou');
+            if (_vfy) {
+                _vfy.innerHTML = '';
+                _vfy.setAttribute('hidden', '');
+            }
+            // Also wipe any leftover content from #search-status (legacy path).
+            const _ss = document.getElementById('search-status');
+            if (_ss) _ss.innerHTML = '';
             renderSearchStatus('loading');
             const results = document.getElementById('search-results');
             if (results) results.innerHTML = '';
@@ -21509,7 +22408,13 @@
             const sentinel = document.getElementById('search-loadmore-sentinel');
             if (!el) return;
             if (state === 'hidden') {
+                // Also wipe innerHTML — otherwise leftover For-You content
+                // (rendered into this same element by _renderVideoForYou)
+                // can reappear if anything later removes the hidden attr.
+                // That was the source of the OWNED cards bleeding into the
+                // search-results grid during an active search.
                 el.setAttribute('hidden', '');
+                el.innerHTML = '';
                 return;
             }
             el.removeAttribute('hidden');
@@ -21634,17 +22539,21 @@
             }
             if (!urls.length) return;
             const label = urls.length === 1 ? '1 item' : `${urls.length} items`;
-            showToast(`Added ${label} to queue`, null, null);
+            showToast(`Adding ${label} to queue…`, null, null);
             // Sequential fire-and-forget. fetch_url_info returns immediately; the actual
             // metadata fetch happens in a background thread on the Python side.
             for (const url of urls) {
                 try { pywebview.api.fetch_url_info(url, 'browser', 'none'); } catch (_) {}
             }
-            // Stay in the search view so the user can keep browsing/adding. Mark each
-            // added card with the "Already in your queue" chip so the visual state
-            // reflects that they're already in the queue.
+            // Mark cards as "Adding…" — NOT "Already in queue" yet. The badge
+            // flips to "Already in queue" inside handleFullFetch once the
+            // backend confirms the video actually landed in the queue. This
+            // was the user-reported timing bug: previously we slapped the
+            // "Already in queue" tag on the card before fetch_url_info even
+            // started fetching, so a flaky network/extract would silently
+            // never add the video while the UI claimed it already had.
             for (const card of cards) {
-                card.dataset.inQueue = '1';
+                card.dataset.addingPending = '1';
                 card.classList.remove('selected');
                 let actionEl = card.querySelector('.sr-action');
                 if (!actionEl) {
@@ -21652,7 +22561,7 @@
                     actionEl.className = 'sr-action';
                     card.querySelector('.sr-meta')?.appendChild(actionEl);
                 }
-                actionEl.innerHTML = '<span class="sr-already"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Already in your queue</span>';
+                actionEl.innerHTML = '<span class="sr-pending">Adding…</span>';
             }
             clearSearchSelection();
         }

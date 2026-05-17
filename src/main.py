@@ -193,7 +193,125 @@ def _log_diag(msg):
         pass
 
 
+def _schedule_mac_maximize(window):
+    """Enter native macOS fullscreen on launch (covers entire screen, hides
+    menubar + Dock, separate Space). User-requested: matches the Windows
+    "maximized" feel of "fills the whole screen" more closely than Mac's
+    Zoom semantics (which keep menubar + Dock visible).
+
+    Recipe:
+      1. Hook `window.events.shown` for correct timing (window fully realized).
+      2. AppHelper.callAfter to dispatch on main thread (Cocoa requires
+         UI ops on main).
+      3. Read `window.native` for the actual NSWindow instance.
+      4. Call `toggleFullScreen_(None)` ONCE — that's the standard Cocoa
+         "go fullscreen" entry point (same as double-clicking the green
+         button or pressing ⌃⌘F).
+
+    Guarded with `_did_fs['done']` so the timer fallbacks don't re-toggle
+    (which would EXIT fullscreen)."""
+    if sys.platform != 'darwin' or window is None:
+        return
+    import threading as _th
+    _did_fs = {'done': False}
+
+    def _go_fullscreen(caller='?'):
+        # Lets the verbose log distinguish whether the call came from the
+        # shown-event hook or one of the timer fallbacks.
+        if _did_fs['done']:
+            _log_diag(f'[ProTube] mac fullscreen ({caller}): already done, skipping')
+            return
+        try:
+            from PyObjCTools import AppHelper
+            from AppKit import NSApp
+
+            def _on_main():
+                if _did_fs['done']:
+                    _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): already done')
+                    return
+                try:
+                    ns_window = getattr(window, 'native', None)
+                    _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): window.native={ns_window is not None}')
+                    candidates = [ns_window] if ns_window is not None else list(NSApp.windows())
+                    _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): candidates={len(candidates)}')
+                    for w in candidates:
+                        if w is None:
+                            continue
+                        try:
+                            vis = bool(w.isVisible())
+                            mini = bool(w.isMiniaturized())
+                            in_fs = bool(w.styleMask() & (1 << 14))
+                            _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): visible={vis} mini={mini} in_fs={in_fs}')
+                            if not vis:
+                                continue
+                            if mini:
+                                w.deminiaturize_(None)
+                            # CRITICAL: NSWindow needs FullScreenPrimary in its
+                            # collectionBehavior or toggleFullScreen_ silently
+                            # no-ops. Apple's docs flag this; pywebview's Cocoa
+                            # backend doesn't set it by default. 128 == (1<<7)
+                            # == NSWindowCollectionBehaviorFullScreenPrimary.
+                            cb = w.collectionBehavior()
+                            if not (cb & 128):
+                                w.setCollectionBehavior_(cb | 128)
+                                _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): set FullScreenPrimary collection behavior')
+                            if not in_fs:
+                                w.toggleFullScreen_(None)
+                                _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): toggleFullScreen_ called')
+                            _did_fs['done'] = True
+                            break
+                        except Exception as e:
+                            _log_diag(f'[ProTube] mac fullscreen on-main ({caller}) per-window: {e}')
+                except Exception as e:
+                    _log_diag(f'[ProTube] mac fullscreen on-main ({caller}) outer: {e}')
+            AppHelper.callAfter(_on_main)
+            _log_diag(f'[ProTube] mac fullscreen dispatch ({caller}): callAfter scheduled')
+        except Exception as e:
+            _log_diag(f'[ProTube] mac fullscreen dispatch ({caller}): {e}')
+
+    # Try `loaded` (DOM ready) first so WebKit has actually painted at least
+    # the first frame before we toggle fullscreen. The previous `shown`-event
+    # hook fired too early — OS fullscreen captured the pre-paint state and
+    # showed a black window (user 2026-05-17 regression). 500ms post-event
+    # delay leaves a comfortable margin for the splash/index.html to render.
+    hooked = False
+    for ev_name in ('loaded', 'shown'):
+        try:
+            ev = getattr(window.events, ev_name)
+            def _delayed(_ev=ev_name):
+                _th.Timer(0.5, _go_fullscreen, args=(f'{_ev}-event',)).start()
+            ev += (lambda: _delayed())
+            _log_diag(f'[ProTube] mac fullscreen hooked to window.events.{ev_name} (+500ms)')
+            hooked = True
+            break
+        except Exception as e:
+            _log_diag(f'[ProTube] mac fullscreen {ev_name}-hook failed: {e}')
+    # Fallback retries — only fire if the event hook didn't (or much later).
+    # Bumped to 2/3.5/5s so they don't pre-empt the paint either.
+    for delay in (2.0, 3.5, 5.0):
+        _th.Timer(delay, _go_fullscreen, args=(f'timer-{delay}s',)).start()
+
+
 def _on_window_ready(api, window):
+    # On macOS, pywebview's Cocoa backend creates the window but doesn't bring
+    # the process to the foreground — the window ends up behind other apps and
+    # the dock icon doesn't bounce. Force-activate so the user sees the window
+    # immediately on launch (matches Windows' behavior). No-op on Win/Linux.
+    if sys.platform == 'darwin':
+        try:
+            from AppKit import NSApp, NSApplicationActivationPolicyRegular
+            NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+            NSApp.activateIgnoringOtherApps_(True)
+            _log_diag('[ProTube] mac window activation: ok')
+            # Schedule window maximize via pywebview's main-thread-safe path
+            # (was previously using setFrame_ from a worker thread; Cocoa
+            # silently ignored some of those calls).
+            _schedule_mac_maximize(window)
+        except Exception as e:
+            _log_diag(f'[ProTube] mac window activation: {e}')
+        # Mac doesn't need the Win11 corner/frame polish — skip the loop below.
+        return
+
     # Apply our window polish (square Win11 corners + frame redraw) once the
     # native window is realized. The API method is shared with set_fullscreen,
     # which calls it again after every fullscreen toggle to undo pywebview's
@@ -213,15 +331,36 @@ def _on_window_ready(api, window):
 
 if __name__ == '__main__':
     api = API()
+    # Window size at creation time. pywebview's `maximized=True` is honored on
+    # Windows (the WinForms backend) but is a no-op on the Cocoa backend —
+    # confirmed via pywebview's source. After many failed attempts to resize
+    # after-the-fact (window.events.shown hook, AppHelper.callAfter +
+    # setFrame_display_, NSWindow.zoom_), the only thing that reliably gives
+    # the user a "maximized on launch" experience on macOS is to pre-size
+    # the window at creation time to the visible-screen dimensions. We read
+    # NSScreen.visibleFrame() (which excludes menubar + dock = correct
+    # "maximize" semantics) and pass those as width/height. Centered placement
+    # falls back to pywebview's default.
+    _init_w, _init_h = 1280, 800
+    if sys.platform == 'darwin':
+        try:
+            from AppKit import NSScreen
+            _screen = NSScreen.mainScreen() or (NSScreen.screens()[0] if NSScreen.screens() else None)
+            if _screen is not None:
+                _vf = _screen.visibleFrame()
+                _init_w = max(int(_vf.size.width), 1024)
+                _init_h = max(int(_vf.size.height), 700)
+        except Exception:
+            pass
     window = webview.create_window(
         'ProTube Saver',
         # --- CRITICAL CHANGE: Use resource_path to find the bundled HTML file ---
         resource_path('index.html'),
         js_api=api,
-        width=1280,
-        height=800,
+        width=_init_w,
+        height=_init_h,
         resizable=True,
-        maximized=True,  # Your preference to start maximized is kept
+        maximized=True,  # Honored on Windows; no-op on Mac (handled via size)
         # Sets the host WinForm's BackColor. Without this, the form paints its
         # default white during the gap before WebView2 loads (visible at launch
         # before the splash) and during the un-maximize→resize→re-maximize

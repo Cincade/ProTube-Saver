@@ -45,8 +45,16 @@ def app_dir():
     anywhere; we want the project folder where the source lives.
     """
     if getattr(sys, 'frozen', False):
-        # PyInstaller --onefile sets sys.frozen and sys.executable points at
-        # the extracted exe, which lives in the user's chosen install location.
+        # Mac .app bundles: writing inside the bundle would invalidate
+        # code-signing and Apple's HIG expects user data under
+        # ~/Library/Application Support/. Anchor outside the bundle.
+        if sys.platform == 'darwin':
+            return os.path.join(
+                os.path.expanduser('~/Library/Application Support'),
+                'ProTube Saver',
+            )
+        # Windows --onefile: sys.executable is the extracted exe, which lives
+        # in the user's chosen install location (the portable next-to-exe layout).
         return os.path.dirname(os.path.abspath(sys.executable))
     # Dev mode — anchor on this file's location and climb one level out of src/
     # to reach the project root (where data/ lives). Post-reorg layout:
