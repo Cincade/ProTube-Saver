@@ -18,6 +18,12 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.3.1 — 2026-05-17 (hotfix)
+
+- Fixes: **2K / 4K downloads silently saved as 1080p.** The format selector preferred AVC1 (H.264) MP4 first for maximum device compatibility — but YouTube only serves AVC1 up to 1080p. At 1440p / 2160p the streams are AV1-in-MP4 or VP9-in-WebM, so the AVC1-preferred selector quietly resolved to the 1080p AVC1 stream even when you'd picked 2K or 4K. Above 1080p we now skip the AVC1 filter and take AV1-in-MP4 (or VP9 as a fallback); the in-app player already decodes both natively, so playback is unchanged. ≤1080p selection is untouched (still AVC1-preferred for Smart-TV-grade compatibility).
+
+---
+
 ## v1.3.0 — 2026-05-17
 
 **Mac support + music-feature parity + queue/library polish + search-side For-You.**

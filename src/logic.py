@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -1405,12 +1405,27 @@ class API:
                     opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
                 else:
                     h = quality.replace('p','')
-                    opts['format'] = (
-                        f'bestvideo[height<={h}][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/'
-                        f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
-                        f'best[height<={h}][ext=mp4]/'
-                        f'best[height<={h}]'
-                    )
+                    # YouTube only serves H.264 (avc1) up to 1080p. At 1440p / 2160p
+                    # the streams are AV1-in-MP4 or VP9-in-WebM. The avc1-first
+                    # selector below silently matched the 1080p avc1 stream when h
+                    # was 1440/2160 (it satisfies [height<=2160] AND [vcodec^=avc1]),
+                    # so 2K/4K downloads always came down as 1080p. Above 1080p we
+                    # skip the avc1 filter; the in-app player handles av01/vp9 natively
+                    # per _is_player_compatible. At ≤1080p we keep the avc1-preferred
+                    # cascade for maximum device compatibility (older Smart TVs etc.).
+                    if int(h) > 1080:
+                        opts['format'] = (
+                            f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
+                            f'bestvideo[height<={h}]+bestaudio/'
+                            f'best[height<={h}]'
+                        )
+                    else:
+                        opts['format'] = (
+                            f'bestvideo[height<={h}][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/'
+                            f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
+                            f'best[height<={h}][ext=mp4]/'
+                            f'best[height<={h}]'
+                        )
                     opts['merge_output_format'] = 'mp4'
                     # Final-stage remux to MP4 with -c copy — instant container change
                     # for anything that slipped past the format selector (e.g. webm
