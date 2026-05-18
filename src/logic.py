@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.3.2'
+__version__ = '1.4.0'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -5291,6 +5291,256 @@ class API:
                 pass
 
         return result
+
+    # ----- In-app auto-update (Mac) -------------------------------------------
+    # The flow: frontend calls start_update_download(url) → backend streams the
+    # .dmg (or .zip) into the data dir, mounts/extracts the .app, stages it,
+    # then emits 'protubeUpdateReady'. Frontend then calls
+    # install_staged_update() which spawns a detached bash helper script and
+    # quits the app. The helper waits for the parent to exit, swaps the .app
+    # bundle on disk (sending the old one to Trash, not rm -rf), and relaunches.
+    # Mac-only — Windows still uses the open-URL fallback because a running
+    # .exe can't be replaced in place without a separate updater binary.
+
+    def _current_app_bundle_path(self):
+        """Return absolute path to the running .app bundle on Mac, or None if
+        we're in dev mode (`python main.py`) or running on Windows."""
+        if sys.platform != 'darwin' or not getattr(sys, 'frozen', False):
+            return None
+        exe = sys.executable
+        marker = '/Contents/MacOS/'
+        if marker in exe:
+            return exe.split(marker)[0]
+        return None
+
+    def _update_staging_dir(self):
+        """Where in-progress update downloads + extracted bundles live."""
+        from app_paths import data_dir
+        return os.path.join(data_dir(), 'update_staging')
+
+    def _resolve_update_helper_path(self):
+        """Locate the bundled update helper bash script."""
+        candidates = []
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            candidates.append(os.path.join(sys._MEIPASS, 'protube_update_helper.sh'))
+        here = os.path.dirname(os.path.abspath(__file__))
+        candidates.append(os.path.join(here, '..', 'assets', 'mac', 'protube_update_helper.sh'))
+        candidates.append(os.path.join(here, 'protube_update_helper.sh'))
+        for p in candidates:
+            if os.path.isfile(p):
+                return os.path.abspath(p)
+        return None
+
+    def start_update_download(self, url):
+        """Kick off an in-app update: download the .dmg/.zip at `url`, extract
+        the .app inside, stage it for install. Returns immediately; progress
+        is pushed to the frontend via _send_to_js events:
+            protubeUpdateProgress {percent, state, msg}
+            protubeUpdateReady    {staged_app_path, install_to}
+            protubeUpdateError    {msg}
+        """
+        if sys.platform != 'darwin':
+            self._send_to_js('protubeUpdateError', {
+                'msg': 'In-app install is Mac-only. Use the Download button to grab the new version from GitHub.'
+            })
+            return False
+        if not self._current_app_bundle_path():
+            self._send_to_js('protubeUpdateError', {
+                'msg': "Couldn't detect the install location (dev mode?). Open the release page to install manually."
+            })
+            return False
+        if getattr(self, '_update_in_progress', False):
+            return False
+        self._update_in_progress = True
+
+        def worker():
+            try:
+                self._update_download_and_stage(url)
+            except Exception as e:
+                self._send_to_js('protubeUpdateError', {'msg': f'Update failed: {e}'})
+            finally:
+                self._update_in_progress = False
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def _update_download_and_stage(self, url):
+        """Worker: download archive, extract .app, emit ready event."""
+        staging = self._update_staging_dir()
+        shutil.rmtree(staging, ignore_errors=True)  # wipe prior attempt
+        os.makedirs(staging, exist_ok=True)
+
+        parsed_name = url.rsplit('/', 1)[-1].split('?', 1)[0] or 'protube_update.bin'
+        download_path = os.path.join(staging, parsed_name)
+
+        self._send_to_js('protubeUpdateProgress', {
+            'percent': 0, 'state': 'downloading', 'msg': 'Downloading update…'
+        })
+
+        with requests.get(url, stream=True, timeout=30) as resp:
+            if resp.status_code != 200:
+                self._send_to_js('protubeUpdateError', {
+                    'msg': f'Download failed (HTTP {resp.status_code})'
+                })
+                return
+            total = int(resp.headers.get('Content-Length') or 0)
+            downloaded = 0
+            last_pct = -1
+            with open(download_path, 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=256 * 1024):
+                    if not chunk:
+                        continue
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        pct = int(downloaded * 100 / total)
+                        if pct != last_pct:
+                            last_pct = pct
+                            self._send_to_js('protubeUpdateProgress', {
+                                'percent': pct, 'state': 'downloading',
+                                'msg': f'Downloading… {pct}%'
+                            })
+
+        self._send_to_js('protubeUpdateProgress', {
+            'percent': 100, 'state': 'extracting', 'msg': 'Extracting…'
+        })
+        staged_app = self._update_extract_app(download_path, staging)
+        if not staged_app:
+            return  # error already sent
+
+        if not os.path.isdir(os.path.join(staged_app, 'Contents', 'MacOS')):
+            self._send_to_js('protubeUpdateError', {
+                'msg': "Downloaded archive didn't contain a valid .app bundle."
+            })
+            return
+
+        self._staged_update_app = staged_app
+        self._send_to_js('protubeUpdateReady', {
+            'staged_app_path': staged_app,
+            'install_to': self._current_app_bundle_path(),
+        })
+
+    def _update_extract_app(self, archive_path, staging):
+        """Pull the .app out of a downloaded .dmg or .zip into staging/extracted.
+        Returns absolute path to the staged .app, or None on failure (after
+        having sent a protubeUpdateError event)."""
+        name_lower = archive_path.lower()
+        extract_dir = os.path.join(staging, 'extracted')
+        os.makedirs(extract_dir, exist_ok=True)
+
+        if name_lower.endswith('.dmg'):
+            try:
+                mount = subprocess.run(
+                    ['hdiutil', 'attach', '-nobrowse', '-noverify',
+                     '-mountrandom', '/tmp', archive_path],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if mount.returncode != 0:
+                    self._send_to_js('protubeUpdateError', {
+                        'msg': f'DMG mount failed: {mount.stderr[:200]}'
+                    })
+                    return None
+                # hdiutil prints lines like: "/dev/diskNsM\t<fs>\t<mountpoint>"
+                mount_point = None
+                for line in mount.stdout.splitlines():
+                    parts = line.split('\t')
+                    if len(parts) >= 3 and parts[-1].strip().startswith('/'):
+                        mount_point = parts[-1].strip()
+                        break
+                if not mount_point:
+                    self._send_to_js('protubeUpdateError', {
+                        'msg': 'Could not determine DMG mount point.'
+                    })
+                    return None
+                try:
+                    app_in_dmg = None
+                    for name in os.listdir(mount_point):
+                        if name.endswith('.app'):
+                            app_in_dmg = os.path.join(mount_point, name)
+                            break
+                    if not app_in_dmg:
+                        self._send_to_js('protubeUpdateError', {
+                            'msg': '.dmg did not contain a .app bundle.'
+                        })
+                        return None
+                    dest = os.path.join(extract_dir, os.path.basename(app_in_dmg))
+                    shutil.copytree(app_in_dmg, dest, symlinks=True)
+                    return dest
+                finally:
+                    subprocess.run(['hdiutil', 'detach', mount_point, '-force'],
+                                   capture_output=True, timeout=30)
+            except Exception as e:
+                self._send_to_js('protubeUpdateError', {'msg': f'DMG extract failed: {e}'})
+                return None
+
+        if name_lower.endswith('.zip'):
+            try:
+                # ditto handles resource forks + symlinks correctly, unlike unzip
+                r = subprocess.run(['ditto', '-x', '-k', archive_path, extract_dir],
+                                   capture_output=True, text=True, timeout=120)
+                if r.returncode != 0:
+                    self._send_to_js('protubeUpdateError', {
+                        'msg': f'Unzip failed: {r.stderr[:200]}'
+                    })
+                    return None
+                for name in os.listdir(extract_dir):
+                    if name.endswith('.app'):
+                        return os.path.join(extract_dir, name)
+                self._send_to_js('protubeUpdateError', {
+                    'msg': '.zip did not contain a .app bundle.'
+                })
+                return None
+            except Exception as e:
+                self._send_to_js('protubeUpdateError', {'msg': f'Zip extract failed: {e}'})
+                return None
+
+        self._send_to_js('protubeUpdateError', {
+            'msg': f'Unsupported archive type: {os.path.basename(archive_path)}'
+        })
+        return None
+
+    def install_staged_update(self):
+        """Spawn the detached helper script to swap the .app on disk, then
+        quit this process. Returns True if helper was spawned successfully."""
+        staged = getattr(self, '_staged_update_app', None)
+        install_to = self._current_app_bundle_path()
+        if not staged or not install_to or not os.path.isdir(staged):
+            self._send_to_js('protubeUpdateError', {'msg': 'No staged update to install.'})
+            return False
+
+        helper = self._resolve_update_helper_path()
+        if not helper:
+            self._send_to_js('protubeUpdateError', {
+                'msg': 'Update helper script not found in app bundle.'
+            })
+            return False
+
+        try:
+            subprocess.Popen(
+                ['/bin/bash', helper, staged, install_to],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,  # detach so it survives our exit
+            )
+        except Exception as e:
+            self._send_to_js('protubeUpdateError', {'msg': f"Couldn't start updater: {e}"})
+            return False
+
+        # Quit on a short delay so the JS side can show a "Restarting…" toast
+        # before the window vanishes. Helper sleeps 2s before swapping, giving
+        # the OS plenty of room to fully release the .app bundle's file locks.
+        def _quit():
+            try:
+                for w in webview.windows:
+                    try:
+                        w.destroy()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            os._exit(0)
+        threading.Timer(0.6, _quit).start()
+        return True
 
     def get_active_progress(self):
         """Return current progress snapshot for any in-flight downloads. Used by the frontend

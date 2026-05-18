@@ -23,6 +23,7 @@ a = Analysis(
         ('src/updater.py', '.'),
         ('src/app_paths.py', '.'),
         ('src/groq_client.py', '.'),
+        ('assets/mac/protube_update_helper.sh', '.'),
         *ytdlp_data,
     ],
     hiddenimports=[
@@ -81,8 +82,8 @@ app = BUNDLE(
     icon='assets/icon.icns',
     bundle_identifier='com.cincade.protubesaver',
     info_plist={
-        'CFBundleShortVersionString': '1.3.2',
-        'CFBundleVersion': '1.3.2',
+        'CFBundleShortVersionString': '1.4.0',
+        'CFBundleVersion': '1.4.0',
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '11.0',
         'NSHumanReadableCopyright': 'Copyright (c) Cincade',

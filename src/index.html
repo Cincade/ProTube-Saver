@@ -5397,6 +5397,50 @@
             background: #2563eb;
             border-color: #2563eb;
         }
+        .update-modal-btn[disabled] {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .update-modal-progress {
+            padding: 0 20px 14px;
+            display: none;
+        }
+        .update-modal-progress.visible { display: block; }
+        .update-modal-progress-text {
+            font-size: 12px;
+            color: #b8b8b8;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .update-modal-progress-text .pct { color: #ededed; font-variant-numeric: tabular-nums; }
+        .update-modal-progress-bar-bg {
+            width: 100%;
+            height: 5px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .update-modal-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.25s ease;
+        }
+        .update-modal-progress.indeterminate .update-modal-progress-bar {
+            width: 35%;
+            animation: updateModalIndeterminate 1.2s ease-in-out infinite;
+        }
+        @keyframes updateModalIndeterminate {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(285%); }
+        }
+        .update-modal-error {
+            color: #ef4444;
+            font-size: 12px;
+            margin-top: 6px;
+        }
 
         /* "Update available" pill — bottom-right corner. Same dark-surface
            language as toasts and the queue-new-pill. Click anywhere on the
@@ -9564,9 +9608,19 @@
                 <div class="update-modal-notes" id="update-modal-notes">No release notes provided.</div>
                 <div class="update-modal-meta" id="update-modal-meta"></div>
             </div>
+            <div class="update-modal-progress" id="update-modal-progress">
+                <div class="update-modal-progress-text">
+                    <span id="update-modal-progress-label">Downloading…</span>
+                    <span class="pct" id="update-modal-progress-pct">0%</span>
+                </div>
+                <div class="update-modal-progress-bar-bg">
+                    <div class="update-modal-progress-bar" id="update-modal-progress-bar"></div>
+                </div>
+                <div class="update-modal-error" id="update-modal-error" hidden></div>
+            </div>
             <div class="update-modal-actions">
                 <button class="update-modal-btn" id="update-modal-later">Later</button>
-                <button class="update-modal-btn primary" id="update-modal-download">Download</button>
+                <button class="update-modal-btn primary" id="update-modal-download">Install update</button>
             </div>
         </div>
     </div>
@@ -14648,6 +14702,71 @@
             }
         };
 
+        // In-app updater events (Mac only — Windows falls back to opening the
+        // release URL in the user's browser). Fired by logic.py during
+        // start_update_download() and install_staged_update().
+        window.protubeUpdateProgress = function(data) {
+            try {
+                const wrap = document.getElementById('update-modal-progress');
+                const bar = document.getElementById('update-modal-progress-bar');
+                const pct = document.getElementById('update-modal-progress-pct');
+                const label = document.getElementById('update-modal-progress-label');
+                if (!wrap || !bar || !pct || !label) return;
+                wrap.classList.add('visible');
+                wrap.classList.remove('indeterminate');
+                const p = Math.max(0, Math.min(100, data.percent || 0));
+                bar.style.width = p + '%';
+                pct.textContent = p + '%';
+                if (data.state === 'extracting') {
+                    // Extraction doesn't report fine progress — show a busy bar.
+                    wrap.classList.add('indeterminate');
+                    pct.textContent = '';
+                }
+                if (data.msg) label.textContent = data.msg;
+            } catch (_) {}
+        };
+
+        window.protubeUpdateReady = function(data) {
+            try {
+                window._stagedUpdateReady = true;
+                const wrap = document.getElementById('update-modal-progress');
+                const bar = document.getElementById('update-modal-progress-bar');
+                const pct = document.getElementById('update-modal-progress-pct');
+                const label = document.getElementById('update-modal-progress-label');
+                const btn = document.getElementById('update-modal-download');
+                if (wrap) {
+                    wrap.classList.remove('indeterminate');
+                    wrap.classList.add('visible');
+                }
+                if (bar) bar.style.width = '100%';
+                if (pct) pct.textContent = '';
+                if (label) label.textContent = 'Ready to install';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Restart & install';
+                    btn.dataset.state = 'ready';
+                }
+            } catch (_) {}
+        };
+
+        window.protubeUpdateError = function(data) {
+            try {
+                const errEl = document.getElementById('update-modal-error');
+                const wrap = document.getElementById('update-modal-progress');
+                const btn = document.getElementById('update-modal-download');
+                if (errEl) {
+                    errEl.textContent = (data && data.msg) || 'Update failed.';
+                    errEl.removeAttribute('hidden');
+                }
+                if (wrap) wrap.classList.remove('indeterminate');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Open download page';
+                    btn.dataset.state = 'fallback';
+                }
+            } catch (_) {}
+        };
+
         window.player = (function() {
             // Cached element references (looked up once on first open)
             let video, canvas, playBtn, muteBtn, fullscreenBtn, speedBtn, speedMenu, upnextBtn, ccBtn, subtitleEl, aiBtn, summaryPanel, summaryBody, summaryRegen, summaryClose, summaryCopy, summaryScroll, chatHistory, chatForm, chatInput, chatSend;
@@ -17838,7 +17957,19 @@
             if (info.releasedAt) metaParts.push(`Released ${info.releasedAt}`);
             metaEl.textContent = metaParts.join(' · ');
 
-            downloadBtn.textContent = `Download v${info.latest}`;
+            // Reset modal to default state each open — handles re-opening after
+            // a previous attempt errored or was abandoned mid-download.
+            downloadBtn.textContent = `Install v${info.latest}`;
+            downloadBtn.disabled = false;
+            downloadBtn.dataset.state = 'idle';
+            const progEl = document.getElementById('update-modal-progress');
+            const errEl = document.getElementById('update-modal-error');
+            const barEl = document.getElementById('update-modal-progress-bar');
+            const pctEl = document.getElementById('update-modal-progress-pct');
+            if (progEl) progEl.classList.remove('visible', 'indeterminate');
+            if (errEl) { errEl.textContent = ''; errEl.setAttribute('hidden', ''); }
+            if (barEl) barEl.style.width = '0%';
+            if (pctEl) pctEl.textContent = '0%';
 
             backdrop.removeAttribute('hidden');
         }
@@ -17867,15 +17998,62 @@
             });
             closeBtn?.addEventListener('click', () => hideUpdateModal(true));
             laterBtn?.addEventListener('click', () => hideUpdateModal(true));
-            downloadBtn?.addEventListener('click', () => {
+            downloadBtn?.addEventListener('click', async () => {
                 const url = (window._updateInfo && window._updateInfo.downloadUrl) || '';
-                if (url) {
-                    try { pywebview.api.open_external_url(url); } catch (_) {}
+                const state = downloadBtn.dataset.state || 'idle';
+
+                // State 'ready': user clicked "Restart & install" after a
+                // successful in-app download — fire the helper script and exit.
+                if (state === 'ready') {
+                    downloadBtn.disabled = true;
+                    downloadBtn.textContent = 'Restarting…';
+                    try {
+                        const ok = await pywebview.api.install_staged_update();
+                        if (!ok) {
+                            // Shouldn't happen — protubeUpdateError would have
+                            // fired already and switched us to 'fallback'.
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = 'Restart & install';
+                        }
+                    } catch (_) {
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = 'Restart & install';
+                    }
+                    return;
                 }
-                // Hide modal but DON'T mark dismissed — user is downloading,
-                // they may want the pill back if they cancel mid-download.
-                hideUpdateModal(false);
-                hideUpdatePill();
+
+                // State 'fallback': in-app install errored — open the release
+                // page in browser so the user can install manually.
+                if (state === 'fallback') {
+                    if (url) {
+                        try { pywebview.api.open_external_url(url); } catch (_) {}
+                    }
+                    hideUpdateModal(false);
+                    hideUpdatePill();
+                    return;
+                }
+
+                // State 'idle' (default): try in-app install. start_update_download
+                // returns false on Windows or in dev mode — fall back to opening
+                // the URL in the browser in that case.
+                if (!url) return;
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'Starting…';
+                let started = false;
+                try {
+                    started = await pywebview.api.start_update_download(url);
+                } catch (_) {}
+                if (started) {
+                    downloadBtn.dataset.state = 'downloading';
+                    downloadBtn.textContent = 'Downloading…';
+                    // Stays disabled until protubeUpdateReady or
+                    // protubeUpdateError flips it.
+                } else {
+                    // Not Mac, or no install location detected — manual fallback
+                    try { pywebview.api.open_external_url(url); } catch (_) {}
+                    hideUpdateModal(false);
+                    hideUpdatePill();
+                }
             });
             // Esc closes modal when it's open
             document.addEventListener('keydown', (e) => {

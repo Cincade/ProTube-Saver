@@ -18,6 +18,15 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.4.0 — 2026-05-18
+
+**Updates are now real updates.** Two pieces of friction removed from the install + update flow on Mac:
+
+- Adds: **`.dmg` installer.** Mac downloads ship as a proper drag-to-Applications disk image instead of a `.zip`. Double-click the `.dmg` → window pops open showing the app icon next to an Applications-folder shortcut with an arrow between them → drag, done. Eliminates the unzip step and the "find Applications folder" step. Same convention every other Mac app uses (Discord, OBS, Spotify, etc).
+- Adds: **In-app one-click auto-update.** Click **Install update** in the update modal and the new version downloads inside the app (live progress bar), extracts in the background, then a **Restart & install** button swaps the running app on disk and relaunches you on the new version. No browser tab, no manual drag, no Gatekeeper warning on the new version. The swap is safe — the old app goes to Trash (recoverable), not `rm -rf`, and if the swap fails midway it restores the old version automatically. Mac-only for now; Windows still uses the open-the-release-page flow until the equivalent updater binary is built.
+
+---
+
 ## v1.3.2 — 2026-05-17 (hotfix)
 
 - Fixes: **In-app update Download button did nothing on Mac.** The GitHub-releases asset picker filtered for `.exe` only, so on Mac (where the release asset is a `.zip`) the resolved `downloadUrl` came back empty — the update pill would fire and the modal would open, but clicking Download was a no-op. Now platform-aware: matches `.dmg`/`.zip` (Mac), `.exe`/`.msi`/`.zip` (Windows), or `.AppImage`/`.deb`/`.tar.gz`/`.zip` (Linux), and disambiguates with a platform keyword (`mac`/`win`/`linux`) in the asset name so a Mac install doesn't accidentally grab the Windows zip when both are attached to one release. Existing Mac users on v1.3.0 or v1.3.1 need one manual update to v1.3.2 from the GitHub Releases page — after that, in-app auto-update works for every release going forward.
