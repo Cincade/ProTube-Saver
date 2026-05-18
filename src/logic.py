@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -178,6 +178,32 @@ class API:
         # the breakage faster. Off by default (settings has no value yet → False).
         use_nightly = bool(self.settings.get('yt_dlp_use_nightly', False))
         self.updater.check_on_startup(silent=True, include_nightly=use_nightly)
+
+        # --- Background WebM → MP4 converter -------------------------------------
+        # On Mac, 2K/4K downloads land as VP9-in-WebM (Safari decodes that
+        # natively → instant playback, no on-play transcode). Users who
+        # prefer MP4 files on disk for downstream tools get them by way of
+        # this background worker: after each download completes, if the
+        # output is .webm, queue a background ffmpeg job that transcodes to
+        # H.264-in-MP4 with a faststart moov atom. When the conversion
+        # finishes the .mp4 atomically replaces the .webm and the library
+        # entry's filepath is updated. POSIX file semantics mean an in-flight
+        # play of the .webm keeps streaming from the open fd even after we
+        # delete the path — so the swap is invisible to any active session.
+        # Single worker (4K libx264 is heavy; parallelism would just thrash).
+        # Toggleable via settings; defaults ON only on Mac, where the choice
+        # actually matters (Windows already gets .mp4 directly from yt-dlp).
+        self._mp4_convert_queue = []  # list of video_ids waiting; dedup'd
+        self._mp4_convert_lock = threading.Lock()
+        self._mp4_convert_event = threading.Event()
+        self._mp4_convert_in_flight = None  # video_id of currently-running job
+        if 'auto_convert_to_mp4' not in self.settings:
+            # Defaults OFF — feature works but requires the app to stay open
+            # for the duration of the transcode (no daemon yet). Until that's
+            # fixed, it's an opt-in tweak via settings.json, not a default.
+            self.settings['auto_convert_to_mp4'] = False
+        threading.Thread(target=self._mp4_convert_worker_loop, daemon=True).start()
+        threading.Thread(target=self._mp4_convert_scan_library, daemon=True).start()
 
         # Local HTTP server for in-app video playback. The webview can't load
         # arbitrary file:// URLs as <video src>, so we serve them through a
@@ -466,18 +492,23 @@ class API:
             return ext in ('.mp4', '.m4v', '.webm')
         v = info.get('video')
         a = info.get('audio')
+        # AV1 (av1/av01) plays natively in Chromium / WebView2 (Windows) but
+        # WKWebView (Mac Safari) only decodes AV1 on M3+ hardware with macOS
+        # 14.4+, and even then unreliably. On Mac we drop AV1 from the
+        # playable list so the transcode-on-play path kicks in for any 2K/4K
+        # YouTube download (which yt-dlp serves as AV1 since YouTube doesn't
+        # publish AVC1 above 1080p). HEVC is omitted on Windows because it
+        # needs the paid Microsoft HEVC Video Extensions most users don't have.
+        is_mac = sys.platform == 'darwin'
         if ext in ('.mp4', '.m4v'):
-            # Chromium / WebView2 plays H.264 (avc1) and AV1 (av01) in MP4
-            # natively. yt-dlp increasingly hands us AV1-in-MP4 for 1080p+ since
-            # YouTube prefers AV1 for higher resolutions; without av1 in the
-            # allowlist we'd round-trip those through `-c copy` for nothing
-            # (still AV1 on the other side, just a different MP4 file). HEVC is
-            # deliberately omitted — playback requires the paid Microsoft HEVC
-            # Video Extensions, which most users don't have, so we'd rather
-            # transcode up front than send an unplayable stream.
-            return v in ('h264', 'avc1', 'av1', 'av01') and a in ('aac', 'mp3', None)
+            mp4_codecs = {'h264', 'avc1'} if is_mac else {'h264', 'avc1', 'av1', 'av01'}
+            return v in mp4_codecs and a in ('aac', 'mp3', None)
         if ext == '.webm':
-            return v in ('vp8', 'vp9', 'av1', 'av01') and a in ('opus', 'vorbis', None)
+            # Safari has solid VP9-in-WebM support since macOS 11 (Big Sur),
+            # so VP9 stays playable on Mac. AV1-in-WebM is uncommon but if
+            # it lands, force transcode just like AV1-in-MP4.
+            webm_codecs = {'vp8', 'vp9'} if is_mac else {'vp8', 'vp9', 'av1', 'av01'}
+            return v in webm_codecs and a in ('opus', 'vorbis', None)
         # .mkv / .avi / .mov / anything else → not directly playable
         return False
 
@@ -604,71 +635,94 @@ class API:
             except Exception: return '<unprintable>'
         ffmpeg = self._ffmpeg_path()
         try:
-            # ----- STAGE 1: -c copy remux ---------------------------------
-            # No re-encoding, just container rewrite. ffmpeg streams the
-            # video and audio bitstreams unmodified into a new MP4. For an
-            # MKV with H.264 + AAC this is a few seconds for a multi-GB file.
             try: self._send_to_js('protubePrepProgress', job_id, 1)
             except Exception: pass
-            self._prep_log(f'[ProTube/transcode] stage 1: -c copy remux for '
-                  f'{_safe(os.path.basename(src_path))} (job={job_id})')
-            remux_tmp = cache_path + '.remux.mp4'
-            # `-map 0:v:0? -map 0:a:0?` is the critical bit. Without explicit
-            # stream selection ffmpeg copies EVERY stream by default, including
-            # SRT/ASS subtitles and font/image attachments that an MKV almost
-            # always carries. The MP4 muxer rejects those (it only knows tx3g
-            # and a few others), so the entire remux aborts with "Subtitle codec
-            # X is not supported by MP4" — and we'd fall through to the slow
-            # transcode for no reason. Mapping just the first video + first
-            # audio (with `?` making each optional, so audio-less or video-less
-            # files don't error) gives us the same playback the user wants and
-            # ignores everything MP4 can't carry. -sn / -dn / -an-not are
-            # belt-and-braces in case the muxer auto-selects extra streams.
-            # -avoid_negative_ts make_zero handles MKVs with negative start
-            # timestamps (common for streams cut from longer sources) which
-            # otherwise cause the MP4 to start with frozen video.
-            remux_cmd = [
-                ffmpeg, '-hide_banner', '-loglevel', 'error', '-y',
-                '-i', src_path,
-                '-map', '0:v:0?', '-map', '0:a:0?',
-                '-sn', '-dn',
-                '-c', 'copy',
-                '-avoid_negative_ts', 'make_zero',
-                '-movflags', '+faststart',
-                '-f', 'mp4',
-                remux_tmp,
-            ]
-            try:
-                rr = subprocess.run(
-                    remux_cmd, capture_output=True, timeout=60 * 10,
-                    text=True, encoding='utf-8', errors='replace',
-                    creationflags=(0x08000000 if sys.platform == 'win32' else 0),
-                )
-            except subprocess.TimeoutExpired:
-                rr = None
+
+            # Stage 1 is a pure container rewrite — codecs stream through
+            # untouched. That's only useful when the source CODECS would
+            # be playable in MP4. For codec-driven incompat (AV1 on Mac,
+            # HEVC anywhere) the remux just produces an identical-codec
+            # MP4 that the player still can't decode, wasting time before
+            # falling through. Predict the remuxed file's playability and
+            # skip stage 1 if it wouldn't help.
+            src_v = (info or {}).get('video') or ''
+            src_a = (info or {}).get('audio') or ''
+            _mp4_v = ({'h264', 'avc1'} if sys.platform == 'darwin'
+                      else {'h264', 'avc1', 'av1', 'av01'})
+            _mp4_a = {'aac', 'mp3', ''}
+            can_remux = src_v in _mp4_v and src_a in _mp4_a
+            if not can_remux:
+                self._prep_log(f'[ProTube/transcode] skipping stage 1 remux — '
+                      f'codecs {src_v}/{src_a} not playable in MP4 on this '
+                      f'platform; going straight to libx264 transcode '
+                      f'(job={job_id})')
+                rr = None  # signal "remux didn't run / didn't succeed"
+                # Jump to stage 2 below by leaving remux_tmp absent.
+                remux_tmp = None
+            else:
+                # ----- STAGE 1: -c copy remux ---------------------------
+                # No re-encoding, just container rewrite. ffmpeg streams the
+                # video and audio bitstreams unmodified into a new MP4. For an
+                # MKV with H.264 + AAC this is a few seconds for a multi-GB file.
+                self._prep_log(f'[ProTube/transcode] stage 1: -c copy remux for '
+                      f'{_safe(os.path.basename(src_path))} (job={job_id})')
+                remux_tmp = cache_path + '.remux.mp4'
+                # `-map 0:v:0? -map 0:a:0?` is the critical bit. Without explicit
+                # stream selection ffmpeg copies EVERY stream by default, including
+                # SRT/ASS subtitles and font/image attachments that an MKV almost
+                # always carries. The MP4 muxer rejects those (it only knows tx3g
+                # and a few others), so the entire remux aborts with "Subtitle codec
+                # X is not supported by MP4" — and we'd fall through to the slow
+                # transcode for no reason. Mapping just the first video + first
+                # audio (with `?` making each optional, so audio-less or video-less
+                # files don't error) gives us the same playback the user wants and
+                # ignores everything MP4 can't carry. -sn / -dn / -an-not are
+                # belt-and-braces in case the muxer auto-selects extra streams.
+                # -avoid_negative_ts make_zero handles MKVs with negative start
+                # timestamps (common for streams cut from longer sources) which
+                # otherwise cause the MP4 to start with frozen video.
+                remux_cmd = [
+                    ffmpeg, '-hide_banner', '-loglevel', 'error', '-y',
+                    '-i', src_path,
+                    '-map', '0:v:0?', '-map', '0:a:0?',
+                    '-sn', '-dn',
+                    '-c', 'copy',
+                    '-avoid_negative_ts', 'make_zero',
+                    '-movflags', '+faststart',
+                    '-f', 'mp4',
+                    remux_tmp,
+                ]
+                try:
+                    rr = subprocess.run(
+                        remux_cmd, capture_output=True, timeout=60 * 10,
+                        text=True, encoding='utf-8', errors='replace',
+                        creationflags=(0x08000000 if sys.platform == 'win32' else 0),
+                    )
+                except subprocess.TimeoutExpired:
+                    rr = None
+                    try: os.remove(remux_tmp)
+                    except OSError: pass
+                if rr is not None and rr.returncode == 0 and os.path.exists(remux_tmp) \
+                        and os.path.getsize(remux_tmp) > 0:
+                    # Success — atomic rename and ship.
+                    try: os.replace(remux_tmp, cache_path)
+                    except Exception as e:
+                        try: self._send_to_js('protubePrepError', job_id,
+                                              f'Cache write failed: {_safe(e)}')
+                        except Exception: pass
+                        return
+                    self._prep_log(f'[ProTube/transcode] remux ok (job={job_id})')
+                    self._ship_done(cache_path, src_path, target, job_id)
+                    return
+                # Remux failed — clean up partial and fall through to transcode.
+                if rr is not None:
+                    err_lines = [ln for ln in (rr.stderr or '').splitlines() if ln.strip()]
+                    err_first = err_lines[0] if err_lines else ''
+                    self._prep_log(f'[ProTube/transcode] remux failed (rc='
+                          f'{rr.returncode}), trying full transcode. First stderr: '
+                          f'{_safe(err_first)}')
                 try: os.remove(remux_tmp)
                 except OSError: pass
-            if rr is not None and rr.returncode == 0 and os.path.exists(remux_tmp) \
-                    and os.path.getsize(remux_tmp) > 0:
-                # Success — atomic rename and ship.
-                try: os.replace(remux_tmp, cache_path)
-                except Exception as e:
-                    try: self._send_to_js('protubePrepError', job_id,
-                                          f'Cache write failed: {_safe(e)}')
-                    except Exception: pass
-                    return
-                self._prep_log(f'[ProTube/transcode] remux ok (job={job_id})')
-                self._ship_done(cache_path, src_path, target, job_id)
-                return
-            # Remux failed — clean up partial and fall through to transcode.
-            if rr is not None:
-                err_lines = [ln for ln in (rr.stderr or '').splitlines() if ln.strip()]
-                err_first = err_lines[0] if err_lines else ''
-                self._prep_log(f'[ProTube/transcode] remux failed (rc='
-                      f'{rr.returncode}), trying full transcode. First stderr: '
-                      f'{_safe(err_first)}')
-            try: os.remove(remux_tmp)
-            except OSError: pass
 
             # ----- STAGE 2: full transcode --------------------------------
             v = (info or {}).get('video') or ''
@@ -761,6 +815,174 @@ class API:
             try: self._send_to_js('protubePrepError', job_id,
                                   f'Transcode worker crashed: {_safe(e)}')
             except Exception: pass
+
+    # ----- Background WebM → MP4 converter -----------------------------------
+    # See __init__ for the design rationale. Public surface:
+    #   _mp4_convert_enqueue(video_id) — fire-and-forget; safe to call from any
+    #                                    thread, deduped, no-op if disabled.
+    #   _mp4_convert_scan_library()    — startup sweep for legacy .webm files.
+
+    def _mp4_convert_enabled(self):
+        return bool(self.settings.get('auto_convert_to_mp4', sys.platform == 'darwin'))
+
+    def _mp4_convert_enqueue(self, video_id):
+        if not video_id or not self._mp4_convert_enabled():
+            return
+        with self._mp4_convert_lock:
+            if video_id in self._mp4_convert_queue or video_id == self._mp4_convert_in_flight:
+                return
+            self._mp4_convert_queue.append(video_id)
+        self._mp4_convert_event.set()
+
+    def _mp4_convert_scan_library(self):
+        """One-time startup sweep — queue every existing .webm library file
+        so legacy downloads get converted on app launch. Deferred a few
+        seconds so we don't fight the initial UI render for CPU."""
+        try:
+            time.sleep(5)
+            if not self._mp4_convert_enabled():
+                return
+            for v in self.settings.get('library', []):
+                if v.get('type') == 'playlist':
+                    for c in (v.get('videos') or []):
+                        fp = c.get('filepath') or ''
+                        if fp.lower().endswith('.webm') and os.path.isfile(fp):
+                            self._mp4_convert_enqueue(c.get('id'))
+                else:
+                    fp = v.get('filepath') or ''
+                    if fp.lower().endswith('.webm') and os.path.isfile(fp):
+                        self._mp4_convert_enqueue(v.get('id'))
+        except Exception as e:
+            self._prep_log(f'[ProTube/bg-mp4] startup scan crashed: {e}')
+
+    def _mp4_convert_worker_loop(self):
+        """Single worker — pull video_ids off the queue and run the conversion
+        serially. libx264 at 4K is heavy enough that parallelism just thrashes
+        the CPU without finishing any faster."""
+        while True:
+            self._mp4_convert_event.wait()
+            with self._mp4_convert_lock:
+                if not self._mp4_convert_queue:
+                    self._mp4_convert_event.clear()
+                    continue
+                video_id = self._mp4_convert_queue.pop(0)
+                self._mp4_convert_in_flight = video_id
+            try:
+                self._mp4_convert_one(video_id)
+            except Exception as e:
+                self._prep_log(f'[ProTube/bg-mp4] {video_id} crashed: {e}')
+            finally:
+                with self._mp4_convert_lock:
+                    self._mp4_convert_in_flight = None
+
+    def _mp4_convert_one(self, video_id):
+        """Convert one .webm library file to .mp4 in place. Failure modes are
+        logged and silent — never break the user's library over a transcode."""
+        if not self._mp4_convert_enabled():
+            return
+        entry = self._find_library_entry(video_id)
+        if not entry:
+            return
+        src = entry.get('filepath') or ''
+        if not src.lower().endswith('.webm') or not os.path.isfile(src):
+            return
+
+        ffmpeg = self._ffmpeg_path()
+        if not ffmpeg:
+            self._prep_log(f'[ProTube/bg-mp4] no ffmpeg available; skipping {video_id}')
+            return
+
+        out_final = src[:-5] + '.mp4'   # drop '.webm', add '.mp4'
+        out_tmp = src[:-5] + '.converting.mp4'
+        # Stale partial from a previous interrupted run? Clean it.
+        try:
+            if os.path.exists(out_tmp):
+                os.remove(out_tmp)
+        except OSError:
+            pass
+
+        self._prep_log(f'[ProTube/bg-mp4] start {os.path.basename(src)}')
+        cmd = [
+            ffmpeg, '-hide_banner', '-loglevel', 'error', '-y',
+            '-i', src,
+            '-map', '0:v:0?', '-map', '0:a:0?',
+            '-sn', '-dn',
+            # libx264 fast preset (not ultrafast) — fast still finishes 4K in a
+            # reasonable window and produces a notably smaller file than
+            # ultrafast. CRF 20 ≈ visually lossless for the source quality we
+            # download. yuv420p forces 8-bit chroma so QuickTime / iOS / every
+            # decoder in existence reads it without complaint.
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p',
+            # Opus → AAC. Most editors take AAC happily; few take Opus-in-MP4.
+            '-c:a', 'aac', '-b:a', '192k',
+            # NOTE: -movflags +faststart deliberately omitted. It triggered
+            # intermittent "Unable to re-open output file for shifting data"
+            # failures on macOS (rc=254) — ffmpeg writes the file, then tries
+            # to reopen it to shuffle the moov atom to the front, and that
+            # reopen fails. The faststart benefit is "video starts playing
+            # before the full file is buffered when streamed over HTTP" —
+            # negligible for localhost playback in-app, and the user's external
+            # players (VLC, QuickTime) handle moov-at-end mp4s fine.
+            out_tmp,
+        ]
+        try:
+            r = subprocess.run(
+                cmd, capture_output=True, timeout=60 * 60 * 4,  # 4hr ceiling
+                text=True, encoding='utf-8', errors='replace',
+                creationflags=(0x08000000 if sys.platform == 'win32' else 0),
+            )
+        except subprocess.TimeoutExpired:
+            self._prep_log(f'[ProTube/bg-mp4] {video_id} timed out (>4h); abandoning')
+            try: os.remove(out_tmp)
+            except OSError: pass
+            return
+        except Exception as e:
+            self._prep_log(f'[ProTube/bg-mp4] {video_id} ffmpeg crashed: {e}')
+            try: os.remove(out_tmp)
+            except OSError: pass
+            return
+
+        if r.returncode != 0 or not os.path.exists(out_tmp) or os.path.getsize(out_tmp) == 0:
+            err = (r.stderr or '').splitlines()
+            self._prep_log(f'[ProTube/bg-mp4] {video_id} ffmpeg rc={r.returncode}: '
+                           f'{err[0] if err else "(no stderr)"}')
+            try: os.remove(out_tmp)
+            except OSError: pass
+            return
+
+        # Promote temp to final. os.replace is atomic on POSIX.
+        try:
+            os.replace(out_tmp, out_final)
+        except OSError as e:
+            self._prep_log(f'[ProTube/bg-mp4] {video_id} rename failed: {e}')
+            try: os.remove(out_tmp)
+            except OSError: pass
+            return
+
+        # Re-fetch the library entry (it may have moved between dicts since we
+        # last looked) and rewrite the filepath in place.
+        entry = self._find_library_entry(video_id)
+        if entry:
+            entry['filepath'] = out_final
+            self._save_settings()
+
+        # Delete the original webm. On POSIX, if the player has it open the
+        # fd keeps the inode alive — playback continues, the path just vanishes.
+        # On Windows, an open file resists delete; we leave it and reap on next
+        # launch.
+        try:
+            os.remove(src)
+        except OSError as e:
+            self._prep_log(f'[ProTube/bg-mp4] {video_id} could not remove webm '
+                           f'(likely in use): {e}; will reap on next scan')
+
+        self._prep_log(f'[ProTube/bg-mp4] done {os.path.basename(out_final)}')
+        try:
+            self._send_to_js('protubeFileConverted', {
+                'video_id': video_id, 'old': src, 'new': out_final,
+            })
+        except Exception:
+            pass
 
     def _ship_done(self, cache_path, src_path, target, job_id):
         """Build the streaming response and signal protubePrepDone. Shared by
@@ -1414,25 +1636,49 @@ class API:
                     # per _is_player_compatible. At ≤1080p we keep the avc1-preferred
                     # cascade for maximum device compatibility (older Smart TVs etc.).
                     if int(h) > 1080:
-                        opts['format'] = (
-                            f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
-                            f'bestvideo[height<={h}]+bestaudio/'
-                            f'best[height<={h}]'
-                        )
+                        # >1080p has no AVC1 stream on YouTube — pick AV1-MP4 or VP9-WebM.
+                        # On Mac, prefer VP9-in-WebM: Safari/WKWebView decodes it natively,
+                        # so playback is instant. AV1-in-MP4 would need a slow ffmpeg
+                        # libx264 transcode on every first play (the in-app player can't
+                        # decode AV1 on Macs without M3+/macOS 14.4+ hardware), so we
+                        # actively avoid it when a VP9 stream is published. On Windows
+                        # Chromium handles AV1-in-MP4 natively, so we keep MP4-first.
+                        if sys.platform == 'darwin':
+                            opts['format'] = (
+                                f'bestvideo[height<={h}][ext=webm][vcodec^=vp9]+bestaudio[ext=webm]/'
+                                f'bestvideo[height<={h}][ext=webm]+bestaudio[ext=webm]/'
+                                f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
+                                f'bestvideo[height<={h}]+bestaudio/'
+                                f'best[height<={h}]'
+                            )
+                            # Don't force MP4 here — let yt-dlp keep webm if the first
+                            # cascade rung matched (vp9+opus stays in webm, playable as-is).
+                            # The MP4 remuxer below is also dropped on this branch so we
+                            # don't reencode VP9 → unsupported VP9-in-MP4.
+                        else:
+                            opts['format'] = (
+                                f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
+                                f'bestvideo[height<={h}]+bestaudio/'
+                                f'best[height<={h}]'
+                            )
+                            opts['merge_output_format'] = 'mp4'
+                            opts['postprocessors'] = [{'key': 'FFmpegVideoRemuxer', 'preferedformat': 'mp4'}]
                     else:
+                        # ≤1080p — AVC1 exists on YouTube, prefer it for max device
+                        # compatibility. Cross-platform identical behavior here.
                         opts['format'] = (
                             f'bestvideo[height<={h}][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/'
                             f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/'
                             f'best[height<={h}][ext=mp4]/'
                             f'best[height<={h}]'
                         )
-                    opts['merge_output_format'] = 'mp4'
-                    # Final-stage remux to MP4 with -c copy — instant container change
-                    # for anything that slipped past the format selector (e.g. webm
-                    # progressive stream as last-resort fallback). Existing
-                    # postprocessors list (audio extract) only applies to the audio
-                    # branch above, so this assignment is safe.
-                    opts['postprocessors'] = [{'key': 'FFmpegVideoRemuxer', 'preferedformat': 'mp4'}]
+                        opts['merge_output_format'] = 'mp4'
+                        # Final-stage remux to MP4 with -c copy — instant container change
+                        # for anything that slipped past the format selector (e.g. webm
+                        # progressive stream as last-resort fallback). Existing
+                        # postprocessors list (audio extract) only applies to the audio
+                        # branch above, so this assignment is safe.
+                        opts['postprocessors'] = [{'key': 'FFmpegVideoRemuxer', 'preferedformat': 'mp4'}]
 
                 with YoutubeDL(opts) as ydl: ydl.download([video_data['url']])
 
@@ -5606,6 +5852,15 @@ class API:
                 except KeyError:
                     pass
         self._save_settings()
+        # Queue background WebM → MP4 conversion if the new entry is a .webm.
+        # No-op when the setting is off or the file isn't .webm. Single-video
+        # path only; playlists hit add_playlist_to_library which queues per-child.
+        try:
+            fp = video.get('filepath') or ''
+            if fp.lower().endswith('.webm'):
+                self._mp4_convert_enqueue(video.get('id'))
+        except Exception:
+            pass
         return True
 
     def _archive_key(self, filepath):
@@ -5794,6 +6049,15 @@ class API:
         lib.append(playlist_copy)
         self.settings['library'] = lib
         self._save_settings()
+        # Queue each .webm child for background MP4 conversion. No-op when
+        # the setting is off or there are no webm files in the playlist.
+        try:
+            for c in playlist_copy.get('videos') or []:
+                fp = c.get('filepath') or ''
+                if fp.lower().endswith('.webm'):
+                    self._mp4_convert_enqueue(c.get('id'))
+        except Exception:
+            pass
         return True
 
     def check_playlist_updates(self, playlist_id):

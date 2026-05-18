@@ -18,6 +18,12 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.4.1 — 2026-05-18 (hotfix)
+
+- Fixes: **2K / 4K videos played as a black screen / nothing in the in-app player on Mac.** The v1.3.1 download-quality fix made 2K/4K come down at the right resolution (was silently downgrading to 1080p before), but the resulting AV1-in-MP4 files couldn't be decoded by Mac's WKWebView — AV1 hardware decode is only on M3+ with macOS 14.4+ and even then unreliable. Three fixes layered: (1) on Mac, prefer **VP9-in-WebM** for downloads above 1080p — Safari decodes it natively, so playback is instant with no transcode; (2) the playability check correctly treats AV1 as unplayable on Mac, routing legacy AV1 library files through the on-play transcoder; (3) the on-play transcoder no longer wastes time on a `-c copy` remux that would just produce another unplayable AV1 file — it now jumps straight to a libx264 transcode when the source codec isn't playable in MP4 on this platform. Windows behavior unchanged (Chromium / WebView2 decodes AV1 in MP4 fine).
+
+---
+
 ## v1.4.0 — 2026-05-18
 
 **Updates are now real updates.** Two pieces of friction removed from the install + update flow on Mac:
