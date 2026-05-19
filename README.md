@@ -1,16 +1,29 @@
 # ProTube Saver
 
-A single-window desktop YouTube downloader and player for Windows 11.
+A single-window desktop YouTube downloader and player for Windows 11 and macOS 11+.
 
 Paste a video, playlist, or channel URL — it downloads in the background, plays in-app with a custom player, and survives offline once cached. Search YouTube without opening a browser. Listen to music with a dedicated Music mode and a persistent mini-player. Optional AI summaries + chat for any video.
 
-Built as a [pywebview](https://pywebview.flowrl.com/) app with the WebView2 (EdgeChromium) renderer. Python backend handles downloads, transcoding, and a localhost video server with HTTP Range support; the entire UI is one HTML/CSS/JS file with no build step.
+Built as a [pywebview](https://pywebview.flowrl.com/) app — WebView2 (EdgeChromium) on Windows, WKWebView (Safari) on Mac. Python backend handles downloads, transcoding, and a localhost video server with HTTP Range support; the entire UI is one HTML/CSS/JS file with no build step.
 
 ## Install
 
-**The easy way:** grab the latest `.exe` from [Releases](https://github.com/Cincade/ProTube-Saver/releases/latest). Single file, ~210 MB (yt-dlp + ffmpeg + ffprobe are bundled). Run it. The first launch creates a `data/` folder next to the exe — everything the app owns (library, settings, downloads, thumbnails) lives there. Move the folder, the install moves with it.
+Grab the latest build for your platform from [Releases](https://github.com/Cincade/ProTube-Saver/releases/latest):
 
-Windows 11 only. WebView2 ships with Windows 11 so there's nothing to install separately.
+- **Windows:** `.exe` — single file, ~210 MB. Run it. State lives in `data/` next to the exe (portable — move the folder, the install moves with it).
+- **macOS:** `.dmg` (universal2 — Apple Silicon + Intel), ~62 MB. Double-click → drag onto Applications → done. State lives at `~/Library/Application Support/ProTube Saver/`.
+
+### First launch on macOS
+
+The app isn't signed with an Apple Developer ID (yet), so macOS will refuse to open it the first time with a "cannot be opened because it is from an unidentified developer" warning. **Bypass it the standard way:**
+
+1. Open Applications, find **ProTube Saver**
+2. **Right-click → Open** (not double-click)
+3. In the dialog that appears, click **Open**
+
+macOS only asks once. Subsequent launches work normally, and the in-app updater (built in to v1.4.0+) handles every future release with no warning ever again.
+
+Windows 11 and macOS 11+ supported. WebView2 ships with Windows 11; WKWebView ships with macOS — nothing to install separately.
 
 ## What it does
 
