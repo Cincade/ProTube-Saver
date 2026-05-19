@@ -12,6 +12,16 @@ data/
 dist/
 build/
 
+# --- VIRTUALENV ---
+.venv/
+venv/
+
+# --- RELEASE ARTIFACTS ---
+# Packaged installers are uploaded to GitHub Releases / the landing site,
+# not tracked in git (they exceed the 100 MB file limit anyway).
+*.dmg
+*.zip
+
 # --- PYTHON BYTECODE ---
 __pycache__/
 *.pyc

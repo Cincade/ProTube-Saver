@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.4.1'
+__version__ = '1.4.2'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -132,6 +132,13 @@ class API:
         self.first_tick_seen = set()  # track per-video first progress tick for resume detection
         self.session_completed_ids = set()  # videos that finished during the current batch
         self.is_fetching = False
+        # Per-URL fetch dedup. The legacy is_fetching boolean blocked ALL
+        # subsequent fetches while one was running, which caused rapid
+        # "Add to queue" clicks across different search cards to silently
+        # drop everyone after the first. Track URLs individually so distinct
+        # fetches run in parallel; only the exact-same URL is deduped.
+        self._fetching_urls = set()
+        self._fetching_urls_lock = threading.Lock()
         # Concurrent download limit is user-configurable via the Settings drawer.
         # Read it at startup; default 2 if never set. New downloads will block on
         # this semaphore. Changing the limit at runtime calls
@@ -179,31 +186,12 @@ class API:
         use_nightly = bool(self.settings.get('yt_dlp_use_nightly', False))
         self.updater.check_on_startup(silent=True, include_nightly=use_nightly)
 
-        # --- Background WebM → MP4 converter -------------------------------------
-        # On Mac, 2K/4K downloads land as VP9-in-WebM (Safari decodes that
-        # natively → instant playback, no on-play transcode). Users who
-        # prefer MP4 files on disk for downstream tools get them by way of
-        # this background worker: after each download completes, if the
-        # output is .webm, queue a background ffmpeg job that transcodes to
-        # H.264-in-MP4 with a faststart moov atom. When the conversion
-        # finishes the .mp4 atomically replaces the .webm and the library
-        # entry's filepath is updated. POSIX file semantics mean an in-flight
-        # play of the .webm keeps streaming from the open fd even after we
-        # delete the path — so the swap is invisible to any active session.
-        # Single worker (4K libx264 is heavy; parallelism would just thrash).
-        # Toggleable via settings; defaults ON only on Mac, where the choice
-        # actually matters (Windows already gets .mp4 directly from yt-dlp).
-        self._mp4_convert_queue = []  # list of video_ids waiting; dedup'd
-        self._mp4_convert_lock = threading.Lock()
-        self._mp4_convert_event = threading.Event()
-        self._mp4_convert_in_flight = None  # video_id of currently-running job
-        if 'auto_convert_to_mp4' not in self.settings:
-            # Defaults OFF — feature works but requires the app to stay open
-            # for the duration of the transcode (no daemon yet). Until that's
-            # fixed, it's an opt-in tweak via settings.json, not a default.
-            self.settings['auto_convert_to_mp4'] = False
-        threading.Thread(target=self._mp4_convert_worker_loop, daemon=True).start()
-        threading.Thread(target=self._mp4_convert_scan_library, daemon=True).start()
+        # Background WebM → MP4 auto-converter REMOVED 2026-05-19. See
+        # archive/auto_mp4_convert.md for the full code and rationale. Short
+        # version: opt-in feature, never used in practice, and a daemon-thread
+        # subprocess lifecycle bug leaked orphan ffmpegs that pegged the
+        # machine. Removed rather than kept-and-fixed until there's a real
+        # user need for .mp4-on-disk on Mac.
 
         # Local HTTP server for in-app video playback. The webview can't load
         # arbitrary file:// URLs as <video src>, so we serve them through a
@@ -816,174 +804,6 @@ class API:
                                   f'Transcode worker crashed: {_safe(e)}')
             except Exception: pass
 
-    # ----- Background WebM → MP4 converter -----------------------------------
-    # See __init__ for the design rationale. Public surface:
-    #   _mp4_convert_enqueue(video_id) — fire-and-forget; safe to call from any
-    #                                    thread, deduped, no-op if disabled.
-    #   _mp4_convert_scan_library()    — startup sweep for legacy .webm files.
-
-    def _mp4_convert_enabled(self):
-        return bool(self.settings.get('auto_convert_to_mp4', sys.platform == 'darwin'))
-
-    def _mp4_convert_enqueue(self, video_id):
-        if not video_id or not self._mp4_convert_enabled():
-            return
-        with self._mp4_convert_lock:
-            if video_id in self._mp4_convert_queue or video_id == self._mp4_convert_in_flight:
-                return
-            self._mp4_convert_queue.append(video_id)
-        self._mp4_convert_event.set()
-
-    def _mp4_convert_scan_library(self):
-        """One-time startup sweep — queue every existing .webm library file
-        so legacy downloads get converted on app launch. Deferred a few
-        seconds so we don't fight the initial UI render for CPU."""
-        try:
-            time.sleep(5)
-            if not self._mp4_convert_enabled():
-                return
-            for v in self.settings.get('library', []):
-                if v.get('type') == 'playlist':
-                    for c in (v.get('videos') or []):
-                        fp = c.get('filepath') or ''
-                        if fp.lower().endswith('.webm') and os.path.isfile(fp):
-                            self._mp4_convert_enqueue(c.get('id'))
-                else:
-                    fp = v.get('filepath') or ''
-                    if fp.lower().endswith('.webm') and os.path.isfile(fp):
-                        self._mp4_convert_enqueue(v.get('id'))
-        except Exception as e:
-            self._prep_log(f'[ProTube/bg-mp4] startup scan crashed: {e}')
-
-    def _mp4_convert_worker_loop(self):
-        """Single worker — pull video_ids off the queue and run the conversion
-        serially. libx264 at 4K is heavy enough that parallelism just thrashes
-        the CPU without finishing any faster."""
-        while True:
-            self._mp4_convert_event.wait()
-            with self._mp4_convert_lock:
-                if not self._mp4_convert_queue:
-                    self._mp4_convert_event.clear()
-                    continue
-                video_id = self._mp4_convert_queue.pop(0)
-                self._mp4_convert_in_flight = video_id
-            try:
-                self._mp4_convert_one(video_id)
-            except Exception as e:
-                self._prep_log(f'[ProTube/bg-mp4] {video_id} crashed: {e}')
-            finally:
-                with self._mp4_convert_lock:
-                    self._mp4_convert_in_flight = None
-
-    def _mp4_convert_one(self, video_id):
-        """Convert one .webm library file to .mp4 in place. Failure modes are
-        logged and silent — never break the user's library over a transcode."""
-        if not self._mp4_convert_enabled():
-            return
-        entry = self._find_library_entry(video_id)
-        if not entry:
-            return
-        src = entry.get('filepath') or ''
-        if not src.lower().endswith('.webm') or not os.path.isfile(src):
-            return
-
-        ffmpeg = self._ffmpeg_path()
-        if not ffmpeg:
-            self._prep_log(f'[ProTube/bg-mp4] no ffmpeg available; skipping {video_id}')
-            return
-
-        out_final = src[:-5] + '.mp4'   # drop '.webm', add '.mp4'
-        out_tmp = src[:-5] + '.converting.mp4'
-        # Stale partial from a previous interrupted run? Clean it.
-        try:
-            if os.path.exists(out_tmp):
-                os.remove(out_tmp)
-        except OSError:
-            pass
-
-        self._prep_log(f'[ProTube/bg-mp4] start {os.path.basename(src)}')
-        cmd = [
-            ffmpeg, '-hide_banner', '-loglevel', 'error', '-y',
-            '-i', src,
-            '-map', '0:v:0?', '-map', '0:a:0?',
-            '-sn', '-dn',
-            # libx264 fast preset (not ultrafast) — fast still finishes 4K in a
-            # reasonable window and produces a notably smaller file than
-            # ultrafast. CRF 20 ≈ visually lossless for the source quality we
-            # download. yuv420p forces 8-bit chroma so QuickTime / iOS / every
-            # decoder in existence reads it without complaint.
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p',
-            # Opus → AAC. Most editors take AAC happily; few take Opus-in-MP4.
-            '-c:a', 'aac', '-b:a', '192k',
-            # NOTE: -movflags +faststart deliberately omitted. It triggered
-            # intermittent "Unable to re-open output file for shifting data"
-            # failures on macOS (rc=254) — ffmpeg writes the file, then tries
-            # to reopen it to shuffle the moov atom to the front, and that
-            # reopen fails. The faststart benefit is "video starts playing
-            # before the full file is buffered when streamed over HTTP" —
-            # negligible for localhost playback in-app, and the user's external
-            # players (VLC, QuickTime) handle moov-at-end mp4s fine.
-            out_tmp,
-        ]
-        try:
-            r = subprocess.run(
-                cmd, capture_output=True, timeout=60 * 60 * 4,  # 4hr ceiling
-                text=True, encoding='utf-8', errors='replace',
-                creationflags=(0x08000000 if sys.platform == 'win32' else 0),
-            )
-        except subprocess.TimeoutExpired:
-            self._prep_log(f'[ProTube/bg-mp4] {video_id} timed out (>4h); abandoning')
-            try: os.remove(out_tmp)
-            except OSError: pass
-            return
-        except Exception as e:
-            self._prep_log(f'[ProTube/bg-mp4] {video_id} ffmpeg crashed: {e}')
-            try: os.remove(out_tmp)
-            except OSError: pass
-            return
-
-        if r.returncode != 0 or not os.path.exists(out_tmp) or os.path.getsize(out_tmp) == 0:
-            err = (r.stderr or '').splitlines()
-            self._prep_log(f'[ProTube/bg-mp4] {video_id} ffmpeg rc={r.returncode}: '
-                           f'{err[0] if err else "(no stderr)"}')
-            try: os.remove(out_tmp)
-            except OSError: pass
-            return
-
-        # Promote temp to final. os.replace is atomic on POSIX.
-        try:
-            os.replace(out_tmp, out_final)
-        except OSError as e:
-            self._prep_log(f'[ProTube/bg-mp4] {video_id} rename failed: {e}')
-            try: os.remove(out_tmp)
-            except OSError: pass
-            return
-
-        # Re-fetch the library entry (it may have moved between dicts since we
-        # last looked) and rewrite the filepath in place.
-        entry = self._find_library_entry(video_id)
-        if entry:
-            entry['filepath'] = out_final
-            self._save_settings()
-
-        # Delete the original webm. On POSIX, if the player has it open the
-        # fd keeps the inode alive — playback continues, the path just vanishes.
-        # On Windows, an open file resists delete; we leave it and reap on next
-        # launch.
-        try:
-            os.remove(src)
-        except OSError as e:
-            self._prep_log(f'[ProTube/bg-mp4] {video_id} could not remove webm '
-                           f'(likely in use): {e}; will reap on next scan')
-
-        self._prep_log(f'[ProTube/bg-mp4] done {os.path.basename(out_final)}')
-        try:
-            self._send_to_js('protubeFileConverted', {
-                'video_id': video_id, 'old': src, 'new': out_final,
-            })
-        except Exception:
-            pass
-
     def _ship_done(self, cache_path, src_path, target, job_id):
         """Build the streaming response and signal protubePrepDone. Shared by
         both stages of _transcode_worker so they emit identical payloads."""
@@ -1197,8 +1017,13 @@ class API:
         return opts
 
     def fetch_url_info(self, url, cookie_mode, cookie_value):
-        if self.is_fetching: return
-        self.is_fetching = True
+        # Dedupe ONLY the same URL — distinct URLs run concurrently, so
+        # rapid clicks across different search cards all succeed instead of
+        # silently dropping after the first.
+        with self._fetching_urls_lock:
+            if url in self._fetching_urls:
+                return
+            self._fetching_urls.add(url)
         threading.Thread(target=self._fetch_worker, args=(url, cookie_mode, cookie_value), daemon=True).start()
 
     def _normalize_channel_url(self, url):
@@ -1246,6 +1071,8 @@ class API:
         - Playlist: extract FLAT (no per-video format probe). ~2s for any size playlist.
           Format resolution happens later via resolve_playlist_formats when user drills in.
         """
+        original_url = url   # preserved so we release the per-URL lock on the
+                             # same key fetch_url_info stored.
         # Bare channel URLs get auto-rewritten to /videos so the fetch returns
         # only long-form videos, not Shorts/Streams/Community mashed together.
         url = self._normalize_channel_url(url)
@@ -1268,7 +1095,8 @@ class API:
         except Exception as e:
             self._send_to_js('finishFetch', f"Error: {str(e)}")
         finally:
-            self.is_fetching = False
+            with self._fetching_urls_lock:
+                self._fetching_urls.discard(original_url)
 
     def _handle_single_video_fetch(self, url, base_opts):
         """Full extract for a single video (formats included)."""
@@ -1315,16 +1143,17 @@ class API:
 
         children = []
         for e in entries:
-            thumb = None
-            thumbs = e.get('thumbnails') or []
-            if thumbs:
-                thumb = thumbs[-1].get('url')  # highest-res available in flat mode
-            elif e.get('thumbnail'):
-                thumb = e.get('thumbnail')
+            # Prefer mqdefault.jpg (320×180, ~10KB) over yt-dlp's highest-res
+            # entry (often maxresdefault.jpg, ~200KB). Channel grids render
+            # cards at ~260px wide, so mqdefault is the smallest size that
+            # still looks crisp — and an order of magnitude faster to load,
+            # which means thumbs don't flash blank when the user scrolls.
+            vid_id = e.get('id')
+            if vid_id:
+                thumb = f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg"
             else:
-                vid_id = e.get('id')
-                if vid_id:
-                    thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+                thumbs = e.get('thumbnails') or []
+                thumb = (thumbs[-1].get('url') if thumbs else e.get('thumbnail')) or ''
 
             children.append({
                 "type": "video",
@@ -1340,6 +1169,13 @@ class API:
             })
 
         source_url = probe.get('webpage_url') or probe.get('original_url')
+        subtype = self._classify_playlist_url(source_url)
+        # For channels, pull the full header bundle (avatar + banner + subscriber
+        # count + description) so the detail-view hero can render a YouTube-style
+        # channel page instead of just a tile + name.
+        channel_meta = {}
+        if subtype == 'channel':
+            channel_meta = self._extract_channel_metadata(probe)
         playlist = {
             "type": "playlist",
             "id": probe.get('id') or f"pl_{int(time.time())}",
@@ -1348,15 +1184,21 @@ class API:
             # the "Check for updates" flow describes itself. Channel URLs (the user
             # pastes them from the channel's Videos tab) re-fetch the same way as
             # playlists; the distinction is purely semantic for display.
-            "subtype": self._classify_playlist_url(source_url),
+            "subtype": subtype,
             "title": probe.get('title', 'Untitled Playlist'),
             "uploader": probe.get('uploader') or probe.get('channel', 'N/A'),
+            "uploader_url": probe.get('uploader_url') or probe.get('channel_url'),
             "videoCount": len(children),
             # Honor the user's Settings → Default quality preference. Falls back
             # to 1080p when unset. _user_default_quality maps 'best'/'audio'
             # abstractions to picker-compatible resolutions.
             "defaultQuality": self._user_default_quality(),
             "thumbnails": [c.get('thumbnail') for c in children[:4] if c.get('thumbnail')],
+            "channelAvatar": channel_meta.get('avatar', ''),
+            "channelBanner": channel_meta.get('banner', ''),
+            "subscriberCount": channel_meta.get('subscriberCount'),
+            "subscriberCountString": channel_meta.get('subscriberCountString', ''),
+            "channelDescription": channel_meta.get('description', ''),
             "videos": children,
             "formatsResolved": False,
         }
@@ -1682,6 +1524,23 @@ class API:
 
                 with YoutubeDL(opts) as ydl: ydl.download([video_data['url']])
 
+                # Pipeline done (download + any post-process/merge). Emit the
+                # final 100% tick the unified-progress hook held back; this
+                # is the visual jump from 99 → 100 the user sees only after
+                # the merge has actually completed.
+                try:
+                    _st = self._dl_state.get(video_id, {})
+                    final_total = _st.get('known_total') or _st.get('done_so_far', 0)
+                    self._send_to_js('updateItemProgress', video_id, 100, '',
+                                     playlist_id, final_total, final_total, 0)
+                    if hasattr(self, '_last_progress') and video_id in self._last_progress:
+                        self._last_progress[video_id] = {'pct': 100, 'speed': '', 'playlist_id': playlist_id}
+                except Exception:
+                    pass
+                finally:
+                    if hasattr(self, '_dl_state'):
+                        self._dl_state.pop(video_id, None)
+
                 # Resolve final filepath. After post-processing the merged file may have
                 # a different name than what hooks reported. Be thorough: prefer existing
                 # merged file (.mp4/.mkv) in the folder over intermediate .m4a / .f140.* files.
@@ -1797,6 +1656,10 @@ class API:
                 # Skip cleanup if we handed off to an auto-retry thread (it now owns the slot)
                 if not locals().get('auto_retry_handoff'):
                     self.active_downloads.pop(video_id, None)
+                    # Drop the unified-progress accumulator so a future download
+                    # of the same id starts from scratch (no stale prior bytes).
+                    if hasattr(self, '_dl_state'):
+                        self._dl_state.pop(video_id, None)
                     if len(self.active_downloads) == 0:
                         # Batch finished. Send count of fresh completions so UI can toast
                         # accurately. If count is 0 (all paused/cancelled/errored), UI stays quiet.
@@ -1972,7 +1835,8 @@ class API:
         # for each stream (video, then audio), then the postprocessor merges them. We
         # prefer the merged .mp4 when it appears, but fall back to whatever was last
         # finished if no postprocessor runs (e.g. audio-only formats).
-        if d.get('status') == 'finished' and captured_filepath is not None:
+        status = d.get('status')
+        if status == 'finished' and captured_filepath is not None:
             fn = d.get('filename') or ''
             current = captured_filepath.get('path') or ''
             # Don't overwrite a merged container with an intermediate stream
@@ -1980,11 +1844,87 @@ class API:
             if not current_is_good:
                 captured_filepath['path'] = fn
 
-        if d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
-            if total > 0:
-                downloaded_bytes = d.get('downloaded_bytes', 0)
-                pct = (downloaded_bytes / total) * 100
+        # Unified-progress state machine. yt-dlp downloads streams in series
+        # (e.g. video → audio → merge) and resets 'downloaded_bytes' to 0
+        # between them. A naive emit produces TWO climbs to 100% AND a visible
+        # regression when stream 2 starts: stream 1 finishes at "99%" (capped
+        # against its own total), then stream 2's first tick re-computes
+        # against a bigger total and the bar drops to ~5%.
+        #
+        # Fix: take the TOTAL upfront from `info_dict.requested_formats` so the
+        # denominator is fixed for the entire download — every stream's bytes
+        # contribute to the same pie. The reported pct then climbs monotonically
+        # to ≤99. After ydl.download() returns (merge done), the worker emits
+        # 100 explicitly. A monotone clamp catches yt-dlp edge cases where
+        # filesize fields are missing or wrong.
+        if not hasattr(self, '_dl_state'):
+            self._dl_state = {}
+        state = self._dl_state.setdefault(vid, {
+            'known_total': 0,
+            'done_so_far': 0,
+            'finished_streams': set(),
+            'last_pct': 0.0,
+        })
+
+        # Pre-compute total bytes ONCE from yt-dlp's planned formats. Falls back
+        # to per-tick totals further down if requested_formats is unavailable
+        # (e.g. audio-only single-stream downloads).
+        if state['known_total'] <= 0:
+            info = d.get('info_dict') or {}
+            rf = info.get('requested_formats') or []
+            if rf:
+                total_sz = 0
+                for f in rf:
+                    sz = f.get('filesize') or f.get('filesize_approx') or 0
+                    if sz:
+                        total_sz += sz
+                state['known_total'] = total_sz
+
+        def _emit(pct_value, combined_done, combined_total, speed_str='', speed_bytes=0):
+            # Monotone clamp — once we've shown N%, never go below N. Belt-and-
+            # braces protection if requested_formats lied about sizes.
+            if pct_value < state['last_pct']:
+                pct_value = state['last_pct']
+            state['last_pct'] = pct_value
+            if not hasattr(self, '_last_progress'):
+                self._last_progress = {}
+            self._last_progress[vid] = {
+                'pct': pct_value, 'speed': speed_str, 'playlist_id': playlist_id
+            }
+            self._send_to_js('updateItemProgress', vid, pct_value, speed_str,
+                             playlist_id, combined_done, combined_total, speed_bytes)
+
+        if status == 'finished':
+            # Add this stream's total to the cumulative-finished bytes. Track
+            # by filename so a stream is never double-counted if yt-dlp fires
+            # 'finished' more than once per stream.
+            fname = d.get('filename') or d.get('tmpfilename') or ''
+            if fname and fname not in state['finished_streams']:
+                state['finished_streams'].add(fname)
+                s_total = (d.get('total_bytes') or d.get('total_bytes_estimate')
+                           or d.get('downloaded_bytes', 0) or 0)
+                state['done_so_far'] += s_total
+            # Use known_total when we have it; fall back to done_so_far so a
+            # single-stream finish still reports a sensible (~99) value.
+            denom = state['known_total'] if state['known_total'] > 0 else state['done_so_far']
+            if denom > 0:
+                pct = min(99.0, (state['done_so_far'] / denom) * 100)
+                _emit(pct, state['done_so_far'], denom)
+            return
+
+        if status == 'downloading':
+            s_done = d.get('downloaded_bytes', 0)
+            combined_done = state['done_so_far'] + s_done
+            # Prefer the pre-computed known_total; fall back to (cumulative
+            # finished + current stream's reported total) if it isn't known.
+            if state['known_total'] > 0:
+                combined_total = state['known_total']
+            else:
+                s_total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+                combined_total = state['done_so_far'] + s_total
+
+            if combined_total > 0:
+                pct = min(99.0, (combined_done / combined_total) * 100)
                 speed_bytes = d.get('speed') or 0
                 speed_str = self._format_bytes(d.get('speed')) + "/s"
 
@@ -1995,23 +1935,11 @@ class API:
                     if pct > 3:
                         filename = d.get('filename', '')
                         title = os.path.basename(filename).rsplit('.', 1)[0] if filename else 'a previous download'
-                        # Truncate long titles for toast
                         if len(title) > 40:
                             title = title[:37] + '...'
                         self._send_to_js('showResumeToast', title, round(pct))
 
-                # Remember last progress so get_active_progress() can resync the UI
-                # after a window refocus (when Chromium throttling lifts).
-                if not hasattr(self, '_last_progress'):
-                    self._last_progress = {}
-                self._last_progress[vid] = {
-                    'pct': pct,
-                    'speed': speed_str,
-                    'playlist_id': playlist_id
-                }
-
-                self._send_to_js('updateItemProgress', vid, pct, speed_str,
-                                 playlist_id, downloaded_bytes, total, speed_bytes)
+                _emit(pct, combined_done, combined_total, speed_str, speed_bytes)
 
     def _parse_formats(self, info):
         """Build the quality-picker list from yt-dlp's per-format metadata.
@@ -2143,26 +2071,60 @@ class API:
         and the dirty flag is set instead — the context manager flushes once
         on exit. Used to coalesce the 4 writes/track on the album download
         hot path (library add + album bump + cover ensure + queue patch) down
-        to a single write per track."""
+        to a single write per track.
+
+        Race-safety: a shared `settings.json.tmp` filename used to corrupt the
+        file when two threads called `_save_settings` simultaneously — both
+        opened the same tmp path with mode='w' (truncating each other's
+        in-progress writes) and then both renamed, leaving the survivor with
+        interleaved bytes. The combination of (a) a process-wide lock and
+        (b) a per-write unique tmp suffix below makes a concurrent corruption
+        impossible: only one writer at a time, and even if the lock were
+        ever bypassed the tmp paths wouldn't collide."""
         if getattr(self, '_save_deferred', False):
             self._save_dirty = True
             return
-        tmp = self.settings_file + '.tmp'
-        try:
-            with open(tmp, 'w', encoding='utf-8') as f:
-                json.dump(self.settings, f)
-                f.flush()
-                os.fsync(f.fileno())
-            # Atomic replace on Windows + POSIX
-            os.replace(tmp, self.settings_file)
-        except OSError as e:
-            # Clean up the temp file on failure; leave original settings.json untouched
+        # Lazily init the lock so frozen builds without a fresh attribute on
+        # an older pickle keep working.
+        if not hasattr(self, '_save_lock') or self._save_lock is None:
+            self._save_lock = threading.Lock()
+        with self._save_lock:
+            # Snapshot via JSON-encode to a string FIRST, then write the
+            # bytes. `json.dumps(self.settings)` iterates the live dict and
+            # we'd hit "dictionary changed size during iteration" whenever
+            # another thread is mutating self.settings (very common — every
+            # add_to_library / save_queue / download tick touches it). Retry
+            # a small number of times under the lock; mutations are quick so
+            # this almost always succeeds on the first or second pass.
+            payload = None
+            for _ in range(6):
+                try:
+                    payload = json.dumps(self.settings)
+                    break
+                except RuntimeError:
+                    time.sleep(0.005)
+            if payload is None:
+                # Last resort: deep-copy then encode. Slower but immune to
+                # concurrent mutation during the dump itself.
+                import copy
+                payload = json.dumps(copy.deepcopy(self.settings))
+
+            tmp = f'{self.settings_file}.tmp.{os.getpid()}.{threading.get_ident()}'
             try:
-                if os.path.exists(tmp):
-                    os.remove(tmp)
-            except OSError:
-                pass
-            print(f'[ProTube] settings save failed: {e}')
+                with open(tmp, 'w', encoding='utf-8') as f:
+                    f.write(payload)
+                    f.flush()
+                    os.fsync(f.fileno())
+                # Atomic replace on Windows + POSIX
+                os.replace(tmp, self.settings_file)
+            except OSError as e:
+                # Clean up the temp file on failure; leave original settings.json untouched
+                try:
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
+                except OSError:
+                    pass
+                print(f'[ProTube] settings save failed: {e}')
 
     @contextlib.contextmanager
     def _deferred_save(self):
@@ -5816,12 +5778,37 @@ class API:
         before the auto-frame feature existed."""
         if not self.settings.get('_library_migrated'):
             self._migrate_queue_done_to_library()
-        # Idempotent — no-ops if there's nothing pending or worker already running
+        # Guarded: only kick the worker when there's actually something to do.
+        # Without this guard, the worker was being spawned on every load_library
+        # call — and load_library is called from ~30 frontend code paths,
+        # including post-event refreshes after every progress tick. That led
+        # to hundreds of "starting worker (pending=0)" entries per second in
+        # protube.log and saturated the bridge enough to make clicks/playback
+        # feel laggy. Now we scan pending once here and skip the kick entirely
+        # when there's no work.
         try:
-            self._start_frame_extraction_worker()
+            if self._has_pending_frame_extraction():
+                self._start_frame_extraction_worker()
         except Exception:
             pass
         return self.settings.get('library', [])
+
+    def _has_pending_frame_extraction(self):
+        """Cheap pending-check used by load_library to avoid spawning the
+        frame-extraction worker when there's nothing for it to do."""
+        try:
+            if not self.settings.get('auto_extract_frame_thumbnails', True):
+                return False
+            for v in self.settings.get('library', []):
+                if v.get('type') == 'playlist':
+                    for c in v.get('videos', []):
+                        if self._needs_auto_frame_thumb(c):
+                            return True
+                elif self._needs_auto_frame_thumb(v):
+                    return True
+        except Exception:
+            return False
+        return False
 
     def save_library(self, lib):
         """Overwrite the library. Frontend calls this after reorder/remove operations."""
@@ -5852,15 +5839,6 @@ class API:
                 except KeyError:
                     pass
         self._save_settings()
-        # Queue background WebM → MP4 conversion if the new entry is a .webm.
-        # No-op when the setting is off or the file isn't .webm. Single-video
-        # path only; playlists hit add_playlist_to_library which queues per-child.
-        try:
-            fp = video.get('filepath') or ''
-            if fp.lower().endswith('.webm'):
-                self._mp4_convert_enqueue(video.get('id'))
-        except Exception:
-            pass
         return True
 
     def _archive_key(self, filepath):
@@ -5989,6 +5967,96 @@ class API:
             'is_playlist_child': is_playlist_child,
         }
 
+    def _extract_channel_branding(self, probe):
+        """Pull (avatar_url, banner_url) from a yt-dlp channel probe.
+
+        yt-dlp's `thumbnails` list mixes the channel avatar (square thumbs at
+        48/88/176/720/900px) and the channel banner (wide thumbs at aspect > 2).
+        Sometimes entries have an `id` like "avatar_uncropped" / "banner_uncropped"
+        which we prefer when present. Otherwise we use aspect ratio:
+          - avatar: w ≈ h  → pick the highest-res square
+          - banner: w / h > 2.5 → pick the highest-res wide
+        Returns ('', '') when neither can be found.
+        """
+        thumbs = probe.get('thumbnails') or []
+        avatar_url, avatar_area = '', 0
+        banner_url, banner_area = '', 0
+        for t in thumbs:
+            url = (t or {}).get('url') or ''
+            if not url:
+                continue
+            w = t.get('width') or 0
+            h = t.get('height') or 0
+            tid = (t.get('id') or '').lower()
+            area = w * h
+            is_avatar = 'avatar' in tid or (w and h and abs(w - h) <= 4)
+            is_banner = 'banner' in tid or (w and h and h > 0 and (w / h) >= 2.5)
+            if is_avatar and area >= avatar_area:
+                avatar_url, avatar_area = url, area or avatar_area or 1
+            elif is_banner and area >= banner_area:
+                banner_url, banner_area = url, area or banner_area or 1
+        return avatar_url, banner_url
+
+    def _channel_about_url(self, url):
+        """Turn `youtube.com/@handle/videos` (or any tabbed channel URL) into
+        `youtube.com/@handle/about` so we can fetch the full About-page
+        description. Returns '' if the input doesn't look like a channel URL.
+        """
+        if not url or not isinstance(url, str):
+            return ''
+        u = url.rstrip('/')
+        # Strip any explicit tab suffix
+        for tab in ('/videos', '/shorts', '/streams', '/live', '/playlists',
+                    '/community', '/about', '/featured', '/podcasts',
+                    '/courses', '/membership', '/store', '/releases'):
+            if u.lower().endswith(tab):
+                u = u[: -len(tab)]
+                break
+        # Only append /about for channel-style URLs
+        ul = u.lower()
+        if '/@' in ul or '/channel/' in ul or '/c/' in ul or '/user/' in ul:
+            return u + '/about'
+        return ''
+
+    def _extract_channel_metadata(self, probe):
+        """Pull the full channel-header bundle from a yt-dlp channel probe so
+        the detail-view hero can render a YouTube-style header instead of just
+        a tile + name. Returns a dict with avatar, banner, subscriberCount
+        (int), subscriberCountString ("1.59M subscribers"), description.
+
+        Only meaningful for channel probes — playlist probes won't populate
+        most of these and the caller should skip the call.
+        """
+        avatar, banner = self._extract_channel_branding(probe)
+        followers = probe.get('channel_follower_count')
+        subs_string = ''
+        if isinstance(followers, int) and followers > 0:
+            subs_string = self._format_compact_count(followers) + ' subscribers'
+        description = (probe.get('description') or '').strip()
+        return {
+            'avatar': avatar,
+            'banner': banner,
+            'subscriberCount': followers if isinstance(followers, int) else None,
+            'subscriberCountString': subs_string,
+            'description': description,
+        }
+
+    def _format_compact_count(self, n):
+        """1_590_000 → '1.59M'. Matches YouTube's compact display style.
+        Used for subscriber/video counts so the channel header reads naturally.
+        """
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            return ''
+        if n < 1000:
+            return str(n)
+        if n < 1_000_000:
+            return ('%.2f' % (n / 1000)).rstrip('0').rstrip('.') + 'K'
+        if n < 1_000_000_000:
+            return ('%.2f' % (n / 1_000_000)).rstrip('0').rstrip('.') + 'M'
+        return ('%.2f' % (n / 1_000_000_000)).rstrip('0').rstrip('.') + 'B'
+
     def _classify_playlist_url(self, url):
         """Return 'channel' for YouTube channel-style URLs, 'playlist' otherwise.
 
@@ -6049,15 +6117,6 @@ class API:
         lib.append(playlist_copy)
         self.settings['library'] = lib
         self._save_settings()
-        # Queue each .webm child for background MP4 conversion. No-op when
-        # the setting is off or there are no webm files in the playlist.
-        try:
-            for c in playlist_copy.get('videos') or []:
-                fp = c.get('filepath') or ''
-                if fp.lower().endswith('.webm'):
-                    self._mp4_convert_enqueue(c.get('id'))
-        except Exception:
-            pass
         return True
 
     def check_playlist_updates(self, playlist_id):
@@ -6179,13 +6238,52 @@ class API:
         removed_ids = sorted(local_ids - remote_ids)
         last_checked_at = int(time.time())
 
+        # Refresh the full channel header bundle (avatar, banner, subscribers,
+        # description) on every update check so existing channels that pre-date
+        # these fields pick them up the next time the user hits "Check for new
+        # videos" — or when the frontend auto-triggers it on first open. We
+        # always overwrite: yt-dlp gives us fresh URLs each fetch.
+        effective_subtype = target.get('subtype') or self._classify_playlist_url(url)
+        channel_meta = {}
+        if effective_subtype == 'channel':
+            channel_meta = self._extract_channel_metadata(probe)
+            # Mirror get_channel_metadata: pull the full About-page description
+            # so "...more" reveals real long-form text, not the 1-2 line header
+            # blurb the /videos tab returns. Best-effort.
+            about_url = self._channel_about_url(url)
+            if about_url:
+                try:
+                    about_opts = self._get_ydl_opts('browser', 'none')
+                    about_opts.update({
+                        'extract_flat': True,
+                        'skip_download': True,
+                        'lazy_playlist': True,
+                    })
+                    with YoutubeDL(about_opts) as ydl_about:
+                        about_probe = ydl_about.extract_info(about_url, download=False)
+                    about_desc = (about_probe.get('description') or '').strip()
+                    if about_desc and len(about_desc) > len(channel_meta.get('description', '')):
+                        channel_meta['description'] = about_desc
+                except Exception:
+                    pass
+
         # Stamp + persist only for library entries. The queue is owned by the
         # frontend (see save_queue / load_queue) and writing to it here would
         # race with the frontend's saveQueueState calls.
         if source == 'library':
             target['last_checked_at'] = last_checked_at
             if not target.get('subtype'):
-                target['subtype'] = self._classify_playlist_url(url)
+                target['subtype'] = effective_subtype
+            if channel_meta.get('avatar'):
+                target['channelAvatar'] = channel_meta['avatar']
+            if channel_meta.get('banner'):
+                target['channelBanner'] = channel_meta['banner']
+            if channel_meta.get('subscriberCount') is not None:
+                target['subscriberCount'] = channel_meta['subscriberCount']
+            if channel_meta.get('subscriberCountString'):
+                target['subscriberCountString'] = channel_meta['subscriberCountString']
+            if channel_meta.get('description'):
+                target['channelDescription'] = channel_meta['description']
             self._save_settings()
 
         return {
@@ -6195,7 +6293,90 @@ class API:
             'removed_ids': removed_ids,
             'total_now': len(remote_ids),
             'last_checked_at': last_checked_at,
-            'subtype': target.get('subtype') or self._classify_playlist_url(url),
+            'subtype': effective_subtype,
+            'channelAvatar': channel_meta.get('avatar', ''),
+            'channelBanner': channel_meta.get('banner', ''),
+            'subscriberCount': channel_meta.get('subscriberCount'),
+            'subscriberCountString': channel_meta.get('subscriberCountString', ''),
+            'channelDescription': channel_meta.get('description', ''),
+        }
+
+    def get_channel_metadata(self, playlist_id):
+        """Cheap, entries-free fetch of a channel's header bundle (avatar,
+        banner, subscribers, description). Used by the frontend to backfill
+        legacy channel entries that pre-date these fields when the user
+        opens the channel detail view — without the seconds-long page walk
+        that `check_playlist_updates` does. Persists onto library entries.
+        Returns {ok: bool, avatar, banner, subscriberCount,
+        subscriberCountString, description, error?}.
+        """
+        target, source = None, None
+        for v in self.settings.get('library', []):
+            if v.get('id') == playlist_id and v.get('type') == 'playlist':
+                target, source = v, 'library'
+                break
+        if not target:
+            for v in self.settings.get('queue', []):
+                if v.get('id') == playlist_id and v.get('type') == 'playlist':
+                    target, source = v, 'queue'
+                    break
+        if not target or not target.get('url'):
+            return {'ok': False, 'error': 'Not found'}
+
+        try:
+            opts = self._get_ydl_opts('browser', 'none')
+            opts.update({
+                'extract_flat': True,
+                'skip_download': True,
+                'lazy_playlist': True,
+            })
+            with YoutubeDL(opts) as ydl:
+                # `extract_flat=True` + `lazy_playlist=True` already keeps entry
+                # walks out of the path; we just never iterate probe['entries']
+                # so no page fetches happen. We DO want full processing of the
+                # channel-level metadata so the description / follower count come
+                # through (process=False would strip those).
+                probe = ydl.extract_info(target['url'], download=False)
+            meta = self._extract_channel_metadata(probe or {})
+
+            # The /videos tab returns the channel HEADER description (a 1-2
+            # line blurb). The full About-page text only comes back when we
+            # hit the /about endpoint specifically. Fetch it separately and
+            # swap in whichever is longer — "Show more" should reveal real
+            # content, not the same blurb.
+            about_url = self._channel_about_url(target['url'])
+            if about_url:
+                try:
+                    with YoutubeDL(opts) as ydl2:
+                        about_probe = ydl2.extract_info(about_url, download=False)
+                    about_desc = (about_probe.get('description') or '').strip()
+                    if about_desc and len(about_desc) > len(meta.get('description', '')):
+                        meta['description'] = about_desc
+                except Exception:
+                    pass   # /about fetch is best-effort
+        except Exception as e:
+            return {'ok': False, 'error': f'Fetch failed: {e}'}
+
+        if source == 'library':
+            if meta.get('avatar'):
+                target['channelAvatar'] = meta['avatar']
+            if meta.get('banner'):
+                target['channelBanner'] = meta['banner']
+            if meta.get('subscriberCount') is not None:
+                target['subscriberCount'] = meta['subscriberCount']
+            if meta.get('subscriberCountString'):
+                target['subscriberCountString'] = meta['subscriberCountString']
+            if meta.get('description'):
+                target['channelDescription'] = meta['description']
+            self._save_settings()
+
+        return {
+            'ok': True,
+            'avatar': meta.get('avatar', ''),
+            'banner': meta.get('banner', ''),
+            'subscriberCount': meta.get('subscriberCount'),
+            'subscriberCountString': meta.get('subscriberCountString', ''),
+            'description': meta.get('description', ''),
         }
 
     def add_videos_to_library_playlist(self, target_playlist_id, videos):

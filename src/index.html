@@ -3107,59 +3107,74 @@
         /* Selected checkmark badge removed — the row's blue border + tint at
            .search-result-card.selected (above) is enough to convey selection. */
 
-        /* Bottom action bar — slides up from bottom of search view when items are selected. */
+        /* Centered floating pill — same primitive as .pd-channel-action-bar.
+           Auto-sizes to its contents, sits ~20px above the bottom of the
+           search view, slides up from below when items are selected. */
         .search-action-bar {
             position: absolute;
-            left: 24px; right: 24px; bottom: 16px;
-            display: flex;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%) translateY(160%);
+            display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 16px;
-            background: rgba(20, 20, 20, 0.96);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid #2a2a2a;
-            border-radius: 11px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-            transform: translateY(120%);
+            padding: 8px 8px 8px 16px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid #232323;
+            border-radius: 999px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
             opacity: 0;
             pointer-events: none;
-            transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease;
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
             z-index: 10;
+            white-space: nowrap;
         }
         .search-action-bar.visible {
-            transform: translateY(0);
+            transform: translateX(-50%) translateY(0);
             opacity: 1;
             pointer-events: auto;
         }
         .search-action-count {
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
-            color: #fff;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
         }
-        .search-action-bar-spacer { flex: 1; }
-        .search-action-clear,
+        .search-action-bar-spacer {
+            width: 1px;
+            align-self: stretch;
+            background: #2a2a2a;
+            margin: 2px 4px;
+        }
+        .search-action-clear {
+            background: transparent;
+            border: none;
+            color: #909090;
+            padding: 6px 10px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: color 0.12s ease, background 0.12s ease;
+        }
+        .search-action-clear:hover { color: #fff; background: rgba(255,255,255,0.04); }
         .search-action-add {
-            padding: 9px 16px;
-            border-radius: 7px;
+            background: #3b82f6;
+            border: none;
+            color: #fff;
+            padding: 9px 18px;
+            border-radius: 999px;
             font-family: inherit;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.12s ease, border-color 0.12s ease;
+            transition: background 0.12s ease, transform 0.05s;
         }
-        .search-action-clear {
-            background: transparent;
-            border: 1px solid #2a2a2a;
-            color: #c0c0c0;
-        }
-        .search-action-clear:hover { color: #fff; border-color: #3a3a3a; }
-        .search-action-add {
-            background: #3b82f6;
-            border: 1px solid #3b82f6;
-            color: #fff;
-        }
-        .search-action-add:hover { background: #2563eb; border-color: #2563eb; }
+        .search-action-add:hover { background: #2563eb; }
+        .search-action-add:active { transform: scale(0.97); }
         /* Position search-view as relative so the action bar's bottom positioning anchors here */
         #search-view { position: relative; }
 
@@ -4286,56 +4301,73 @@
         .music-track-row.in-library .mtr-add,
         .music-track-row.downloading .mtr-add { opacity: 1; }
 
-        /* Multi-select bottom action bar */
-        /* Mirror .search-action-bar styling so the music selection bar reads
-           as the same primitive as the video search bar. Bottom offset is
-           bumped to 96px when the music player dock is visible (78px dock +
-           18px breathing room) so the bar doesn't sit underneath it. */
+        /* Music multi-select pill — same primitive as .pd-channel-action-bar
+           and .search-action-bar. Centered, auto-sized, floats above the
+           music dock when it's visible. */
         .music-actionbar {
             position: absolute;
-            left: 24px; right: 24px; bottom: 16px;
-            display: flex;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%);
+            display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 16px;
-            background: rgba(20, 20, 20, 0.96);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid #2a2a2a;
-            border-radius: 11px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            padding: 8px 8px 8px 16px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid #232323;
+            border-radius: 999px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
             z-index: 30;
-            animation: mab-slide-up 0.18s ease;
+            white-space: nowrap;
+            animation: mab-slide-up 0.2s ease;
         }
         body.music-dock-visible .music-actionbar { bottom: 106px; }
         .music-actionbar[hidden] { display: none; }
         @keyframes mab-slide-up {
-            from { transform: translateY(10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            from { transform: translateX(-50%) translateY(14px); opacity: 0; }
+            to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
         }
-        .mab-count { font-size: 14px; font-weight: 600; color: #fff; }
-        .mab-count em { color: #3b82f6; font-style: normal; font-variant-numeric: tabular-nums; }
+        .mab-count {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
+        }
+        .mab-count em { color: #3b82f6; font-style: normal; }
         .mab-clear {
-            display: flex; align-items: center; gap: 6px;
+            display: inline-flex; align-items: center; gap: 6px;
             background: transparent; border: none;
-            font-family: inherit; font-size: 12px; color: #8a8a8a;
+            font-family: inherit; font-size: 12.5px; color: #909090; font-weight: 500;
             cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 8px;
+            transition: color 0.12s ease, background 0.12s ease;
         }
-        .mab-clear:hover { color: #fff; }
-        .mab-clear svg { width: 14px; height: 14px; }
-        .mab-actions { margin-left: auto; display: flex; gap: 10px; }
+        .mab-clear:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .mab-clear svg { width: 13px; height: 13px; }
+        .mab-actions { display: inline-flex; gap: 6px; align-items: center; }
+        .mab-divider {
+            width: 1px;
+            align-self: stretch;
+            background: #2a2a2a;
+            margin: 2px 4px;
+        }
         .mab-btn {
-            display: flex; align-items: center; gap: 8px;
+            display: inline-flex; align-items: center; gap: 8px;
             padding: 9px 16px;
             font-family: inherit; font-size: 13px; font-weight: 600;
-            border-radius: 8px;
+            border-radius: 999px;
             cursor: pointer;
+            transition: background 0.12s ease, transform 0.05s, color 0.12s ease;
         }
-        .mab-btn svg { width: 14px; height: 14px; }
+        .mab-btn svg { width: 13px; height: 13px; }
         .mab-btn.primary { background: #3b82f6; color: #fff; border: none; }
         .mab-btn.primary:hover { background: #2563eb; }
-        .mab-btn.ghost { background: transparent; color: #d0d0d0; border: 1px solid #2a2a2a; }
-        .mab-btn.ghost:hover { border-color: #3a3a3a; color: #fff; }
+        .mab-btn.primary:active { transform: scale(0.97); }
+        .mab-btn.ghost { background: transparent; color: #c0c0c0; border: none; padding: 9px 14px; }
+        .mab-btn.ghost:hover { color: #fff; background: rgba(255,255,255,0.04); }
 
         /* Right-click context menu */
         .music-ctx {
@@ -6319,39 +6351,32 @@
             display: flex;
         }
 
-        .pd-topbar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 14px;
-        }
-
+        /* Floating circular back button — mirrors .pd-channel-refresh-btn
+           on the opposite side of the banner area. No row of its own; the
+           detail view starts at the top of the panel. */
+        #playlist-detail-view { position: relative; }
         .pd-back-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+            cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            height: 32px;
-            padding: 0 12px;
-            background: transparent;
-            color: #a0a0a0;
-            border: 1px solid #262626;
-            border-radius: 7px;
-            font-size: 12px;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.15s;
+            justify-content: center;
+            transition: background 0.12s ease, transform 0.05s;
+            z-index: 4;
         }
-
-        .pd-back-btn:hover {
-            border-color: #3b82f6;
-            color: #3b82f6;
-        }
-
-        .pd-back-btn svg {
-            width: 14px;
-            height: 14px;
-        }
+        .pd-back-btn:hover { background: rgba(0, 0, 0, 0.75); }
+        .pd-back-btn:active { transform: scale(0.94); }
+        .pd-back-btn svg { width: 16px; height: 16px; }
 
         .pd-layout {
             display: grid;
@@ -6500,6 +6525,470 @@
         .pd-videos-list::-webkit-scrollbar-thumb {
             background: #262626;
             border-radius: 10px;
+        }
+
+        /* ==================================================================
+           CHANNEL MODE — playlist-detail-view variant for channel-type
+           entries (classifyPlaylistEntry === 'channel'). Goal: read like a
+           YouTube channel page — clean grid of thumbnails, no checkmarks,
+           no pre-selection. Clicking a card toggles selection (blue ring
+           only); a bottom action bar slides up with quality + Download.
+           Regular playlists keep their list layout unchanged.
+           ================================================================== */
+
+        /* Channel mode: hero is replaced by .pd-channel-header (a separate
+           markup branch rendered when classifyPlaylistEntry(pl) === 'channel'),
+           so the only thing the channel-mode layout needs to do is stack
+           that header on top of the grid and suppress the select-all pill
+           the regular playlist view shows.
+
+           grid-template-rows: auto 1fr — header sizes to content, grid takes
+           the rest. .pd-videos gets min-height:0 so its child .library-grid
+           can scroll INSIDE it instead of overflowing past the hero. The old
+           `grid-auto-rows: min-content 1fr` was invalid (auto-rows takes one
+           value) and let the grid scroll over the header. */
+        /* Single-page scroll, YouTube-style — the WHOLE channel detail view
+           scrolls as one document. The banner + avatar + stats + bio scroll
+           up with the grid, instead of staying pinned while the grid slides
+           under them (which read as "two pages" rather than one channel
+           page). The floating action bar stays fixed at the visual bottom
+           because it anchors to #playlist-detail-view, not the scroll. */
+        .pd-layout.channel-mode {
+            display: block;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: 100px;   /* breathing room so the last row of
+                                       cards never sits under the action bar */
+        }
+        .pd-layout.channel-mode .pd-videos {
+            display: block;
+            overflow: visible;
+        }
+        .pd-layout.channel-mode .library-grid.is-channel-grid {
+            overflow: visible;
+            flex: none;
+        }
+        .pd-layout.channel-mode .pd-videos-top { display: none; }
+
+        /* YouTube-style channel header — mirrors youtube.com/@channel:
+           a rounded banner band on top, then a row of [144px avatar | name +
+           stats + bio + Subscribe-style pill]. The Subscribe pill is repurposed
+           as "Check for new videos" since the channel is already in queue. */
+        .pd-channel-header {
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px 8px;
+        }
+        .pd-channel-banner-wrap {
+            position: relative;
+            margin-bottom: 18px;
+        }
+        .pd-channel-banner {
+            width: 100%;
+            aspect-ratio: 6.2 / 1;
+            max-height: 220px;
+            min-height: 120px;
+            background-color: #161616;
+            background-size: cover;
+            background-position: center;
+            border-radius: 12px;
+        }
+        /* If the channel has no banner, render a subtle gradient instead of a
+           flat dark slab — feels intentional rather than empty. */
+        .pd-channel-banner-empty {
+            background-image: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 60%, #1a1a1a 100%);
+        }
+        /* Twin circular controls on the banner — refresh on the right,
+           back on the left. Both scroll with the banner (they're inside
+           .pd-channel-banner-wrap), so when the banner scrolls out of view
+           the .pd-sticky-header takes over with its own back + refresh. */
+        .pd-channel-refresh-btn,
+        .pd-channel-back-btn {
+            position: absolute;
+            top: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s ease, transform 0.05s;
+            z-index: 2;
+        }
+        .pd-channel-refresh-btn { right: 12px; }
+        .pd-channel-back-btn { left: 12px; }
+        .pd-channel-refresh-btn:hover,
+        .pd-channel-back-btn:hover { background: rgba(0, 0, 0, 0.75); }
+        .pd-channel-refresh-btn:active,
+        .pd-channel-back-btn:active { transform: scale(0.94); }
+        .pd-channel-refresh-btn svg,
+        .pd-channel-back-btn svg { width: 16px; height: 16px; }
+
+        /* Sticky compact header — slides in from the top when the channel
+           banner has scrolled out of view. Shows the controls (back/refresh)
+           plus a slim avatar + name so the user always knows what channel
+           they're scrolling on. */
+        .pd-sticky-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: rgba(15, 15, 15, 0.85);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            z-index: 6;
+            transform: translateY(-100%);
+            opacity: 0;
+            transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease;
+            pointer-events: none;
+        }
+        .pd-sticky-header.is-visible {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .pd-sticky-header[hidden] { display: none; }
+        .pd-sticky-back,
+        .pd-sticky-refresh {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: #ededed;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s ease;
+        }
+        .pd-sticky-back svg,
+        .pd-sticky-refresh svg { width: 16px; height: 16px; }
+        .pd-sticky-back:hover,
+        .pd-sticky-refresh:hover { background: rgba(255,255,255,0.08); }
+        .pd-sticky-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #1a1a1a center / cover no-repeat;
+            flex-shrink: 0;
+        }
+        .pd-sticky-name {
+            flex: 1;
+            font-size: 14.5px;
+            font-weight: 600;
+            color: #ededed;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pd-channel-meta {
+            display: grid;
+            grid-template-columns: 144px 1fr;
+            gap: 24px;
+            align-items: start;
+            padding: 4px 0 8px;
+        }
+        .pd-channel-avatar {
+            width: 144px;
+            height: 144px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .pd-channel-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .pd-channel-info {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            padding-top: 4px;
+        }
+        .pd-channel-name {
+            color: #fff;
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: -0.5px;
+        }
+        .pd-channel-stats {
+            color: #a3a3a3;
+            font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .pd-channel-handle {
+            color: #ededed;
+            font-weight: 500;
+        }
+        .pd-channel-stats-sep {
+            opacity: 0.55;
+        }
+        .pd-channel-bio {
+            color: #a3a3a3;
+            font-size: 13.5px;
+            line-height: 1.4;
+            max-width: 680px;
+        }
+        .pd-channel-bio-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .pd-channel-bio.is-expanded .pd-channel-bio-text {
+            -webkit-line-clamp: unset;
+            display: block;
+        }
+        .pd-channel-bio-toggle {
+            color: #ededed;
+            font-weight: 500;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 2px 0 0;
+            font-family: inherit;
+            font-size: inherit;
+            margin-top: 2px;
+        }
+        .pd-channel-bio-toggle:hover {
+            text-decoration: underline;
+        }
+
+        /* Channel-mode grid reuses .library-grid; this modifier just adds the
+           padding the library grid skips (library page has its own outer pad). */
+        .library-grid.is-channel-grid {
+            padding: 14px 14px 24px;
+        }
+        .library-grid.is-channel-grid::-webkit-scrollbar { width: 8px; }
+        .library-grid.is-channel-grid::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
+
+        /* Resolving state — card half-faded and non-interactive while its
+           formats are still loading. Used by the channel grid only. */
+        .library-card.is-resolving {
+            pointer-events: none;
+            opacity: 0.45;
+        }
+        /* Downloaded videos in a channel: single-click is locked out so the
+           user can't re-select something already in their library. Hover is
+           still allowed (visual inspection / double-click play). */
+        .library-card.is-downloaded {
+            cursor: default;
+        }
+        .library-card.is-downloaded:hover {
+            border-color: #1f1f1f;
+            background: #141414;
+        }
+
+        /* Top-right state badge on a library-card thumb — used by the channel
+           grid to show Downloaded / Downloading% / Retrying / Paused / Cancelled
+           / Error. Tiny and minimal so the thumb itself is the focus.
+             - .s-owned: 18px green circle with a check icon, no text
+             - .s-downloading: tiny percentage chip
+             - other states: tiny colored dot, no text (status comes from a
+               native tooltip via data-tip)
+           Layered above duration but below the watch-progress strip. */
+        .library-card-state-badge {
+            position: absolute;
+            top: 4px; right: 4px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 9.5px;
+            font-weight: 700;
+            line-height: 1;
+            border-radius: 999px;
+            z-index: 3;
+            letter-spacing: 0.2px;
+        }
+        .library-card-state-badge.s-owned {
+            width: 18px; height: 18px;
+            background: rgba(16,185,129,0.95);
+            color: #061a13;
+            padding: 0;
+        }
+        .library-card-state-badge.s-owned svg { width: 11px; height: 11px; }
+        .library-card-state-badge.s-downloading {
+            padding: 2px 6px;
+            background: rgba(59,130,246,0.95);
+            color: #fff;
+            border-radius: 4px;
+        }
+        .library-card-state-badge.s-error,
+        .library-card-state-badge.s-cancelled,
+        .library-card-state-badge.s-paused,
+        .library-card-state-badge.s-retrying {
+            width: 10px; height: 10px;
+            padding: 0;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.45);
+        }
+        .library-card-state-badge.s-error       { background: #dc2626; cursor: help; }
+        .library-card-state-badge.s-cancelled,
+        .library-card-state-badge.s-paused      { background: #737373; }
+        .library-card-state-badge.s-retrying    { background: #eab308; animation: librarycard-state-pulse 0.9s ease-in-out infinite; }
+        @keyframes librarycard-state-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* ==================================================================
+           Bottom action bar — only visible when at least one card is picked.
+           Slides up from the bottom of the playlist-detail-view. Mirrors
+           .search-action-bar so users get the same gesture across views.
+           ================================================================== */
+        #playlist-detail-view { position: relative; }
+        /* Centered, pill-shaped, content-sized — no longer spans the full
+           detail view. Sits above the grid with a soft halo so it reads as
+           a floating control card rather than a footer bar. */
+        .pd-channel-action-bar {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%) translateY(160%);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 8px 8px 16px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid #232323;
+            border-radius: 999px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        .pd-channel-action-bar.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .pd-channel-action-count {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
+        }
+        .pd-channel-action-spacer {
+            width: 1px;
+            align-self: stretch;
+            background: #2a2a2a;
+            margin: 2px 4px;
+        }
+        .pd-channel-action-quality {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            color: #c0c0c0;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.12s ease;
+            position: relative;
+            border-radius: 8px;
+        }
+        .pd-channel-action-quality:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .pd-channel-action-quality .caret { width: 10px; height: 6px; opacity: 0.7; }
+        .pd-channel-action-clear {
+            background: transparent;
+            border: none;
+            color: #909090;
+            padding: 6px 10px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: color 0.12s ease, background 0.12s ease;
+        }
+        .pd-channel-action-clear:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .pd-channel-action-go {
+            background: #3b82f6;
+            border: none;
+            color: #fff;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.12s ease, transform 0.05s;
+        }
+        .pd-channel-action-go:hover { background: #2563eb; }
+        .pd-channel-action-go:active { transform: scale(0.97); }
+        /* Compact quality popup hung above the action bar's quality chip. */
+        .pd-channel-quality-menu {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            right: 0;
+            min-width: 160px;
+            background: #181818;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 4px;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        .pd-channel-action-quality.open .pd-channel-quality-menu { display: block; }
+        .pd-channel-quality-menu .quality-option {
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            color: #c0c0c0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .pd-channel-quality-menu .quality-option:hover { background: #232323; color: #fff; }
+        .pd-channel-quality-menu .quality-option.selected { color: #fff; }
+        .pd-channel-quality-menu .quality-option.selected .check-icon { width: 12px; height: 12px; }
+
+        /* Subscribe button mid-flight — replaces the white pill with a darker
+           "Fetching channel…" indicator so the user sees the action took. */
+        .sr-subscribe-btn.fetching {
+            background: rgba(255,255,255,0.08);
+            color: #cfcfcf;
+            cursor: wait;
+        }
+        .sr-subscribe-btn.fetching:hover { background: rgba(255,255,255,0.08); }
+        .sr-subscribe-btn .sub-spin {
+            display: inline-block;
+            width: 11px; height: 11px;
+            margin-right: 6px;
+            vertical-align: -1px;
+            border: 1.6px solid rgba(255,255,255,0.25);
+            border-top-color: #cfcfcf;
+            border-radius: 50%;
+            animation: search-spin 0.8s linear infinite;
         }
 
         .pd-video-row {
@@ -9331,12 +9820,27 @@
 
             <!-- Playlist detail view -->
             <div class="playlist-detail-view" id="playlist-detail-view">
-                <div class="pd-topbar">
-                    <button class="pd-back-btn" onclick="app.closePlaylistDetail()">
+                <!-- Sticky compact header — appears when banner has scrolled out
+                     of view in channel mode. Filled and shown/hidden by JS. -->
+                <div class="pd-sticky-header" id="pd-sticky-header" hidden>
+                    <button class="pd-sticky-back" onclick="app.closePlaylistDetail()" aria-label="Back">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M15 19l-7-7 7-7"/></svg>
-                        Back to queue
+                    </button>
+                    <div class="pd-sticky-avatar" id="pd-sticky-avatar"></div>
+                    <div class="pd-sticky-name" id="pd-sticky-name"></div>
+                    <button class="pd-sticky-refresh" id="pd-sticky-refresh" aria-label="Check for new videos">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
                     </button>
                 </div>
+                <!-- Floating back button — only used by the PLAYLIST hero (which
+                     has no banner of its own). For channels, the back button is
+                     rendered INSIDE the banner so it scrolls with the banner. -->
+                <button class="pd-back-btn" id="pd-back-btn" onclick="app.closePlaylistDetail()" data-tip="Back to queue" aria-label="Back to queue">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M15 19l-7-7 7-7"/></svg>
+                </button>
                 <div class="pd-layout" id="pd-layout">
                     <!-- Filled by JS: hero (left) + videos (right) -->
                 </div>
@@ -10353,6 +10857,9 @@
                 // shouldn't persist into the queue, player, or anywhere else.
                 if (typeof Selection !== 'undefined' && Selection.isActive()) {
                     Selection.exit();
+                }
+                if (typeof MusicSelection !== 'undefined' && MusicSelection.isActive()) {
+                    MusicSelection.exit();
                 }
 
                 // If we're leaving player view, stop playback so the file is released
@@ -11418,7 +11925,7 @@
                 // dedup-toast UX is unchanged for the normal case.
                 const urls = this.extractMultipleUrls(raw);
                 if (urls.length >= 2) {
-                    this._fetchBatch(urls);
+                    this._startFetchBatch(urls);
                     return;
                 }
 
@@ -11457,7 +11964,14 @@
             // Multi-URL batch path. Dedups the batch against queue, library,
             // AND itself (paste with the same URL twice → only one fetch).
             // Then enqueues survivors and kicks the pump.
-            _fetchBatch(urls) {
+            // NAMED `_startFetchBatch` (not `_fetchBatch`) on purpose — the
+            // batch STATE lives at app._fetchBatch. A method with the same
+            // name overwrites itself when state is assigned, and on app
+            // startup `app._fetchBatch` would be this function (truthy) —
+            // causing finishFetch's `inBatch = !!app._fetchBatch` to be true
+            // for Subscribe / single-URL flows, then crash on
+            // `batch.pending.length`. Don't rename back without untangling.
+            _startFetchBatch(urls) {
                 const seenInBatch = new Set();
                 const survivors = [];
                 let dupQueue = 0, dupLibrary = 0, dupSelf = 0;
@@ -11749,6 +12263,29 @@
                 this.elements.queueView.style.display = 'none';
                 this.elements.playlistDetailView.classList.add('visible');
 
+                // Auto-refetch channel branding for channels that pre-date the
+                // channelAvatar/banner/subscriber fields. Silent — no toast, no
+                // progress bar; the hero just morphs into a complete YouTube-
+                // style header once the data lands. This is what saves the user
+                // from having to click "Check for new videos" on every legacy
+                // channel.
+                // Auto-refetch channel branding when missing — but ONLY once
+                // per channel per hour. Without the cooldown we'd re-fire the
+                // fetch on every open for channels where yt-dlp returned no
+                // avatar/banner (rare but real), making the user wait every
+                // single time. Once branding is set, the !channelAvatar guard
+                // skips the fetch outright.
+                if (classifyPlaylistEntry(pl) === 'channel' && !pl.channelAvatar) {
+                    const HOUR_MS = 60 * 60 * 1000;
+                    const triedRecently = pl._brandingFetchedAt
+                        && (Date.now() - pl._brandingFetchedAt) < HOUR_MS;
+                    if (!triedRecently) {
+                        pl._brandingFetchedAt = Date.now();
+                        this.saveQueueState();
+                        this._silentRefetchChannelBranding(pl);
+                    }
+                }
+
                 // Kick off format resolution if not done
                 if (!pl.formatsResolved) {
                     const unresolvedUrls = pl.videos
@@ -11760,7 +12297,50 @@
                 }
             },
 
+            async _silentRefetchChannelBranding(pl) {
+                if (!pl || !pl.url) return;
+                try {
+                    // Uses get_channel_metadata (no entry walk) so this is
+                    // sub-second even for channels with thousands of videos.
+                    const result = await pywebview.api.get_channel_metadata(pl.id);
+                    if (!result || !result.ok) return;
+                    let changed = false;
+                    if (result.avatar && pl.channelAvatar !== result.avatar) {
+                        pl.channelAvatar = result.avatar;
+                        changed = true;
+                    }
+                    if (result.banner && pl.channelBanner !== result.banner) {
+                        pl.channelBanner = result.banner;
+                        changed = true;
+                    }
+                    if (result.subscriberCountString && pl.subscriberCountString !== result.subscriberCountString) {
+                        pl.subscriberCountString = result.subscriberCountString;
+                        changed = true;
+                    }
+                    if (result.subscriberCount != null && pl.subscriberCount !== result.subscriberCount) {
+                        pl.subscriberCount = result.subscriberCount;
+                        changed = true;
+                    }
+                    if (result.description && pl.channelDescription !== result.description) {
+                        pl.channelDescription = result.description;
+                        changed = true;
+                    }
+                    if (!changed) return;
+                    this.saveQueueState();
+                    if (this.currentPlaylistId === pl.id) this.renderPlaylistDetail(pl);
+                } catch (_) {
+                    // Silent — auto-refetch failures shouldn't surface; user can
+                    // still hit "Check for new videos" manually.
+                }
+            },
+
             closePlaylistDetail() {
+                this._teardownChannelStickyObserver();
+                const sticky = document.getElementById('pd-sticky-header');
+                if (sticky) {
+                    sticky.classList.remove('is-visible');
+                    sticky.setAttribute('hidden', '');
+                }
                 const returningFromId = this.currentPlaylistId;
                 this.currentPlaylistId = null;
                 this.elements.playlistDetailView.classList.remove('visible');
@@ -11775,10 +12355,41 @@
             },
 
             renderPlaylistDetail(pl) {
-                const pickedCount = pl.videos.filter(v => v.selected !== false).length;
-                const heroThumb = (pl.thumbnails && pl.thumbnails[0]) || (pl.videos[0] && pl.videos[0].thumbnail) || '';
+                const isChan = classifyPlaylistEntry(pl) === 'channel';
 
-                const videosHTML = pl.videos.map((v, idx) => this.createPdVideoRowHTML(v, idx)).join('');
+                // Channels open clean EVERY time — "let it be like as if I'm
+                // looking at the channel." A finished or library-owned video
+                // should not stay ringed forever from a prior selection.
+                // We preserve `selected` only for videos that are mid-flight
+                // (Downloading / Retrying / Paused / Cancelled / Error) so an
+                // in-progress batch isn't visually disrupted by re-opening the
+                // detail view.
+                if (isChan) {
+                    const inFlight = new Set(['Downloading', 'Retrying', 'Paused', 'Cancelled', 'Error']);
+                    let mutated = false;
+                    for (const child of pl.videos) {
+                        if (child.selected === true && !inFlight.has(child.status)) {
+                            child.selected = false;
+                            mutated = true;
+                        }
+                    }
+                    if (mutated) this.saveQueueState();
+                }
+
+                const pickedCount = pl.videos.filter(v => v.selected === true).length;
+                // For channels prefer the real avatar pulled from yt-dlp; fall
+                // back to legacy entries' first thumbnail. For playlists keep
+                // the existing first-child fallback (playlists have no canonical
+                // avatar — the user accepted this).
+                const heroThumb = (isChan && pl.channelAvatar)
+                    || (pl.thumbnails && pl.thumbnails[0])
+                    || (pl.videos[0] && pl.videos[0].thumbnail)
+                    || '';
+
+                const videosHTML = pl.videos.map((v, idx) => isChan
+                    ? this.createPdChannelCardHTML(v, idx)
+                    : this.createPdVideoRowHTML(v, idx)
+                ).join('');
 
                 // XSS guard — escape every yt-dlp-derived string before it lands
                 // in the template. Hero is the loudest surface; an unescaped title
@@ -11788,10 +12399,96 @@
                 const eUploader = this.escapeHtml(pl.uploader || '');
                 const eId = this.escapeHtml(pl.id || '');
                 const eThumb = this.escapeHtml(heroThumb || '');
+                const eBanner = this.escapeHtml(pl.channelBanner || '');
                 const eQuality = this.escapeHtml(pl.defaultQuality || '');
-                const isChan = classifyPlaylistEntry(pl) === 'channel';
+                // Pull @handle from uploader_url when available so the channel
+                // header can render `@handle · N videos` like YouTube's page.
+                let channelHandle = '';
+                if (isChan && pl.uploader_url) {
+                    const m = String(pl.uploader_url).match(/youtube\.com\/(@[\w.-]+)/i);
+                    if (m) channelHandle = m[1];
+                }
+                const eHandle = this.escapeHtml(channelHandle);
 
-                this.elements.pdLayout.innerHTML = `
+                // Bottom action bar (channel only) — invisible by default,
+                // slides up on selection. Holds the quality picker, clear,
+                // and Download N button.
+                const channelActionBar = isChan ? `
+                    <div class="pd-channel-action-bar" id="pd-channel-action-bar">
+                        <span class="pd-channel-action-count" id="pd-channel-action-count">0 selected</span>
+                        <div class="pd-channel-action-spacer"></div>
+                        <button class="pd-channel-action-quality" id="pd-channel-action-quality" onclick="event.stopPropagation(); app.togglePdChannelQualityMenu()">
+                            <span id="pd-channel-action-quality-label">${eQuality}</span>
+                            <svg class="caret" viewBox="0 0 12 8" fill="none"><path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <div class="pd-channel-quality-menu" id="pd-channel-quality-menu">${this.buildDefaultQualityMenuHTML(pl)}</div>
+                        </button>
+                        <button class="pd-channel-action-clear" onclick="app.clearChannelSelection()">Cancel</button>
+                        <button class="pd-channel-action-go" id="pd-channel-action-go" onclick="app.downloadPlaylist()">Download 0</button>
+                    </div>
+                ` : '';
+
+                // Channel-mode hero — mirrors YouTube's channel page:
+                //   [banner band, rounded]
+                //   [avatar] [name big & bold]
+                //            [@handle · X subscribers · X videos]
+                //            [short bio, 2-line clamp, with …more affordance]
+                //            [Check for new videos pill]
+                // Playlist-mode hero is unchanged (320px thumb on the left).
+                const eSubs = this.escapeHtml(pl.subscriberCountString || '');
+                const eBio = this.escapeHtml(pl.channelDescription || '');
+                const statsParts = [];
+                if (eHandle) statsParts.push(`<span class="pd-channel-handle">${eHandle}</span>`);
+                if (eSubs) statsParts.push(`<span>${eSubs}</span>`);
+                statsParts.push(`<span>${pl.videoCount} videos</span>`);
+                const statsHTML = statsParts.join('<span class="pd-channel-stats-sep">·</span>');
+
+                // "Check for new videos" lives as a small refresh icon overlaid
+                // on the banner's top-right corner — frees up the row under the
+                // bio that was burning whole-line vertical space for a single
+                // button.
+                const checkBtn = pl.url
+                    ? `<button class="pd-channel-refresh-btn" onclick="checkPlaylistUpdates('${eId}')" data-tip-left="Check for new videos">
+                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                               <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                           </svg>
+                       </button>`
+                    : '';
+
+                // Back arrow rendered INSIDE the banner-wrap for channels so
+                // it sits inside the banner and scrolls with it (the user's
+                // direction: "make it part of the banner like the refresh
+                // icon, don't have it floating in the corner").
+                const channelBackBtn = `<button class="pd-channel-back-btn" onclick="app.closePlaylistDetail()" data-tip="Back to queue" aria-label="Back to queue">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path d="M15 19l-7-7 7-7"/></svg>
+                </button>`;
+
+                const channelHeader = isChan ? `
+                    <div class="pd-channel-header">
+                        <div class="pd-channel-banner-wrap">
+                            ${eBanner
+                                ? `<div class="pd-channel-banner" style="background-image: url('${eBanner}');"></div>`
+                                : `<div class="pd-channel-banner pd-channel-banner-empty"></div>`}
+                            ${channelBackBtn}
+                            ${checkBtn}
+                        </div>
+                        <div class="pd-channel-meta">
+                            <div class="pd-channel-avatar">
+                                ${heroThumb ? `<img src="${eThumb}" alt="${eTitle}">` : ''}
+                            </div>
+                            <div class="pd-channel-info">
+                                <div class="pd-channel-name">${eTitle}</div>
+                                <div class="pd-channel-stats">${statsHTML}</div>
+                                ${eBio ? `<div class="pd-channel-bio is-collapsed">
+                                    <span class="pd-channel-bio-text">${eBio}</span>
+                                    <button class="pd-channel-bio-toggle" onclick="togglePdChannelBio(this.closest('.pd-channel-bio'))">…more</button>
+                                </div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                ` : '';
+
+                const playlistHero = !isChan ? `
                     <div class="pd-hero">
                         <div class="pd-hero-thumb">
                             ${heroThumb ? `<img src="${eThumb}" alt="${eTitle}">` : ''}
@@ -11819,9 +12516,15 @@
                         </div>
                         <div class="pd-hero-action-row">
                             <button class="pd-download-btn" id="pd-download-btn" onclick="app.downloadPlaylist()">Download ${pickedCount}</button>
-                            ${pl.url ? `<button class="pd-update-btn" onclick="checkPlaylistUpdates('${eId}')" data-tip="Re-fetch from YouTube and add any new videos">${isChan ? 'Check for new videos' : 'Check for updates'}</button>` : ''}
+                            ${pl.url ? `<button class="pd-update-btn" onclick="checkPlaylistUpdates('${eId}')" data-tip="Re-fetch from YouTube and add any new videos">Check for updates</button>` : ''}
                         </div>
                     </div>
+                ` : '';
+
+                this.elements.pdLayout.className = 'pd-layout' + (isChan ? ' channel-mode' : '');
+                this.elements.pdLayout.innerHTML = `
+                    ${channelHeader}
+                    ${playlistHero}
                     <div class="pd-videos">
                         <div class="pd-videos-top">
                             <button class="select-all-pill" onclick="app.togglePlaylistSelectAll()">
@@ -11831,8 +12534,174 @@
                                 <span class="sa-label" id="pd-sa-label">${this.getSelectAllLabel(pickedCount, pl.videoCount)}</span>
                             </button>
                         </div>
-                        <div class="pd-videos-list" id="pd-videos-list">
+                        <div class="${isChan ? 'library-grid is-channel-grid' : 'pd-videos-list'}" id="pd-videos-list">
                             ${videosHTML}
+                        </div>
+                    </div>
+                    ${channelActionBar}
+                `;
+
+                // Show/hide the floating back button per mode. Channel mode
+                // renders its own back button inside the banner; playlist mode
+                // keeps the absolute-positioned one for its hero.
+                const floatBack = document.getElementById('pd-back-btn');
+                if (floatBack) floatBack.style.display = isChan ? 'none' : '';
+
+                // Sticky compact header — populate + wire observer for channels;
+                // hide entirely for playlists.
+                const sticky = document.getElementById('pd-sticky-header');
+                if (sticky) {
+                    if (isChan) {
+                        const nameEl = document.getElementById('pd-sticky-name');
+                        const avatarEl = document.getElementById('pd-sticky-avatar');
+                        const refreshEl = document.getElementById('pd-sticky-refresh');
+                        if (nameEl) nameEl.textContent = pl.title || '';
+                        if (avatarEl) {
+                            avatarEl.style.backgroundImage = heroThumb
+                                ? `url('${eThumb}')`
+                                : '';
+                        }
+                        if (refreshEl) {
+                            refreshEl.onclick = () => checkPlaylistUpdates(pl.id);
+                        }
+                        sticky.removeAttribute('hidden');
+                        sticky.classList.remove('is-visible');
+                        this._wireChannelStickyObserver();
+                    } else {
+                        sticky.classList.remove('is-visible');
+                        sticky.setAttribute('hidden', '');
+                        this._teardownChannelStickyObserver();
+                    }
+                }
+
+                if (isChan) this.refreshPdChannelActionBar();
+            },
+
+            // IntersectionObserver: when the channel banner is fully out of the
+            // scroll container's visible area, fade in the sticky compact header.
+            // When banner is back in view, fade it out. Mirrors YouTube's
+            // channel-page behavior.
+            _wireChannelStickyObserver() {
+                this._teardownChannelStickyObserver();
+                const sticky = document.getElementById('pd-sticky-header');
+                const banner = document.querySelector('.pd-layout.channel-mode .pd-channel-banner-wrap');
+                const scroller = document.querySelector('.pd-layout.channel-mode');
+                if (!sticky || !banner || !scroller) return;
+                this._channelBannerObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        if (entry.target === banner) {
+                            sticky.classList.toggle('is-visible', !entry.isIntersecting);
+                        }
+                    }
+                }, {
+                    root: scroller,
+                    // -1px rootMargin keeps the observer from firing on the
+                    // exact edge boundary, which on some scroll deltas was
+                    // causing rapid toggle ("flashing") between visible and
+                    // hidden states.
+                    rootMargin: '-1px 0px 0px 0px',
+                    threshold: 0,
+                });
+                this._channelBannerObserver.observe(banner);
+            },
+            _teardownChannelStickyObserver() {
+                if (this._channelBannerObserver) {
+                    try { this._channelBannerObserver.disconnect(); } catch (_) {}
+                    this._channelBannerObserver = null;
+                }
+            },
+
+            createPdChannelCardHTML(v, idx) {
+                // Channel-grid card. Reuses .library-card / .library-card-thumb /
+                // .library-card-duration / .library-card-body / .library-card-title
+                // so the channel grid looks identical to the library grid.
+                // Channel-specific extras layered on top:
+                //   - .is-selected for the picked-blue-ring (no checkmark)
+                //   - .is-resolving for the half-faded pre-formats state
+                //   - .library-card-state-badge top-right for active/terminal status
+                //   - .library-card-watch-progress repurposed as the download bar
+                const picked = v.selected === true;
+                const resolving = !v.formats;
+
+                const inLibrary = (() => {
+                    if (!this.videosInLibrary) return false;
+                    for (const entry of this.videosInLibrary) {
+                        if (entry.type === 'playlist') {
+                            if ((entry.videos || []).some(c => c.id === v.id && !c.missing)) return true;
+                        } else {
+                            if (entry.id === v.id && !entry.missing) return true;
+                        }
+                    }
+                    return false;
+                })();
+
+                const eTitle = this.escapeHtml(v.title || '');
+                const eId = this.escapeHtml(v.id || '');
+                const eDuration = this.escapeHtml(v.duration_string || '');
+                const safeThumb = (v.thumbnail && /^(?:https?:|pt:thumb:|data:image\/)/i.test(v.thumbnail))
+                    ? this.escapeHtml(v.thumbnail) : '';
+
+                const checkSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+                // Tiny, low-noise badges — text-only for the % progress chip,
+                // colored dots (with hover tooltips) for active/error states,
+                // and a small green check-circle for Downloaded. No labels.
+                let stateBadge = '';
+                if (v.status === 'Downloading') {
+                    const pct = typeof v.progressPct === 'number' ? Math.floor(v.progressPct) : 0;
+                    stateBadge = `<span class="library-card-state-badge s-downloading">${pct}%</span>`;
+                } else if (v.status === 'Retrying') {
+                    stateBadge = `<span class="library-card-state-badge s-retrying" data-tip="Retrying download"></span>`;
+                } else if (v.status === 'Paused') {
+                    stateBadge = `<span class="library-card-state-badge s-paused" data-tip="Paused"></span>`;
+                } else if (v.status === 'Cancelled') {
+                    stateBadge = `<span class="library-card-state-badge s-cancelled" data-tip="Cancelled"></span>`;
+                } else if (v.status === 'Error') {
+                    const msg = (v.errorMessage || 'Download failed.').replace(/"/g, '&quot;');
+                    stateBadge = `<span class="library-card-state-badge s-error" data-tip="${msg}"></span>`;
+                } else if (inLibrary || v.status === 'Done') {
+                    stateBadge = `<span class="library-card-state-badge s-owned" data-tip="Downloaded">${checkSvg}</span>`;
+                }
+
+                let progressBar = '';
+                if (v.status === 'Downloading') {
+                    const pct = typeof v.progressPct === 'number' ? v.progressPct : 0;
+                    progressBar = `<div class="library-card-watch-progress" style="width: ${pct}%;"></div>`;
+                }
+
+                // No loading="lazy" — channel grids only show 100-ish small
+                // (10KB) mqdefault thumbs, and eager loading means there's no
+                // blank flash when the user scrolls. The library uses lazy on
+                // its (larger) thumbs but the channel set is small enough.
+                const thumbInner = safeThumb
+                    ? `<img src="${safeThumb}" alt="">`
+                    : `<div class="library-card-thumb-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>`;
+
+                const isDownloaded = inLibrary || v.status === 'Done';
+                const classes = ['library-card'];
+                if (picked) classes.push('is-selected');
+                if (resolving) classes.push('is-resolving');
+                if (isDownloaded) classes.push('is-downloaded');
+
+                // Downloaded videos: double-click plays them via the same
+                // library player path the library grid uses. Single-click
+                // is intentionally still bound to togglePlaylistVideo, which
+                // no-ops for downloaded items so selection can't be toggled
+                // back on.
+                const dblClickAttr = isDownloaded
+                    ? ` ondblclick="event.stopPropagation(); playLibraryItem('${eId}')"`
+                    : '';
+
+                return `
+                    <div class="${classes.join(' ')}" id="pd-v-${eId}" data-item-id="${eId}" onclick="app.togglePlaylistVideo('${eId}')"${dblClickAttr} oncontextmenu="event.preventDefault(); event.stopPropagation();">
+                        <div class="library-card-thumb">
+                            ${thumbInner}
+                            ${eDuration ? `<div class="library-card-duration">${eDuration}</div>` : ''}
+                            ${stateBadge}
+                            ${progressBar}
+                        </div>
+                        <div class="library-card-body">
+                            <div class="library-card-title">${eTitle}</div>
                         </div>
                     </div>
                 `;
@@ -12001,15 +12870,106 @@
                 if (!pl) return;
                 const v = pl.videos.find(x => x.id === videoId);
                 if (!v) return;
-                v.selected = v.selected === false ? true : false;
+                // Don't allow toggling while formats are still resolving — the
+                // card's .resolving class disables pointer-events anyway, but
+                // belt-and-braces here in case the click slipped through.
+                if (!v.formats) return;
+                // Downloaded videos are locked from re-selection in channel
+                // mode. Single-click is a no-op; double-click plays the file
+                // (wired via ondblclick on the card).
+                const isChannel = classifyPlaylistEntry(pl) === 'channel';
+                if (isChannel) {
+                    if (v.status === 'Done') return;
+                    if (this.videosInLibrary) {
+                        for (const entry of this.videosInLibrary) {
+                            if (entry.type === 'playlist') {
+                                if ((entry.videos || []).some(c => c.id === v.id && !c.missing)) return;
+                            } else if (entry.id === v.id && !entry.missing) {
+                                return;
+                            }
+                        }
+                    }
+                }
+                // Channels start with everything explicitly unpicked, so "picked"
+                // means v.selected === true. Playlists default to picked
+                // (undefined ≈ picked), so "picked" means v.selected !== false.
+                // We branch so toggling always reads the same way as the render.
+                const isChan = classifyPlaylistEntry(pl) === 'channel';
+                const wasPicked = isChan ? (v.selected === true) : (v.selected !== false);
+                v.selected = !wasPicked;
 
                 const row = document.getElementById(`pd-v-${videoId}`);
                 if (row) {
-                    row.classList.toggle('picked', v.selected);
-                    row.classList.toggle('unpicked', !v.selected);
+                    if (isChan) {
+                        // Channel cards are .library-card and use the library's
+                        // selection class — toggling .picked/.unpicked here was
+                        // a no-op (those styles only exist for .pd-video-row).
+                        row.classList.toggle('is-selected', v.selected === true);
+                    } else {
+                        row.classList.toggle('picked', v.selected);
+                        row.classList.toggle('unpicked', !v.selected);
+                    }
                 }
                 this.refreshPdHeaderCounts();
+                if (isChan) this.refreshPdChannelActionBar();
                 this.saveQueueState();
+            },
+
+            // Channel-mode bottom action bar — visibility + count + quality
+            // label. Called after every selection change and after a quality
+            // change. Cheap; no full re-render.
+            refreshPdChannelActionBar() {
+                const pl = this.videosInQueue.find(i => i.type === 'playlist' && i.id === this.currentPlaylistId);
+                if (!pl) return;
+                const bar = document.getElementById('pd-channel-action-bar');
+                if (!bar) return;
+                const picked = pl.videos.filter(v => v.selected === true).length;
+                const countEl = document.getElementById('pd-channel-action-count');
+                const goBtn = document.getElementById('pd-channel-action-go');
+                const qLabel = document.getElementById('pd-channel-action-quality-label');
+                if (countEl) countEl.textContent = `${picked} selected`;
+                if (goBtn) {
+                    goBtn.textContent = picked === 1 ? 'Download 1' : `Download ${picked}`;
+                    goBtn.disabled = picked === 0;
+                }
+                if (qLabel) qLabel.textContent = pl.defaultQuality || '';
+                bar.classList.toggle('visible', picked > 0);
+            },
+
+            clearChannelSelection() {
+                const pl = this.videosInQueue.find(i => i.type === 'playlist' && i.id === this.currentPlaylistId);
+                if (!pl) return;
+                pl.videos.forEach(v => {
+                    if (v.selected !== true) return;
+                    v.selected = false;
+                    const row = document.getElementById(`pd-v-${v.id}`);
+                    if (row) {
+                        // Channel cards use .is-selected (library atom); old
+                        // playlist rows use .picked. Strip both so the call
+                        // is safe to run against either renderer.
+                        row.classList.remove('is-selected');
+                        row.classList.remove('picked');
+                    }
+                });
+                this.refreshPdHeaderCounts();
+                this.refreshPdChannelActionBar();
+                this.saveQueueState();
+            },
+
+            togglePdChannelQualityMenu() {
+                const trigger = document.getElementById('pd-channel-action-quality');
+                if (!trigger) return;
+                const wasOpen = trigger.classList.contains('open');
+                trigger.classList.toggle('open');
+                // Outside-click dismiss — bound only while the menu is open.
+                if (!wasOpen) {
+                    const dismiss = (e) => {
+                        if (trigger.contains(e.target)) return;
+                        trigger.classList.remove('open');
+                        document.removeEventListener('click', dismiss, true);
+                    };
+                    setTimeout(() => document.addEventListener('click', dismiss, true), 0);
+                }
             },
 
             togglePlaylistSelectAll() {
@@ -12059,6 +13019,22 @@
                 pywebview.api.start_download([pl], 'browser', 'none');
                 this.elements.downloadButton.classList.add('hidden');
                 this.elements.cancelButton.classList.remove('hidden');
+
+                // Channel mode: clear `selected` on the videos we just kicked
+                // off. The cards now express their state via the downloading
+                // pill + progress bar, not the blue selection outline — and
+                // the bottom action bar should hide since "0 selected".
+                if (classifyPlaylistEntry(pl) === 'channel') {
+                    pl.videos.forEach(v => {
+                        if (v.selected === true) {
+                            v.selected = false;
+                            const row = document.getElementById(`pd-v-${v.id}`);
+                            if (row) row.classList.remove('is-selected');
+                        }
+                    });
+                    this.refreshPdChannelActionBar();
+                    this.saveQueueState();
+                }
             },
 
             pausePlaylistVideo(videoId) {
@@ -12111,7 +13087,10 @@
                     const row = document.getElementById(`pd-v-${v.id}`);
                     if (row) {
                         const idx = pl.videos.indexOf(v);
-                        row.outerHTML = this.createPdVideoRowHTML(v, idx);
+                        const isChan = classifyPlaylistEntry(pl) === 'channel';
+                        row.outerHTML = isChan
+                            ? this.createPdChannelCardHTML(v, idx)
+                            : this.createPdVideoRowHTML(v, idx);
                     }
                 }
                 this.saveQueueState();
@@ -12129,7 +13108,10 @@
                     const row = document.getElementById(`pd-v-${v.id}`);
                     if (row) {
                         const idx = pl.videos.indexOf(v);
-                        row.outerHTML = this.createPdVideoRowHTML(v, idx);
+                        const isChan = classifyPlaylistEntry(pl) === 'channel';
+                        row.outerHTML = isChan
+                            ? this.createPdChannelCardHTML(v, idx)
+                            : this.createPdVideoRowHTML(v, idx);
                     }
                     this.refreshPdHeaderCounts();
                 }
@@ -12228,7 +13210,10 @@
                 const row = document.getElementById(`pd-v-${videoId}`);
                 if (!row) return;
                 const idx = pl.videos.indexOf(v);
-                row.outerHTML = this.createPdVideoRowHTML(v, idx);
+                const isChan = classifyPlaylistEntry(pl) === 'channel';
+                row.outerHTML = isChan
+                    ? this.createPdChannelCardHTML(v, idx)
+                    : this.createPdVideoRowHTML(v, idx);
             },
 
             createVideoItemHTML(v) {
@@ -12976,6 +13961,33 @@
                 });
             }
 
+            // Flip any channel search cards stuck in "Fetching channel…" to
+            // the "Channel in queue" pill. handleFullFetch is the moment the
+            // channel-as-playlist actually lands in the queue, so this is
+            // the right time to confirm to the user that their Subscribe
+            // worked. We match by URL (channel cards stash data-result-url
+            // and the playlist arriving carries the same url that was sent
+            // to fetch_url_info). If URL matching misses (different
+            // normalization), we fall back to flipping ALL pending channel
+            // cards — typically there's only one Subscribe in flight at a
+            // time, so that's safe.
+            if (isPlaylist && videos.length === 1 && videos[0] && videos[0].url) {
+                const fetchedUrl = String(videos[0].url || '');
+                const norm = (u) => String(u || '').toLowerCase().replace(/\/videos\/?$/, '').replace(/\/+$/, '');
+                const target = norm(fetchedUrl);
+                const pendingCards = document.querySelectorAll('.search-result-card.channel[data-fetching-pending="1"]');
+                let matched = false;
+                pendingCards.forEach(card => {
+                    if (norm(card.dataset.resultUrl || '') === target) {
+                        matched = true;
+                        _flipChannelCardToQueued(card);
+                    }
+                });
+                if (!matched && pendingCards.length > 0) {
+                    pendingCards.forEach(_flipChannelCardToQueued);
+                }
+            }
+
             // Clear the URL input so the user can paste the next one immediately
             app.elements.mainUrlInput.value = '';
 
@@ -13088,10 +14100,48 @@
             };
         })();
 
+        // Swap the Subscribe button (or its lingering "Fetching channel…"
+        // state) for a green "Channel in queue" pill. Used by handleFullFetch
+        // when a Subscribe finishes successfully.
+        function _flipChannelCardToQueued(card) {
+            if (!card) return;
+            delete card.dataset.fetchingPending;
+            card.dataset.inQueue = '1';
+            const subBtn = card.querySelector('.sr-subscribe-btn');
+            if (subBtn) subBtn.remove();
+            const actionEl = card.querySelector('.sr-action');
+            const pillHtml = '<span class="sr-already"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Channel in queue</span>';
+            if (actionEl) {
+                actionEl.innerHTML = pillHtml;
+            } else {
+                // No existing .sr-action wrapper (channel cards put the
+                // Subscribe button as a direct child) — inject one.
+                card.insertAdjacentHTML('beforeend', `<div class="sr-action">${pillHtml}</div>`);
+            }
+        }
+
         function finishFetch(msg) {
             setFetchLoading(false, 'main');
             const isError = typeof msg === 'string' && msg.startsWith('Error:');
             const inBatch = !!app._fetchBatch;
+
+            // If a Subscribe-driven fetch errored, restore the Subscribe
+            // button on any channel card still showing "Fetching channel…".
+            // We can't tell which URL errored at this layer, but in practice
+            // only one Subscribe is in flight at a time, so restoring all
+            // pending cards is safe. (Batch mode rolls errors into the
+            // summary toast instead.)
+            if (isError && !inBatch) {
+                document.querySelectorAll('.search-result-card.channel[data-fetching-pending="1"]').forEach(card => {
+                    delete card.dataset.fetchingPending;
+                    const subBtn = card.querySelector('.sr-subscribe-btn');
+                    if (subBtn) {
+                        subBtn.classList.remove('fetching');
+                        subBtn.disabled = false;
+                        subBtn.textContent = 'Subscribe';
+                    }
+                });
+            }
 
             // Backend signals success with an empty string and failure with a
             // string starting "Error: ...". On success we stay silent (a toast
@@ -13225,7 +14275,15 @@
                 card.classList.toggle('is-error', status === 'Error');
 
                 const container = card.querySelector('.item-status-container');
-                if (container) {
+                if (container && container.dataset.renderedStatus !== status) {
+                    // Only rebuild when the rendered status ACTUALLY changes.
+                    // Without this guard, every status replay (renderQueue ⇒
+                    // replayStatus loop) or duplicate Downloading event tears
+                    // the progress bar down to 0% and rebuilds it, producing
+                    // visible flicker mid-download. The width is updated
+                    // surgically by updateItemProgress; let it keep doing
+                    // that and leave the container alone when same-state.
+                    container.dataset.renderedStatus = status;
                     if (status === 'Downloading') {
                         const pauseSvg = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
                         container.innerHTML = `
@@ -13362,9 +14420,42 @@
                             });
                         });
                     } else if (video) {
+                        // IDEMPOTENCY GUARD: renderQueue() replays status events on
+                        // every render (replayStatus loop at ~line 12152) so the
+                        // cards reflect persisted state. If THIS Rule B path keeps
+                        // re-firing add_to_library / saveQueueState / renderQueue
+                        // for a video that's already been moved into the library,
+                        // renderQueue at the end of the chain triggers another
+                        // replayStatus → Rule B → renderQueue → … infinite loop.
+                        // We saw it: hundreds of save-queue + render bursts per
+                        // second, document-level events starved, UI feels frozen.
+                        // For channel children this matters because the channel
+                        // branch deliberately keeps the Done child in pl.videos
+                        // (so the gallery still shows it). The exit condition is
+                        // "library already has this id" — once true, every later
+                        // replay is a no-op.
+                        const alreadyInLibrary = (app.videosInLibrary || []).some(e => {
+                            if (!e) return false;
+                            if (e.id === id) return true;
+                            if (e.type === 'playlist' && Array.isArray(e.videos)) {
+                                return e.videos.some(c => c && c.id === id);
+                            }
+                            return false;
+                        });
+                        if (alreadyInLibrary) {
+                            return;   // breaks the replay → render → replay cycle
+                        }
                         // Rule B — individual child moves to library as standalone.
                         // The child keeps its playlist context (playlistTitle, isFromPlaylist) so
                         // we know where it came from, but it lives as a top-level library entry.
+                        //
+                        // Channel exception: a channel is a browseable backlog, not a
+                        // disposable batch. Splicing a downloaded child out of pl.videos
+                        // makes the user lose their place in the channel gallery. So
+                        // for channels we keep the child in place — it stays visible
+                        // with a "Downloaded" badge — and only the standalone library
+                        // copy is added. (See createPdChannelCardHTML.)
+                        const parentIsChannel = classifyPlaylistEntry(parentPlaylist) === 'channel';
                         const standaloneCopy = {
                             ...video,
                             // Drop the isFromPlaylist flag so it renders as a standalone card
@@ -13373,16 +14464,27 @@
                             status: 'Done'
                         };
                         pywebview.api.add_to_library(standaloneCopy).then(async () => {
-                            // Remove the child from the playlist in queue state
-                            parentPlaylist.videos = allChildren.filter(c => c.id !== id);
-                            // If that emptied the playlist, drop the playlist from queue entirely
-                            if (parentPlaylist.videos.length === 0) {
-                                app.videosInQueue = app.videosInQueue.filter(it => it.id !== parentPlaylist.id);
+                            if (!parentIsChannel) {
+                                // Regular playlist — original behavior: remove the child from queue.
+                                parentPlaylist.videos = allChildren.filter(c => c.id !== id);
+                                if (parentPlaylist.videos.length === 0) {
+                                    app.videosInQueue = app.videosInQueue.filter(it => it.id !== parentPlaylist.id);
+                                }
                             }
+                            // Channel: keep video.status === 'Done' on the child so the
+                            // gallery card shows the green Downloaded badge instead of
+                            // disappearing. nothing else to mutate locally.
                             app.videosInLibrary = (await pywebview.api.load_library()) || [];
                             app.saveQueueState();
                             app.renderQueue();
                             app.renderLibrary();
+                            // If the channel detail view is open and showing this
+                            // playlist, refresh the affected card so the "Downloaded"
+                            // overlay paints immediately (load_library round-trip
+                            // means the inLibrary check now resolves true).
+                            if (parentIsChannel && app.currentPlaylistId === parentPlaylist.id) {
+                                app.updatePdVideoStatusInDom(id, 'Done');
+                            }
                         });
                     }
                 } else if (video) {
@@ -13523,7 +14625,18 @@
         // Primary play action — uses the in-app player. Called by double-click on cards
         // and by the Play button in the detail panel.
         function playLibraryItem(itemId) {
-            const item = app.videosInLibrary.find(i => i.id === itemId);
+            // Walk top-level AND playlist children — channel videos land as
+            // children of the channel playlist entry, not top-level items, so
+            // a flat find() missed them and double-click did nothing.
+            let item = app.videosInLibrary.find(i => i.id === itemId);
+            if (!item) {
+                for (const entry of app.videosInLibrary) {
+                    if (entry.type === 'playlist' && Array.isArray(entry.videos)) {
+                        const child = entry.videos.find(c => c.id === itemId);
+                        if (child) { item = child; break; }
+                    }
+                }
+            }
             if (!item) return;
             if (item.type === 'playlist') {
                 // Playlists don't have a single playable file. Open folder for now.
@@ -13999,6 +15112,16 @@
         //    and routes the finished children into the original library entry via
         //    add_videos_to_library_playlist instead of creating a new entry.
         // ============================================================
+        // Toggle the channel-header bio between 2-line clamp and full text.
+        // The inline "…more" / "Show less" button is a real element so the
+        // user can click on a clear hotspot at the end of the bio text.
+        function togglePdChannelBio(el) {
+            if (!el) return;
+            const expanded = el.classList.toggle('is-expanded');
+            const toggle = el.querySelector('.pd-channel-bio-toggle');
+            if (toggle) toggle.textContent = expanded ? 'Show less' : '…more';
+        }
+
         async function checkPlaylistUpdates(itemId) {
             // Pre-empt offline — yt_dlp would otherwise sit on a DNS lookup
             // for ~15s before failing. Keep parity with fetch()'s offline guard.
@@ -14073,6 +15196,23 @@
             if (!result || !result.ok) {
                 showToast(result?.error || 'Update check failed', null, null);
                 return;
+            }
+
+            // Backfill the channel's avatar/banner if the backend returned fresh
+            // values. Older queue/library entries pre-date these fields, so this
+            // is how an existing channel finally gets its proper profile photo.
+            let brandingChanged = false;
+            if (result.channelAvatar && item.channelAvatar !== result.channelAvatar) {
+                item.channelAvatar = result.channelAvatar;
+                brandingChanged = true;
+            }
+            if (result.channelBanner && item.channelBanner !== result.channelBanner) {
+                item.channelBanner = result.channelBanner;
+                brandingChanged = true;
+            }
+            if (brandingChanged) {
+                if (item === app.videosInQueue.find(i => i.id === item.id)) app.saveQueueState();
+                if (app.currentPlaylistId === item.id) app.renderPlaylistDetail(item);
             }
 
             const newVideos = result.new || [];
@@ -14602,17 +15742,33 @@
                     }
                 }
                 if (bar) bar.style.width = pct + '%';
-                if (text) text.textContent = `${Math.floor(pct)}% (${speed})`;
+                // Drop the "(speed)" suffix when speed is empty — the final
+                // 99%/100% ticks come through with an empty speed string, and
+                // "100% ()" looks broken. Show just the percentage then.
+                if (text) text.textContent = speed ? `${Math.floor(pct)}% (${speed})` : `${Math.floor(pct)}%`;
             }
 
             // Update detail-view row if its playlist is open
             if (parentPlaylist && app.currentPlaylistId === parentPlaylist.id) {
                 const row = document.getElementById(`pd-v-${id}`);
                 if (row) {
-                    const bar = row.querySelector('.pd-video-progress-bar');
-                    const text = row.querySelector('.pd-video-progress-text');
-                    if (bar) bar.style.width = pct + '%';
-                    if (text) text.textContent = `${Math.floor(pct)}% · ${speed}`;
+                    if (row.classList.contains('library-card')) {
+                        // Channel grid card — updates the watch-progress bar
+                        // pinned at the thumb's bottom + the small %xx pill
+                        // top-right. Without this the bar stayed at 0% width
+                        // and the pill stayed at 0% until status flipped to
+                        // Done, making downloads look frozen.
+                        const watchBar = row.querySelector('.library-card-watch-progress');
+                        if (watchBar) watchBar.style.width = pct + '%';
+                        const pill = row.querySelector('.library-card-state-badge.s-downloading');
+                        if (pill) pill.textContent = `${Math.floor(pct)}%`;
+                    } else {
+                        // Legacy playlist row layout
+                        const bar = row.querySelector('.pd-video-progress-bar');
+                        const text = row.querySelector('.pd-video-progress-text');
+                        if (bar) bar.style.width = pct + '%';
+                        if (text) text.textContent = speed ? `${Math.floor(pct)}% · ${speed}` : `${Math.floor(pct)}%`;
+                    }
                 }
             }
 
@@ -18438,6 +19594,10 @@
                 btn.addEventListener('click', () => {
                     const tab = btn.getAttribute('data-music-tab');
                     if (!tab) return;
+                    // Leaving the library pane cancels any active multi-select —
+                    // the selection + action bar are library-only and shouldn't
+                    // bleed into the Search / Downloads panes.
+                    try { if (MusicSelection.isActive()) MusicSelection.exit(); } catch (_) {}
                     _musicState.sub = tab;
                     document.querySelectorAll('.music-subtab').forEach(b => b.classList.toggle('active', b === btn));
                     document.getElementById('music-pane-library')?.classList.toggle('active', tab === 'library');
@@ -18805,16 +19965,11 @@
                 });
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    // Right-click in selection mode → toggle the card into
-                    // selection (mirrors video library). Outside selection
-                    // mode, right-click opens the existing per-item ctx menu.
-                    if (MusicSelection.isActive()) {
-                        MusicSelection.toggle(card.dataset.trackId);
-                        return;
-                    }
-                    const id = card.dataset.trackId;
-                    const track = lib.find(x => x.id === id);
-                    if (track) _showMlibCtx(e.clientX, e.clientY, { kind: 'track', track });
+                    // Right-click = multi-select, exactly like the video library.
+                    // First right-click enters selection mode with this card
+                    // selected; subsequent right-clicks toggle. Bulk actions
+                    // (Hide / Remove / Delete) live in the selection action bar.
+                    MusicSelection.handleCheckboxClick(card.dataset.trackId);
                 });
             });
             // Album cards: body click → open detail view; play-button click → play first track;
@@ -18865,12 +20020,10 @@
                 });
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    if (MusicSelection.isActive()) {
-                        MusicSelection.toggle(albumId);
-                        return;
-                    }
-                    const album = (_musicState.albums || []).find(a => a.id === albumId);
-                    if (album) _showMlibCtx(e.clientX, e.clientY, { kind: 'album', album });
+                    // Right-click = multi-select, like the video library. An
+                    // album id in the selection expands to its track ids when
+                    // a bulk action runs (see MusicSelection.expandedTrackIds).
+                    MusicSelection.handleCheckboxClick(albumId);
                 });
             });
 
@@ -22638,29 +23791,46 @@
             }
 
             // CHANNELS are NOT selectable — clicking a channel card subscribes immediately
-            // (queues every video on the channel). The card stays in the search results
-            // with a green "Subscribed" badge so the user knows the action took effect.
+            // (queues every video on the channel). The card transitions inline:
+            //   Subscribe → "Fetching channel…" (spinner) → "Channel in queue" (green)
+            // No toast — the inline state IS the feedback, and toasts for an action
+            // the user just clicked on a card right in front of them are noise.
+            // The "Fetching" → "Channel in queue" flip is driven by handleFullFetch
+            // (which fires when the backend's fetch_url_info resolves and pushes
+            // the channel-as-playlist into the queue).
             if (type === 'channel') {
                 if (!url) return;
                 card.classList.add('adding');
                 const subBtn = card.querySelector('.sr-subscribe-btn');
-                if (subBtn) {
-                    subBtn.textContent = 'Subscribing…';
-                    subBtn.disabled = true;
-                }
                 try {
                     pywebview.api.fetch_url_info(url, 'browser', 'none');
-                    showToast('Subscribing — channel videos coming to your queue…', null, null);
-                    // Mark the card as in-queue so a re-click jumps instead of re-firing.
-                    card.dataset.inQueue = '1';
-                    // Swap the Subscribe button for the "Already in your queue" chip.
-                    const actionEl = card.querySelector('.sr-action');
-                    if (actionEl) {
-                        actionEl.innerHTML = '<span class="sr-already"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Subscribed</span>';
+                    // Stash URL on the card so handleFullFetch can match by URL.
+                    card.dataset.fetchingPending = '1';
+                    if (subBtn) {
+                        subBtn.classList.add('fetching');
+                        subBtn.disabled = true;
+                        subBtn.innerHTML = '<span class="sub-spin"></span>Fetching channel…';
                     }
-                    if (subBtn) subBtn.remove();
+                    // Fail-safe: if no handleFullFetch arrives within 60s (offline,
+                    // unexpected backend hang), restore the button so the user
+                    // isn't stuck staring at "Fetching" forever. The success path
+                    // clears data-fetching-pending so this no-ops normally.
+                    setTimeout(() => {
+                        if (card.dataset.fetchingPending !== '1') return;
+                        delete card.dataset.fetchingPending;
+                        if (subBtn && subBtn.isConnected) {
+                            subBtn.classList.remove('fetching');
+                            subBtn.disabled = false;
+                            subBtn.textContent = 'Subscribe';
+                        }
+                    }, 60000);
                 } catch (e) {
-                    if (subBtn) { subBtn.textContent = 'Subscribe'; subBtn.disabled = false; }
+                    delete card.dataset.fetchingPending;
+                    if (subBtn) {
+                        subBtn.classList.remove('fetching');
+                        subBtn.disabled = false;
+                        subBtn.textContent = 'Subscribe';
+                    }
                     showToast('Couldn\'t add channel: ' + (e?.message || e), null, null);
                 } finally {
                     card.classList.remove('adding');
