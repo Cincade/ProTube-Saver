@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.4.2'
+__version__ = '1.4.3'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -139,6 +139,13 @@ class API:
         # fetches run in parallel; only the exact-same URL is deduped.
         self._fetching_urls = set()
         self._fetching_urls_lock = threading.Lock()
+        # Throttle gate for yt-dlp metadata ops (fetch + format probes).
+        # Unbounded concurrent fetches blast YouTube and trip the no-cookies
+        # bot wall ("Sign in to confirm you're not a bot"). Cap simultaneous
+        # ops so a burst of channel adds / format resolutions stays under the
+        # radar. Settings-overridable; default 3.
+        _gate_n = int(self.settings.get('ytdlp_max_concurrent') or 3)
+        self._ytdlp_gate = threading.BoundedSemaphore(max(1, _gate_n))
         # Concurrent download limit is user-configurable via the Settings drawer.
         # Read it at startup; default 2 if never set. New downloads will block on
         # this semaphore. Changing the limit at runtime calls
@@ -1008,13 +1015,35 @@ class API:
             'title': target.get('title', ''),
         }
 
-    def _get_ydl_opts(self, cookie_mode, cookie_value):
+    # YouTube alternate player clients used to dodge the "Sign in to confirm
+    # you're not a bot" wall WITHOUT cookies. YouTube enforces the bot-check
+    # most aggressively on the default `web` client; these clients hit
+    # different API surfaces that are challenged far less. yt-dlp tries them
+    # in order and uses the first that succeeds. This is settings-overridable
+    # (`youtube_player_clients`) so it can be retuned without a rebuild when
+    # YouTube patches a client. We DON'T force these on the happy path — yt-dlp's
+    # built-in default is best for the common case — we only swap them in on a
+    # bot-check retry, so a stale list can never make the normal path worse.
+    _BOT_FALLBACK_CLIENTS = ['tv', 'web_safari', 'mweb', 'android_vr']
+
+    def _get_ydl_opts(self, cookie_mode, cookie_value, player_clients=None):
         opts = {'quiet': True, 'no_warnings': True, 'noprogress': True, 'ratelimit': 10*1024*1024}
         if self.ffmpeg_location:
             opts['ffmpeg_location'] = self.ffmpeg_location
         if cookie_mode == 'browser' and cookie_value != 'none': opts['cookiesfrombrowser'] = (cookie_value,)
         elif cookie_mode == 'file' and os.path.exists(cookie_value): opts['cookies'] = cookie_value
+        # Optional explicit player-client override (used by the bot-check retry,
+        # or pinned permanently via settings for users who always get walled).
+        clients = player_clients or self.settings.get('youtube_player_clients')
+        if clients:
+            opts['extractor_args'] = {'youtube': {'player_client': list(clients)}}
         return opts
+
+    def _is_bot_check_error(self, msg):
+        """True if a yt-dlp error is YouTube's no-cookies bot wall. Drives the
+        automatic alternate-client retry."""
+        m = (msg or '').lower()
+        return ("confirm you" in m and "not a bot" in m) or "sign in to confirm" in m
 
     def fetch_url_info(self, url, cookie_mode, cookie_value):
         # Dedupe ONLY the same URL — distinct URLs run concurrently, so
@@ -1077,26 +1106,39 @@ class API:
         # only long-form videos, not Shorts/Streams/Community mashed together.
         url = self._normalize_channel_url(url)
         try:
-            base_opts = self._get_ydl_opts(cookie_mode, cookie_value)
-
-            # Step 1: probe whether this URL is a playlist using the cheapest possible call
-            probe_opts = {**base_opts, 'extract_flat': True, 'skip_download': True}
-            with YoutubeDL(probe_opts) as ydl:
-                probe = ydl.extract_info(url, download=False)
-
-            is_playlist = probe.get('_type') == 'playlist' or 'entries' in probe
-
-            if is_playlist:
-                self._handle_playlist_fetch(probe, base_opts)
-            else:
-                # Single video — do a full fetch to get formats (same as before)
-                self._handle_single_video_fetch(url, base_opts)
-
+            # Throttle: cap how many yt-dlp network ops run at once so a burst
+            # of fetches (many channels / format probes) doesn't trip YouTube's
+            # bot wall. See _ytdlp_gate.
+            with self._ytdlp_gate:
+                self._run_fetch(url, cookie_mode, cookie_value)
         except Exception as e:
+            # Bot wall? Retry once through alternate player clients (no cookies).
+            if self._is_bot_check_error(str(e)):
+                try:
+                    with self._ytdlp_gate:
+                        self._run_fetch(url, cookie_mode, cookie_value,
+                                        player_clients=self._BOT_FALLBACK_CLIENTS)
+                    return
+                except Exception as e2:
+                    e = e2
             self._send_to_js('finishFetch', f"Error: {str(e)}")
         finally:
             with self._fetching_urls_lock:
                 self._fetching_urls.discard(original_url)
+
+    def _run_fetch(self, url, cookie_mode, cookie_value, player_clients=None):
+        """One fetch attempt — probe playlist-vs-video then dispatch. Split out
+        of _fetch_worker so the bot-check path can re-run it with an alternate
+        player-client set."""
+        base_opts = self._get_ydl_opts(cookie_mode, cookie_value, player_clients=player_clients)
+        probe_opts = {**base_opts, 'extract_flat': True, 'skip_download': True}
+        with YoutubeDL(probe_opts) as ydl:
+            probe = ydl.extract_info(url, download=False)
+        is_playlist = probe.get('_type') == 'playlist' or 'entries' in probe
+        if is_playlist:
+            self._handle_playlist_fetch(probe, base_opts)
+        else:
+            self._handle_single_video_fetch(url, base_opts)
 
     def _handle_single_video_fetch(self, url, base_opts):
         """Full extract for a single video (formats included)."""
@@ -1334,14 +1376,27 @@ class API:
         base_opts = self._get_ydl_opts(cookie_mode, cookie_value)
         total = len(video_urls)
 
+        def _extract(vid_url, clients=None):
+            opts = (self._get_ydl_opts(cookie_mode, cookie_value, player_clients=clients)
+                    if clients else base_opts)
+            with self._ytdlp_gate:
+                with YoutubeDL(opts) as ydl:
+                    return ydl.extract_info(vid_url, download=False)
+
         for idx, item in enumerate(video_urls):
             vid_id = item.get('id')
             vid_url = item.get('url')
             if not vid_id or not vid_url:
                 continue
             try:
-                with YoutubeDL(base_opts) as ydl:
-                    info = ydl.extract_info(vid_url, download=False)
+                try:
+                    info = _extract(vid_url)
+                except Exception as e_first:
+                    # No-cookies bot wall → retry this video via alternate clients.
+                    if self._is_bot_check_error(str(e_first)):
+                        info = _extract(vid_url, clients=self._BOT_FALLBACK_CLIENTS)
+                    else:
+                        raise
                 formats, size_map = self._parse_formats(info)
                 payload = {
                     "id": vid_id,
@@ -1522,7 +1577,17 @@ class API:
                         # branch above, so this assignment is safe.
                         opts['postprocessors'] = [{'key': 'FFmpegVideoRemuxer', 'preferedformat': 'mp4'}]
 
-                with YoutubeDL(opts) as ydl: ydl.download([video_data['url']])
+                try:
+                    with YoutubeDL(opts) as ydl: ydl.download([video_data['url']])
+                except Exception as e_dl:
+                    # No-cookies bot wall mid-download → retry once through the
+                    # alternate player clients. Same opts, just a different
+                    # client surface for the format/stream URLs.
+                    if self._is_bot_check_error(str(e_dl)) and video_id not in self.cancelled_ids and video_id not in self.paused_ids:
+                        retry_opts = {**opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
+                        with YoutubeDL(retry_opts) as ydl: ydl.download([video_data['url']])
+                    else:
+                        raise
 
                 # Pipeline done (download + any post-process/merge). Emit the
                 # final 100% tick the unified-progress hook held back; this
@@ -1669,8 +1734,15 @@ class API:
 
     def _classify_error(self, msg):
         """Classify a yt-dlp / download exception into a (category, friendly_message) tuple.
-        Categories: network, geo, rate_limit, unavailable, age_restricted, format, disk, stale_resume, generic."""
+        Categories: network, geo, rate_limit, unavailable, age_restricted, format, disk, stale_resume, bot_check, generic."""
         m = (msg or '').lower()
+
+        # YouTube no-cookies bot wall — we already auto-retried through alternate
+        # player clients before this point, so reaching here means even those
+        # were challenged. Tell the user to slow down rather than dumping the
+        # raw yt-dlp "use --cookies" hint.
+        if self._is_bot_check_error(m):
+            return ('rate_limit', "YouTube is bot-checking this IP. Wait a few minutes and retry — fewer at once helps.")
 
         # HTTP 416 — stale resume. The .part file is out of sync with what's on YouTube's side.
         # User-facing fix: clear the .part and retry from scratch.
