@@ -10914,10 +10914,20 @@
                 this.elements.queueView.style.display = '';
                 this.elements.libraryView.style.display = '';
                 if (this.elements.playerView) this.elements.playerView.style.display = '';
-                // Also make sure the playlist-detail overlay is dismissed if we're leaving queue
-                if (view !== 'queue' && this.elements.playlistDetailView) {
+                // ALWAYS dismiss the playlist-detail overlay on a rail switch —
+                // even when the target IS 'queue'. The detail view is only ever
+                // opened via openPlaylistDetail; clicking the Queue icon while
+                // inside a channel must return to the queue LIST, not leave the
+                // channel grid bleeding on top of it. (Previously this was gated
+                // `view !== 'queue'`, so Queue→Queue left the overlay up.)
+                if (this.elements.playlistDetailView) {
                     this.elements.playlistDetailView.classList.remove('visible');
-                    this.currentPlaylistId = null;
+                    if (this.currentPlaylistId) {
+                        this.currentPlaylistId = null;
+                        if (this._teardownChannelStickyObserver) this._teardownChannelStickyObserver();
+                        const _sticky = document.getElementById('pd-sticky-header');
+                        if (_sticky) { _sticky.classList.remove('is-visible'); _sticky.setAttribute('hidden', ''); }
+                    }
                 }
                 // Toggle view panes
                 this.elements.libraryView.classList.toggle('active', view === 'library');
