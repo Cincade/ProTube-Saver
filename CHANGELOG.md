@@ -18,6 +18,13 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.4.5 — 2026-05-21
+
+- Adds: **Browse a creator's channel from search without saving it.** Click a creator's name or avatar on any search result to open a read-only preview of their channel — banner, video grid, view counts and publish dates — so you can judge whether it's worth following. Download individual videos straight from the preview, or hit "Subscribe to save" to keep the channel in your queue.
+- Changes: **The search landing is now built around your library.** Replaced the generic trending / "for you" feed (and the endless scroll) with recommendation rows seeded by the channels you actually save from, plus your recent searches — shown as clean library-style cards with view counts and dates. Recent searches can now be removed one at a time.
+
+---
+
 ## v1.4.4 — 2026-05-21
 
 A batch of fixes across music, library, channels, search, downloads, and the window.

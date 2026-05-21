@@ -2943,6 +2943,48 @@
             gap: 8px;
             margin-bottom: 8px;
         }
+        /* Clickable creator row → opens the read-only channel preview. */
+        .sr-channel-row.sr-channel-clickable {
+            cursor: pointer; width: fit-content; max-width: 100%;
+            border-radius: 8px; padding: 2px 8px 2px 2px; margin-left: -2px;
+            transition: background 0.12s ease;
+        }
+        .sr-channel-row.sr-channel-clickable:hover { background: rgba(255,255,255,0.06); }
+        .sr-channel-row.sr-channel-clickable:hover .sr-channel-name { color: #fff; }
+        /* "Subscribe to save" pill shown in the channel hero during a preview. */
+        .pd-channel-subscribe-btn {
+            margin-top: 10px;
+            align-self: flex-start;   /* don't stretch full-width in the flex column */
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 14px;
+            background: #f1f1f1; color: #0f0f0f;
+            border: none; border-radius: 999px;
+            font-family: inherit; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: background 0.12s ease;
+        }
+        .pd-channel-subscribe-btn:hover { background: #fff; }
+        .pd-channel-subscribe-btn svg { width: 15px; height: 15px; }
+        .pd-channel-card-stats {
+            font-size: 12px; color: #8b8b8b; margin-top: 3px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        /* Search-landing: removable recent-search chip × */
+        .myf-chip-label { display: inline; }
+        .myf-chip-x {
+            background: transparent; border: none; color: #8a8a8a; cursor: pointer;
+            font-size: 15px; line-height: 1; padding: 0; margin-left: 7px;
+        }
+        .myf-chip-x:hover { color: #fff; }
+        /* Search-landing: "Recommended for you" grid — reuses the .library-card
+           component (same as channel/library mode); this is just the wrapping grid. */
+        .vfy-rec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 14px;
+            padding: 2px 0 8px;
+        }
+        .vfy-rec-card { cursor: pointer; }
         .sr-channel-avatar {
             width: 24px; height: 24px;
             border-radius: 50%;
@@ -10916,6 +10958,10 @@
                 this.elements.queueView.style.display = '';
                 this.elements.libraryView.style.display = '';
                 if (this.elements.playerView) this.elements.playerView.style.display = '';
+                // Also clear inline hides on the other panes (search/music) — a
+                // channel preview opened from search inline-hid search-view; without
+                // this it would stay hidden when navigating back to it via the rail.
+                document.querySelectorAll('.cockpit-main > .view-pane').forEach(p => { p.style.display = ''; });
                 // ALWAYS dismiss the playlist-detail overlay on a rail switch —
                 // even when the target IS 'queue'. The detail view is only ever
                 // opened via openPlaylistDetail; clicking the Queue icon while
@@ -12118,7 +12164,7 @@
             renderQueue() {
                 // Apply current filter (type-based for videos/playlists/channels,
                 // status-based for failed, no-op for all)
-                const filtered = this.videosInQueue.filter(item => this.matchesFilter(item, this.currentFilter));
+                const filtered = this.videosInQueue.filter(item => !item.isPreview && this.matchesFilter(item, this.currentFilter));
 
                 // Empty state handling. We collapse the list container's
                 // display when the empty state shows so the empty's `flex: 1`
@@ -12271,7 +12317,11 @@
                 // Render the detail view
                 this.renderPlaylistDetail(pl);
 
-                // Switch views
+                // Switch views. Hide EVERY content pane (not just the queue) so the
+                // detail view fully replaces whatever was showing — channel previews
+                // open from the search pane too, and hiding only the queue left the
+                // search results stacked above the channel. Cleared again on close.
+                document.querySelectorAll('.cockpit-main > .view-pane').forEach(p => { p.style.display = 'none'; });
                 this.elements.queueView.style.display = 'none';
                 this.elements.playlistDetailView.classList.add('visible');
 
@@ -12307,6 +12357,18 @@
                         pywebview.api.resolve_playlist_formats(playlistId, unresolvedUrls, 'browser', 'none');
                     }
                 }
+            },
+
+            // Promote a read-only preview channel into a saved (subscribed) one:
+            // drop the isPreview flag so it persists + shows in the queue rail.
+            subscribeChannelPreview(playlistId) {
+                const pl = this.videosInQueue.find(i => i.id === playlistId);
+                if (!pl || !pl.isPreview) return;
+                delete pl.isPreview;
+                this.saveQueueState();   // now persists (filter no longer excludes it)
+                this.renderQueue();      // appears in the queue rail
+                this.renderPlaylistDetail(pl);   // re-render to drop the Subscribe pill
+                showToast('Subscribed — added to your queue', null, null);
             },
 
             async _silentRefetchChannelBranding(pl) {
@@ -12356,11 +12418,25 @@
                 const returningFromId = this.currentPlaylistId;
                 this.currentPlaylistId = null;
                 this.elements.playlistDetailView.classList.remove('visible');
-                this.elements.queueView.style.display = 'flex';
+                // Reveal the pane that's still active (clear the inline hides set in
+                // openPlaylistDetail; the .active CSS shows the right one — search if
+                // you came from a channel preview, otherwise the queue).
+                document.querySelectorAll('.cockpit-main > .view-pane').forEach(p => { p.style.display = ''; });
+                // A transient preview channel (read-only browse, never saved) is
+                // dropped when you leave it — UNLESS it has downloads in flight, in
+                // which case keep it in memory (still hidden from the rail +
+                // persistence) so progress keeps routing to its rows.
+                const _prev = returningFromId && this.videosInQueue.find(i => i.id === returningFromId);
+                if (_prev && _prev.isPreview) {
+                    const busy = (_prev.videos || []).some(v => ['Downloading', 'Queued', 'Paused', 'Retrying'].includes(v.status));
+                    if (!busy) {
+                        this.videosInQueue = this.videosInQueue.filter(i => i.id !== returningFromId);
+                    }
+                }
                 // DON'T call renderQueue() here — it wipes active progress bars and re-inits Sortable,
                 // which makes in-flight downloads look like they restarted. The queue DOM is intact;
                 // only the playlist card's rollup and global dashboard may need updating.
-                if (returningFromId) {
+                if (returningFromId && !(_prev && _prev.isPreview)) {
                     this.updatePlaylistCardRollup(returningFromId);
                 }
                 this.updateDashboard();
@@ -12491,6 +12567,10 @@
                             <div class="pd-channel-info">
                                 <div class="pd-channel-name">${eTitle}</div>
                                 <div class="pd-channel-stats">${statsHTML}</div>
+                                ${pl.isPreview ? `<button class="pd-channel-subscribe-btn" onclick="app.subscribeChannelPreview('${eId}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                                    Subscribe to save
+                                </button>` : ''}
                                 ${eBio ? `<div class="pd-channel-bio is-collapsed">
                                     <span class="pd-channel-bio-text">${eBio}</span>
                                     <button class="pd-channel-bio-toggle" onclick="togglePdChannelBio(this.closest('.pd-channel-bio'))">…more</button>
@@ -12721,6 +12801,14 @@
                         </div>
                         <div class="library-card-body">
                             <div class="library-card-title">${eTitle}</div>
+                            ${(() => {
+                                // View count + date — only on channel PREVIEW cards
+                                // (search-opened), where they help decide what to grab.
+                                const _pl = this.videosInQueue.find(i => i.id === this.currentPlaylistId);
+                                if (!(_pl && _pl.isPreview)) return '';
+                                const _bits = [v.view_count_string, v.published_time].filter(Boolean).map(s => this.escapeHtml(s)).join(' · ');
+                                return _bits ? `<div class="pd-channel-card-stats">${_bits}</div>` : '';
+                            })()}
                         </div>
                     </div>
                 `;
@@ -13100,6 +13188,8 @@
                 if (payload.uploader) v.uploader = payload.uploader;
                 if (payload.thumbnail) v.thumbnail = payload.thumbnail;
                 if (payload.duration_string) v.duration_string = payload.duration_string;
+                if (payload.view_count_string) v.view_count_string = payload.view_count_string;
+                if (payload.published_time) v.published_time = payload.published_time;
 
                 // Re-render just this row if we're on the detail view
                 if (this.currentPlaylistId === playlistId) {
@@ -13640,7 +13730,8 @@
             },
 
             saveQueueState() {
-                pywebview.api.save_queue(this.videosInQueue);
+                // Never persist transient preview channels (read-only browse).
+                pywebview.api.save_queue(this.videosInQueue.filter(v => !v.isPreview));
             },
 
             clearAll() {
@@ -13944,6 +14035,28 @@
         }
 
         function handleFullFetch(videos, title, isPlaylist) {
+            // Read-only channel preview: when a preview fetch resolves, open the
+            // channel as a transient (isPreview) entry instead of adding it to the
+            // queue. Guard on type==='playlist' so a concurrent single-video fetch
+            // can't be mistaken for the preview.
+            if (app._pendingPreview) {
+                app._pendingPreview = false;   // consume the flag either way (no staleness)
+                if (videos && videos[0] && videos[0].type === 'playlist') {
+                    const ch = videos[0];
+                    const existing = app.videosInQueue.find(v => v.id === ch.id);
+                    if (existing) {
+                        // Already saved (or already previewing) — just open it.
+                        app.openPlaylistDetail(existing.id);
+                    } else {
+                        ch.isPreview = true;          // in-memory only — excluded from
+                        app.videosInQueue.push(ch);   // the queue rail + persistence
+                        app.openPlaylistDetail(ch.id);
+                    }
+                    finishFetch('');
+                    return;
+                }
+                // Not a channel/playlist — fall through to the normal add flow.
+            }
             // Detect whether the user is currently at the bottom of the queue
             // BEFORE we mutate state. "Near bottom" is within 80px of the
             // container's full scrollHeight. We use this to decide between two
@@ -14142,6 +14255,9 @@
         function finishFetch(msg) {
             setFetchLoading(false, 'main');
             const isError = typeof msg === 'string' && msg.startsWith('Error:');
+            // A failed fetch never reaches handleFullFetch's preview branch, so
+            // clear any pending-preview flag here to avoid mis-tagging the next fetch.
+            if (isError) app._pendingPreview = false;
             const inBatch = !!app._fetchBatch;
 
             // If a Subscribe-driven fetch errored, restore the Subscribe
@@ -23388,6 +23504,12 @@
             // prefetch hasn't already filled in the rest. With prefetch usually completing
             // before the user gets to the bottom, this rarely fires.
             const io = new IntersectionObserver((entries) => {
+                // Only paginate when ACTUAL search results are showing — never on
+                // the For-You landing. Its bottom sentinel was triggering an
+                // unwanted "infinite scroll" of the previous query's results.
+                const fy = document.getElementById('video-foryou');
+                const landingVisible = fy && !fy.hasAttribute('hidden');
+                if (landingVisible) return;
                 for (const entry of entries) {
                     if (entry.isIntersecting && !_searchState.loading && !_searchState.loadingMore && _searchState.query) {
                         loadMore();
@@ -23473,6 +23595,9 @@
             const results = document.getElementById('search-results');
             if (results) results.innerHTML = '';
             if (status) status.setAttribute('hidden', '');
+            // No infinite-scroll sentinel on the landing (only on real results).
+            const _sent = document.getElementById('search-loadmore-sentinel');
+            if (_sent) _sent.setAttribute('hidden', '');
             if (!wrap) return;
             wrap.removeAttribute('hidden');
             wrap.innerHTML = '<div class="search-status" style="padding:24px;"><div>Loading…</div></div>';
@@ -23480,72 +23605,46 @@
             try { data = await pywebview.api.get_video_for_you(); }
             catch (_) { data = null; }
             const recents = (data && data.recent_searches) || [];
-            const recentLib = (data && data.recent_library) || [];
-            const topUploader = (data && data.top_uploader) || '';
-            const becauseYou = (data && data.because_you) || [];
-            const trending = (data && data.trending) || [];
-            const shuffledLib = (data && data.shuffled_lib) || [];
+            const recommendations = (data && data.recommendations) || [];
             const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             const clockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
             const playSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l12-7z"/></svg>';
-            // OWNED card — for library-derived rows (Pick up / From your library).
-            const ownedCardHtml = (v) => {
-                const tAttrs = _musicThumbAttrs(v.thumbnail);
-                const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
-                return `<div class="myf-card" data-vfy-lib-id="${esc(v.id)}">
-                    <div class="myf-card-art">${thumb}<span class="myf-badge">OWNED</span><div class="myf-card-play">${playSvg}</div></div>
-                    <div class="myf-card-title">${esc(v.title)}</div>
-                    <div class="myf-card-sub">${esc(v.uploader)}</div>
-                </div>`;
-            };
-            // Search-source card — for "Because you have" / "Trending" rows.
-            // Click runs a search for the card's title+uploader (mirrors music's
-            // [data-myf-search-id] behavior — keeps the click contract honest:
-            // download is an explicit weighty action, click previews/explores).
-            const searchCardHtml = (r) => {
-                // Search results' thumbnail is typically a plain remote URL,
-                // but be defensive and use _musicThumbAttrs in case it's a
-                // marker for any reason.
-                const tAttrs = _musicThumbAttrs(r.thumbnail);
-                const thumb = tAttrs ? `<img ${tAttrs} loading="lazy">` : '';
-                return `<div class="myf-card" data-vfy-search-id="${esc(r.id)}">
-                    <div class="myf-card-art">${thumb}<div class="myf-card-play">${playSvg}</div></div>
-                    <div class="myf-card-title">${esc(r.title || 'Untitled')}</div>
-                    <div class="myf-card-sub">${esc(r.uploader || r.channel || '')}</div>
+            // Recommendation card — library-card style (16:9 thumb on top, title,
+            // channel, then view count · date). Crisp thumb via maxresdefault with
+            // onerror→hqdefault. Click runs a search seeded by the video title so
+            // the user lands on full results (incl. it) and downloads from there.
+            const recCardHtml = (r) => {
+                const id = esc(r.id || '');
+                const stats = [r.view_count_string, r.published_time].filter(Boolean).map(esc).join(' · ');
+                const thumb = /^[\w-]{11}$/.test(r.id || '')
+                    ? `<img src="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${id}/hqdefault.jpg'">`
+                    : (r.thumbnail ? `<img src="${esc(r.thumbnail)}" loading="lazy" alt="">` : '');
+                const dur = r.duration_string ? `<div class="library-card-duration">${esc(r.duration_string)}</div>` : '';
+                // Reuse the SAME card component as channel/library mode (.library-card)
+                // so the recommendations look identical, plus uploader + view·date.
+                return `<div class="library-card vfy-rec-card" data-vfy-rec-title="${esc(r.title || '')}">
+                    <div class="library-card-thumb">${thumb}${dur}</div>
+                    <div class="library-card-body">
+                        <div class="library-card-title">${esc(r.title || 'Untitled')}</div>
+                        ${r.uploader ? `<div class="pd-channel-card-stats">${esc(r.uploader)}</div>` : ''}
+                        ${stats ? `<div class="pd-channel-card-stats">${stats}</div>` : ''}
+                    </div>
                 </div>`;
             };
             let html = '';
-            // Row 1: Recent searches chips
+            // Recent searches — chips, each with a × to remove (couldn't clear
+            // individual past searches before).
             if (recents.length) {
                 html += '<div class="myf-section"><div class="myf-head"><h3>Recent searches</h3></div><div class="myf-chips">';
-                html += recents.map(q => `<button class="myf-chip" data-vfy-query="${esc(q)}">${clockSvg}${esc(q)}</button>`).join('');
+                html += recents.map(q => `<span class="myf-chip" data-vfy-query="${esc(q)}">${clockSvg}<span class="myf-chip-label">${esc(q)}</span><button class="myf-chip-x" data-vfy-remove="${esc(q)}" title="Remove" aria-label="Remove">&times;</button></span>`).join('');
                 html += '</div></div>';
             }
-            // Row 2: Pick up where you left off (most-recent library items)
-            if (recentLib.length) {
-                html += '<div class="myf-section"><div class="myf-head"><h3>Pick up where you left off</h3><span class="myf-sub">from your library</span></div><div class="myf-grid">';
-                html += recentLib.map(ownedCardHtml).join('');
-                html += '</div></div>';
-            }
-            // Row 3: Because you have [Top Uploader] — search results for the
-            // user's most-represented uploader (capped at 6, library dupes
-            // filtered server-side). 24h cached.
-            if (topUploader && becauseYou.length) {
-                html += `<div class="myf-section"><div class="myf-head"><h3>Because you have ${esc(topUploader)}</h3></div><div class="myf-grid">`;
-                html += becauseYou.map(searchCardHtml).join('');
-                html += '</div></div>';
-            }
-            // Row 4: Trending on YouTube — via FEtrending Innertube browse.
-            if (trending.length) {
-                html += '<div class="myf-section"><div class="myf-head"><h3>Trending on YouTube</h3><span class="myf-sub">Updated daily</span></div><div class="myf-grid">';
-                html += trending.map(searchCardHtml).join('');
-                html += '</div></div>';
-            }
-            // Row 5: From your library (shuffled).
-            if (shuffledLib.length) {
-                html += '<div class="myf-section"><div class="myf-head"><h3>From your library</h3><span class="myf-sub">shuffled</span></div><div class="myf-grid">';
-                html += shuffledLib.map(ownedCardHtml).join('');
-                html += '</div></div>';
+            // ONE "Recommended for you" grid (~2-3 rows) of library-style cards,
+            // seeded by your library's top channels + recent searches. NO trending /
+            // shuffled / "pick up where you left off".
+            if (recommendations.length) {
+                html += '<div class="myf-section"><div class="myf-head"><h3>Recommended for you</h3><span class="myf-sub">based on your library</span></div>';
+                html += '<div class="vfy-rec-grid">' + recommendations.map(recCardHtml).join('') + '</div></div>';
             }
             if (!html) {
                 // No history + no library + no recommendations → show the
@@ -23564,44 +23663,38 @@
             if (typeof _resolveMusicThumbMarkers === 'function') {
                 _resolveMusicThumbMarkers();
             }
-            wrap.querySelectorAll('[data-vfy-query]').forEach(el => {
-                el.addEventListener('click', () => {
+            const _runFromChip = (q) => {
+                const input = document.getElementById('search-input');
+                if (input) {
+                    input.value = q;
+                    const cb = document.getElementById('search-clear-btn');
+                    if (cb) cb.classList.toggle('visible', !!q);
+                }
+                runSearch(q, _searchState.kind || 'all');
+            };
+            // Recent-search chip → run that search (ignoring clicks on the × ).
+            wrap.querySelectorAll('.myf-chip[data-vfy-query]').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('.myf-chip-x')) return;
                     const q = el.getAttribute('data-vfy-query');
-                    const input = document.getElementById('search-input');
-                    if (input) {
-                        input.value = q;
-                        const cb = document.getElementById('search-clear-btn');
-                        if (cb) cb.classList.toggle('visible', !!q);
-                    }
-                    runSearch(q, _searchState.kind);
+                    if (q) _runFromChip(q);
                 });
             });
-            // Click an OWNED card → open that library entry's detail panel,
-            // same flow as clicking the card in the Library view.
-            wrap.querySelectorAll('[data-vfy-lib-id]').forEach(el => {
-                el.addEventListener('click', () => {
-                    const id = el.getAttribute('data-vfy-lib-id');
-                    if (!id) return;
-                    try { app.switchView('library'); } catch (_) {}
-                    try { openLibraryDetail(id); } catch (_) {}
+            // Per-chip × → remove from recent searches, then re-render.
+            wrap.querySelectorAll('.myf-chip-x[data-vfy-remove]').forEach(el => {
+                el.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const q = el.getAttribute('data-vfy-remove');
+                    try { await pywebview.api.remove_video_recent_search(q); } catch (_) {}
+                    _renderVideoForYou();
                 });
             });
-            // Because-you / trending cards → run a search seeded by the card's
-            // title + uploader. Same click contract as the music side:
-            // download is explicit (button), click previews/explores.
-            wrap.querySelectorAll('[data-vfy-search-id]').forEach(el => {
+            // Recommendation card → search the video's title so the user lands on
+            // full results (incl. it) and downloads from there.
+            wrap.querySelectorAll('.vfy-rec-card[data-vfy-rec-title]').forEach(el => {
                 el.addEventListener('click', () => {
-                    const t = el.querySelector('.myf-card-title')?.textContent || '';
-                    const a = el.querySelector('.myf-card-sub')?.textContent || '';
-                    const q = (t + ' ' + a).trim();
-                    if (!q) return;
-                    const input = document.getElementById('search-input');
-                    if (input) {
-                        input.value = q;
-                        const cb = document.getElementById('search-clear-btn');
-                        if (cb) cb.classList.toggle('visible', !!q);
-                    }
-                    runSearch(q, _searchState.kind || 'all');
+                    const q = (el.getAttribute('data-vfy-rec-title') || '').trim();
+                    if (q) _runFromChip(q);
                 });
             });
         }
@@ -23793,7 +23886,7 @@
                     <div class="sr-meta">
                         <div class="sr-title">${escapeHtml(r.title)}</div>
                         ${statsLine ? `<div class="sr-stats">${statsLine}</div>` : ''}
-                        ${r.uploader ? `<div class="sr-channel-row">${channelAvatar}<span class="sr-channel-name">${escapeHtml(r.uploader)}</span>${verified}</div>` : ''}
+                        ${r.uploader ? `<div class="sr-channel-row${r.channel_url ? ' sr-channel-clickable' : ''}"${r.channel_url ? ` data-channel-url="${escapeHtml(r.channel_url)}" title="View channel"` : ''}>${channelAvatar}<span class="sr-channel-name">${escapeHtml(r.uploader)}</span>${verified}</div>` : ''}
                         ${r.description ? `<div class="sr-description">${escapeHtml(r.description)}</div>` : ''}
                         ${action ? `<div class="sr-action">${action}</div>` : ''}
                     </div>
@@ -23812,7 +23905,32 @@
             newCards.forEach(card => {
                 card.setAttribute('data-bound', '1');
                 card.addEventListener('click', () => handleSearchResultClick(card));
+                // Creator row → open the read-only channel preview, without
+                // triggering the card's own video action.
+                const chRow = card.querySelector('.sr-channel-row.sr-channel-clickable');
+                if (chRow && chRow.dataset.channelUrl) {
+                    chRow.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openChannelPreview(chRow.dataset.channelUrl);
+                    });
+                }
             });
+        }
+
+        // Read-only channel preview: fetch a channel and open its detail view
+        // WITHOUT saving it to the queue. Reuses the normal channel fetch; the
+        // _pendingPreview flag tells handleFullFetch to open the result as a
+        // transient (isPreview) entry instead of a persisted queue item.
+        function openChannelPreview(channelUrl) {
+            if (!channelUrl) return;
+            app._pendingPreview = true;
+            showToast('Opening channel…', null, null);
+            try {
+                pywebview.api.fetch_url_info(channelUrl, 'browser', 'none');
+            } catch (e) {
+                app._pendingPreview = false;
+                showToast('Could not open channel', null, null);
+            }
         }
 
         function updateSearchMeta(count) {

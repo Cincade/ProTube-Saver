@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.4.4'
+__version__ = '1.4.5'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -1427,6 +1427,10 @@ class API:
                     "uploader": info.get('channel') or info.get('uploader'),
                     "thumbnail": info.get('thumbnail'),
                     "duration_string": self._format_duration(info.get('duration')),
+                    # For channel-PREVIEW cards (shown only there): the flat channel
+                    # fetch has no view count / date, but this full extract does.
+                    "view_count_string": self._format_view_count(info.get('view_count')),
+                    "published_time": self._relative_published(info),
                 }
                 self._send_to_js('onVideoFormatsResolved', playlist_id, payload, idx + 1, total)
             except Exception as e:
@@ -2761,6 +2765,31 @@ class API:
                 channel_verified = True
                 break
 
+        # Channel URL for the "open the creator's channel" preview. The owner link
+        # lives in the byline runs' navigationEndpoint; prefer the @handle path,
+        # fall back to /channel/<id>.
+        channel_url = ''
+        def _url_from_be(_be):
+            _canon = (_be or {}).get('canonicalBaseUrl') or ''
+            _bid = (_be or {}).get('browseId') or ''
+            if _canon.startswith('/'):
+                return f'https://www.youtube.com{_canon}'
+            if _bid.startswith('UC'):
+                return f'https://www.youtube.com/channel/{_bid}'
+            return ''
+        for _key in ('ownerText', 'longBylineText', 'shortBylineText'):
+            for _run in ((vr.get(_key) or {}).get('runs') or []):
+                channel_url = _url_from_be((_run.get('navigationEndpoint') or {}).get('browseEndpoint'))
+                if channel_url:
+                    break
+            if channel_url:
+                break
+        # Fallback: the channel-avatar link carries the same browseEndpoint and is
+        # present on videos whose byline runs omit it (was leaving channel_url empty
+        # for some results, so their creator row wasn't clickable).
+        if not channel_url:
+            channel_url = _url_from_be((ctwlr.get('navigationEndpoint') or {}).get('browseEndpoint'))
+
         thumbs = (vr.get('thumbnail') or {}).get('thumbnails') or []
         thumb = thumbs[-1].get('url') if thumbs else f'https://i.ytimg.com/vi/{vid}/hqdefault.jpg'
         return {
@@ -2776,6 +2805,7 @@ class API:
             'description': description,                  # short snippet line
             'channel_thumbnail': channel_thumbnail,      # small avatar URL
             'channel_verified': channel_verified,        # bool
+            'channel_url': channel_url,                   # creator channel → preview
             'in_queue': vid in dedup['queue_video_ids'],
             'in_library': vid in dedup['lib_video_ids'],
         }
@@ -3032,100 +3062,92 @@ class API:
             return {'error': str(e)}
 
     def get_video_for_you(self):
-        """Video-search landing data — direct parallel of `get_music_for_you()`.
-        Returns the same 6-row shape so the Search view's empty state feels
-        identical to the Music tab's:
+        """Search-landing data. User-requested redesign: NO generic recommendations
+        (trending / shuffled / "pick up where you left off") and no infinite scroll —
+        just the user's own recent searches plus up to 3 recommendation shelves
+        seeded by their LIBRARY (top channels) and recent searches.
 
           {
-            recent_searches: [str, ...]      # cap 8
-            recent_library:  [video, ...]    # last 8 added
-            top_uploader:    str|None        # most-represented uploader in library
-            because_you:     [search-result, ...]  # 6 videos by top_uploader (cached)
-            trending:        [search-result, ...]  # 6 trending YT videos (cached)
-            shuffled_lib:    [video, ...]    # 6 random library videos
+            recent_searches: [str, ...]   # cap 8, each removable
+            shelves: [ {title, kind:'channel'|'search', seed, items:[search-result,...]}, ... ]  # <=3
           }
-        All sub-arrays may be empty; frontend hides empty rows."""
-        import random
-        result = {
-            'recent_searches': [],
-            'recent_library': [],
-            'top_uploader': None,
-            'because_you': [],
-            'trending': [],
-            'shuffled_lib': [],
-        }
+        Shelf items are search-result videos (carry view_count_string + published_time),
+        library dupes filtered, cached 24h per seed."""
+        result = {'recent_searches': [], 'recommendations': []}
         try:
-            result['recent_searches'] = (self.settings.get('video_recent_searches', []) or [])[:8]
+            recents = (self.settings.get('video_recent_searches', []) or [])[:8]
+            result['recent_searches'] = recents
 
             lib = list(self.settings.get('library', []) or [])
-            def _proj(v):
-                return {
-                    'id': v.get('id') or '',
-                    'title': v.get('title') or 'Untitled',
-                    'uploader': v.get('uploader') or '',
-                    'thumbnail': v.get('thumbnail') or '',
-                    'type': v.get('type') or 'video',
-                }
-            if lib:
-                # Last 8 added — by added_at desc.
-                lib_sorted = sorted(lib, key=lambda v: int(v.get('added_at') or 0), reverse=True)
-                result['recent_library'] = [_proj(v) for v in lib_sorted[:8]]
-                # Top uploader by count.
-                counts = {}
-                for v in lib:
-                    u = (v.get('uploader') or '').strip()
-                    if u:
-                        counts[u] = counts.get(u, 0) + 1
-                if counts:
-                    result['top_uploader'] = max(counts.items(), key=lambda kv: kv[1])[0]
-                # Shuffled — prefer entries NOT by the top uploader so the row
-                # feels different from "Because you have X". Falls back to the
-                # whole library if there aren't enough non-top-uploader items.
-                pool = [v for v in lib if (v.get('uploader') or '') != result['top_uploader']]
-                if len(pool) < 6:
-                    pool = lib
-                random.shuffle(pool)
-                result['shuffled_lib'] = [_proj(v) for v in pool[:6]]
+            dedup = self._build_dedup_sets()
+            lib_ids = dedup.get('library_ids', set()) if isinstance(dedup, dict) else set()
 
-            # "Because you have [Top Uploader]" — search YouTube for that
-            # uploader's videos. Cached 24h to avoid hitting Innertube every
-            # mount. Filter out library dupes so the row offers genuinely
-            # new content.
-            if result['top_uploader']:
-                cached_key = f'video_because_you_cache_{result["top_uploader"]}'
-                cached = self.settings.get(cached_key)
-                if cached and (int(time.time()) - cached.get('at', 0)) < 86400:
-                    result['because_you'] = cached.get('items', [])
-                else:
-                    try:
-                        sr = self.search_youtube(result['top_uploader'], count=12, kind='videos')
-                        items = (sr or {}).get('results', []) or []
-                        dedup = self._build_dedup_sets()
-                        lib_ids = dedup.get('library_ids', set()) if isinstance(dedup, dict) else set()
-                        items = [i for i in items if isinstance(i, dict) and i.get('type') == 'video' and i.get('id') not in lib_ids][:6]
-                        result['because_you'] = items
-                        self.settings[cached_key] = {'at': int(time.time()), 'items': items}
-                        self._save_settings()
-                    except Exception:
-                        pass
+            # Seeds: top library channels (by how many of their videos you've saved),
+            # then recent searches to round it out.
+            counts, order = {}, []
+            for v in lib:
+                u = (v.get('uploader') or '').strip()
+                if u:
+                    if u not in counts:
+                        order.append(u)
+                    counts[u] = counts.get(u, 0) + 1
+            top_channels = sorted(order, key=lambda u: counts[u], reverse=True)[:3]
+            seeds = list(top_channels)
+            for q in recents:
+                if len(seeds) >= 4:
+                    break
+                if q and q not in seeds:
+                    seeds.append(q)
 
-            # Trending — YouTube's daily trending feed via Innertube browse.
-            # 24h cache. Same pattern as music's _fetch_yt_music_trending.
-            cached_trend = self.settings.get('video_trending_cache')
-            if cached_trend and (int(time.time()) - cached_trend.get('at', 0)) < 86400:
-                result['trending'] = cached_trend.get('items', [])
-            else:
-                try:
-                    result['trending'] = self._fetch_yt_trending()
-                    self.settings['video_trending_cache'] = {'at': int(time.time()), 'items': result['trending']}
-                    self._save_settings()
-                except Exception:
-                    pass
-
+            # Interleave each seed's results into ONE "Recommended for you" grid
+            # (~2-3 rows of library-style cards), library dupes filtered, deduped
+            # across seeds.
+            import itertools
+            pools = [self._for_you_shelf_items(s, lib_ids) for s in seeds]
+            recs, seen = [], set()
+            for group in itertools.zip_longest(*pools):
+                for it in group:
+                    if it and it.get('id') and it['id'] not in seen:
+                        seen.add(it['id'])
+                        recs.append(it)
+                if len(recs) >= 12:
+                    break
+            result['recommendations'] = recs[:12]
             return result
         except Exception as e:
             print(f'[ProTube] video for-you build failed: {e}')
             return result
+
+    def _for_you_shelf_items(self, seed, lib_ids):
+        """Up to ~10 search-result videos for a landing shelf seed, library dupes
+        filtered out, cached 24h per seed so the landing doesn't re-hit Innertube
+        on every mount."""
+        cached_key = f'video_fy_shelf_{seed}'
+        cached = self.settings.get(cached_key)
+        if cached and (int(time.time()) - cached.get('at', 0)) < 86400:
+            return cached.get('items', [])
+        try:
+            sr = self.search_youtube(seed, count=15, kind='videos')
+            items = (sr or {}).get('results', []) or []
+            items = [i for i in items if isinstance(i, dict) and i.get('type') == 'video'
+                     and i.get('id') not in lib_ids][:10]
+            self.settings[cached_key] = {'at': int(time.time()), 'items': items}
+            self._save_settings()
+            return items
+        except Exception:
+            return []
+
+    def remove_video_recent_search(self, query):
+        """Remove a single recent search query (the user can't clear individual
+        chips otherwise)."""
+        try:
+            cur = self.settings.get('video_recent_searches', []) or []
+            ql = (query or '').strip().lower()
+            self.settings['video_recent_searches'] = [q for q in cur if (q or '').strip().lower() != ql]
+            self._save_settings()
+            return {'ok': True}
+        except Exception as e:
+            return {'error': str(e)}
 
     def _fetch_yt_trending(self):
         """Hit YouTube's trending feed (browseId=FEtrending) via Innertube
@@ -5047,6 +5069,32 @@ class API:
             return f'{n} views'
         except Exception:
             return ''
+
+    def _relative_published(self, info):
+        """A 'N years/months/... ago' string from a yt-dlp info dict's timestamp or
+        upload_date (YYYYMMDD). Empty when neither is present. Used for channel-
+        preview cards so they read like the search results."""
+        ts = info.get('timestamp') or info.get('release_timestamp')
+        if not ts:
+            ud = str(info.get('upload_date') or '')
+            if len(ud) == 8:
+                try:
+                    import datetime as _dt
+                    ts = _dt.datetime(int(ud[:4]), int(ud[4:6]), int(ud[6:8])).timestamp()
+                except Exception:
+                    ts = None
+        if not ts:
+            return ''
+        try:
+            secs = max(0, int(time.time()) - int(ts))
+        except Exception:
+            return ''
+        for name, span in (('year', 31536000), ('month', 2592000), ('week', 604800),
+                           ('day', 86400), ('hour', 3600), ('minute', 60)):
+            if secs >= span:
+                n = secs // span
+                return f"{n} {name}{'s' if n != 1 else ''} ago"
+        return 'just now'
 
     def find_channel_for_video(self, video_id):
         """Look up the canonical channel URL for a library video AND check whether that
