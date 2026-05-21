@@ -4323,7 +4323,9 @@
             white-space: nowrap;
             animation: mab-slide-up 0.2s ease;
         }
-        body.music-dock-visible .music-actionbar { bottom: 106px; }
+        /* Sit just above the 88px music dock (8px gap) — was 106px, which left
+           the pill drifting ~18px above the bar and feeling detached. */
+        body.music-dock-visible .music-actionbar { bottom: 96px; }
         .music-actionbar[hidden] { display: none; }
         @keyframes mab-slide-up {
             from { transform: translateX(-50%) translateY(14px); opacity: 0; }
@@ -12430,7 +12432,7 @@
                         <button class="pd-channel-action-quality" id="pd-channel-action-quality" onclick="event.stopPropagation(); app.togglePdChannelQualityMenu()">
                             <span id="pd-channel-action-quality-label">${eQuality}</span>
                             <svg class="caret" viewBox="0 0 12 8" fill="none"><path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                            <div class="pd-channel-quality-menu" id="pd-channel-quality-menu">${this.buildDefaultQualityMenuHTML(pl)}</div>
+                            <div class="pd-channel-quality-menu" id="pd-channel-quality-menu" onclick="event.stopPropagation()">${this.buildDefaultQualityMenuHTML(pl)}</div>
                         </button>
                         <button class="pd-channel-action-clear" onclick="app.clearChannelSelection()">Cancel</button>
                         <button class="pd-channel-action-go" id="pd-channel-action-go" onclick="app.downloadPlaylist()">Download 0</button>
@@ -12679,13 +12681,20 @@
                     progressBar = `<div class="library-card-watch-progress" style="width: ${pct}%;"></div>`;
                 }
 
-                // No loading="lazy" — channel grids only show 100-ish small
-                // (10KB) mqdefault thumbs, and eager loading means there's no
-                // blank flash when the user scrolls. The library uses lazy on
-                // its (larger) thumbs but the channel set is small enough.
-                const thumbInner = safeThumb
-                    ? `<img src="${safeThumb}" alt="">`
-                    : `<div class="library-card-thumb-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>`;
+                // Crisp 16:9 thumbnail. Derive maxresdefault from the video id at
+                // RENDER time so we override any cached low-res mqdefault URL stored
+                // on channels fetched before this change (no re-fetch needed). maxres
+                // 404s for non-HD uploads → onerror falls back to hqdefault, which
+                // always exists. `.library-card-thumb img` is object-fit:cover on a
+                // 16:9 box, so hqdefault's 4:3 letterbox bars get cropped — both
+                // render clean. lazy-load since maxres is heavier than the old mqdefault
+                // (the #1a1a1a thumb bg covers any brief blank, so no white flash).
+                const ytId = (v.id && /^[\w-]{11}$/.test(v.id)) ? v.id : '';
+                const thumbInner = ytId
+                    ? `<img src="https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${ytId}/hqdefault.jpg'">`
+                    : (safeThumb
+                        ? `<img src="${safeThumb}" alt="">`
+                        : `<div class="library-card-thumb-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>`);
 
                 const isDownloaded = inLibrary || v.status === 'Done';
                 const classes = ['library-card'];
@@ -12838,7 +12847,7 @@
                 const items = options.map(q => {
                     const sel = q === pl.defaultQuality;
                     return `
-                        <div class="quality-option ${sel ? 'selected' : ''}" onclick="pickPlaylistDefaultQuality('${pl.id}', '${q}')">
+                        <div class="quality-option ${sel ? 'selected' : ''}" onclick="event.stopPropagation(); pickPlaylistDefaultQuality('${pl.id}', '${q}')">
                             <span class="opt-label">${q}</span>
                             <span class="opt-hint">${hintFor(q)}</span>
                             ${sel ? checkIcon : ''}
@@ -12849,7 +12858,7 @@
                 const audioSel = pl.defaultQuality === 'Audio';
                 return items + `
                     <div class="quality-menu-divider"></div>
-                    <div class="quality-option ${audioSel ? 'selected' : ''}" onclick="pickPlaylistDefaultQuality('${pl.id}', 'Audio')">
+                    <div class="quality-option ${audioSel ? 'selected' : ''}" onclick="event.stopPropagation(); pickPlaylistDefaultQuality('${pl.id}', 'Audio')">
                         <span class="opt-label">
                             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19V6l12-3v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm12-3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             Audio only
@@ -15700,6 +15709,29 @@
             try {
                 const result = await pywebview.api.delete_video_from_library_and_disk(itemId);
                 app.videosInLibrary = (await pywebview.api.load_library()) || [];
+                // Mirror the backend's queue cleanup in the in-memory queue so a
+                // channel/playlist grid updates WITHOUT a restart: drop a standalone
+                // queued copy, and clear the downloaded state on any channel/playlist
+                // child so its card unlocks and becomes re-downloadable again (the
+                // "can't re-download a deleted channel video" bug).
+                if (Array.isArray(app.videosInQueue)) {
+                    app.videosInQueue = app.videosInQueue.filter(q => !(q.id === itemId && q.type !== 'playlist'));
+                    app.videosInQueue.forEach(q => {
+                        if (q.type === 'playlist' && Array.isArray(q.videos)) {
+                            q.videos.forEach(c => {
+                                if (c.id === itemId) {
+                                    delete c.status; delete c.progressPct; delete c.missing; c.selected = false;
+                                }
+                            });
+                        }
+                    });
+                    // Re-render the channel/playlist detail if it's the open view so
+                    // the unlocked card shows immediately.
+                    if (app.currentPlaylistId && typeof app.renderPlaylistDetail === 'function') {
+                        const pl = app.videosInQueue.find(i => i.type === 'playlist' && i.id === app.currentPlaylistId);
+                        if (pl) app.renderPlaylistDetail(pl);
+                    }
+                }
                 app.renderLibrary();
                 hideDetailPanel();
                 if (result?.skipped && result.skipped.length > 0) {
@@ -19013,7 +19045,23 @@
             });
             // Close the dropdown (also resets inline positioning)
             closeAllDropdownMenus();
-            // Re-render the detail view
+            // CHANNEL mode: the quality picker lives in the bottom selection action
+            // bar (the "pill"). A full renderPlaylistDetail() here tore that bar AND
+            // the current selection down, so the pill vanished and the user had to
+            // re-click a video to bring it back. Update the label IN PLACE instead —
+            // the data (defaultQuality + child selectedQuality) is already set above,
+            // so nothing else needs to repaint.
+            const chanQ = document.getElementById('pd-channel-action-quality');
+            const chanLabel = document.getElementById('pd-channel-action-quality-label');
+            if (chanQ && chanLabel) {
+                chanQ.classList.remove('open');
+                chanLabel.textContent = quality;
+                app.saveQueueState();
+                return;
+            }
+            // Playlist (non-channel) hero view: per-card quality badges rely on the
+            // re-render to reflect the new default, and there's no floating pill to
+            // lose there, so keep the original behavior.
             if (app.currentPlaylistId === playlistId) {
                 app.renderPlaylistDetail(pl);
             }
@@ -19637,6 +19685,7 @@
             let _msSuggTimer = null;
             let _msSuggList = [];
             let _msSuggIdx = -1;
+            let _msSuggAbort = 0;   // bumped to invalidate in-flight suggestion fetches
             const hideSugg = () => {
                 if (suggBox) suggBox.setAttribute('hidden', '');
                 _msSuggIdx = -1;
@@ -19664,8 +19713,12 @@
                 });
             };
             const fetchSugg = async (q) => {
+                const tok = ++_msSuggAbort;
                 try {
                     const res = await pywebview.api.search_youtube_suggestions(q);
+                    // Stale: a newer keystroke OR a committed search bumped the token
+                    // while we awaited the network — don't re-open the dropdown.
+                    if (tok !== _msSuggAbort) return;
                     _msSuggList = (res && res.suggestions) || [];
                     _msSuggIdx = -1;
                     paintSugg();
@@ -19701,6 +19754,7 @@
                         // Cancel pending suggestion fetch + clear list so the
                         // debounced timer can't re-show the dropdown after Enter.
                         if (_msSuggTimer) { clearTimeout(_msSuggTimer); _msSuggTimer = null; }
+                        _msSuggAbort++;   // abort any in-flight fetch awaiting network
                         _msSuggList = [];
                         hideSugg();
                         input.blur();
@@ -19714,6 +19768,9 @@
             if (goBtn) {
                 goBtn.addEventListener('click', () => {
                     const q = (input?.value || '').trim();
+                    if (_msSuggTimer) { clearTimeout(_msSuggTimer); _msSuggTimer = null; }
+                    _msSuggAbort++;   // abort any in-flight fetch so it can't re-show
+                    _msSuggList = [];
                     hideSugg();
                     if (q) _runMusicSearch(q, _musicState.searchKind);
                 });
@@ -22494,7 +22551,11 @@
                     if (v === true) { _musicPlayer.shuffle = true; _paintModeButtons(); }
                 }).catch(() => {});
                 pywebview.api.get_setting('music_repeat').then(v => {
-                    if (v === 'all' || v === 'one') { _musicPlayer.repeat = v; _paintModeButtons(); }
+                    if (v === 'all' || v === 'one') {
+                        _musicPlayer.repeat = v;
+                        if (_musicPlayer.audio) _musicPlayer.audio.loop = (v === 'one');
+                        _paintModeButtons();
+                    }
                 }).catch(() => {});
             } catch (_) {}
 
@@ -22691,6 +22752,12 @@
             if (repeat) repeat.addEventListener('click', () => {
                 const order = ['off', 'all', 'one'];
                 _musicPlayer.repeat = order[(order.indexOf(_musicPlayer.repeat) + 1) % 3];
+                // Repeat-one is driven by the native HTMLMediaElement.loop flag — the
+                // browser loops the current track seamlessly with no `ended` round-trip.
+                // The old path ("on ended: currentTime=0; play()") swallowed the
+                // play() promise rejection, so repeat silently did nothing — that was
+                // the user's "repeat button does nothing" bug.
+                if (_musicPlayer.audio) _musicPlayer.audio.loop = (_musicPlayer.repeat === 'one');
                 _paintModeButtons();
                 _paintMpPanel();
                 try { pywebview.api.set_setting('music_repeat', _musicPlayer.repeat); } catch (_) {}
@@ -22978,6 +23045,8 @@
                 }
                 const audio = _musicPlayer.audio;
                 audio.src = res.url;
+                // Carry repeat-one across track loads via the native loop flag.
+                audio.loop = (_musicPlayer.repeat === 'one');
                 // Run the linear slider value through the perceptual log curve before
                 // assigning to audio.volume — otherwise track-change resets perceived
                 // loudness because the slider's 0.2 becomes 0.2 actual gain (vs the
@@ -23565,6 +23634,13 @@
                 clearTimeout(_searchState.suggestionsTimer);
                 _searchState.suggestionsTimer = null;
             }
+            // Invalidate any ALREADY-DISPATCHED suggestion fetch that's still
+            // awaiting the network. Without this, a fetch that resolves AFTER the
+            // user pressed Enter calls renderSuggestions → removeAttribute('hidden')
+            // and the dropdown pops back over the results (the "suggestions stay
+            // after I search" bug). Bumping the abort token makes fetchSuggestions
+            // see a stale token and bail before it renders.
+            _searchState.suggestionsAbort++;
             // Wipe + hide the For-You landing so its OWNED / Recent / Because-you
             // sections don't bleed into the search-results layout while results
             // are coming in (the bug that caused the jumbled side-by-side

@@ -194,22 +194,25 @@ def _log_diag(msg):
 
 
 def _schedule_mac_maximize(window):
-    """Enter native macOS fullscreen on launch (covers entire screen, hides
-    menubar + Dock, separate Space). User-requested: matches the Windows
-    "maximized" feel of "fills the whole screen" more closely than Mac's
-    Zoom semantics (which keep menubar + Dock visible).
+    """Maximize the window to fill the visible screen on launch (menu bar + Dock
+    stay visible) WITHOUT entering native macOS fullscreen.
+
+    We deliberately no longer call toggleFullScreen_: a window in a native
+    fullscreen Space CANNOT be minimized (macOS greys out the yellow button and
+    ⌘M) — that was the user's "I can't minimize" bug. A maximized normal window
+    fills the screen the same way but keeps minimize working; the user can still
+    go full-immersive anytime via the green traffic-light button or the in-app F
+    shortcut.
 
     Recipe:
-      1. Hook `window.events.shown` for correct timing (window fully realized).
-      2. AppHelper.callAfter to dispatch on main thread (Cocoa requires
+      1. Hook `window.events.shown`/`loaded` for correct timing.
+      2. AppHelper.callAfter to dispatch on the main thread (Cocoa requires
          UI ops on main).
       3. Read `window.native` for the actual NSWindow instance.
-      4. Call `toggleFullScreen_(None)` ONCE — that's the standard Cocoa
-         "go fullscreen" entry point (same as double-clicking the green
-         button or pressing ⌃⌘F).
+      4. setFrame_display_(screen.visibleFrame(), True) — the Cocoa "zoom to
+         fill" without the fullscreen-Space side effects.
 
-    Guarded with `_did_fs['done']` so the timer fallbacks don't re-toggle
-    (which would EXIT fullscreen)."""
+    Guarded with `_did_fs['done']` so the timer fallbacks don't re-fire."""
     if sys.platform != 'darwin' or window is None:
         return
     import threading as _th
@@ -241,23 +244,39 @@ def _schedule_mac_maximize(window):
                             vis = bool(w.isVisible())
                             mini = bool(w.isMiniaturized())
                             in_fs = bool(w.styleMask() & (1 << 14))
-                            _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): visible={vis} mini={mini} in_fs={in_fs}')
+                            _log_diag(f'[ProTube] mac maximize on-main ({caller}): visible={vis} mini={mini} in_fs={in_fs}')
                             if not vis:
                                 continue
+                            # Maximize = fill the visible screen as a NORMAL window.
+                            # We intentionally do NOT toggleFullScreen_: a window in a
+                            # fullscreen Space can't be minimized (the user's bug). If
+                            # a prior build left us in fullscreen, back out first so
+                            # minimize is available again.
+                            if in_fs:
+                                w.toggleFullScreen_(None)
+                                _log_diag(f'[ProTube] mac maximize on-main ({caller}): exited stale fullscreen')
                             if mini:
                                 w.deminiaturize_(None)
-                            # CRITICAL: NSWindow needs FullScreenPrimary in its
-                            # collectionBehavior or toggleFullScreen_ silently
-                            # no-ops. Apple's docs flag this; pywebview's Cocoa
-                            # backend doesn't set it by default. 128 == (1<<7)
-                            # == NSWindowCollectionBehaviorFullScreenPrimary.
-                            cb = w.collectionBehavior()
-                            if not (cb & 128):
-                                w.setCollectionBehavior_(cb | 128)
-                                _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): set FullScreenPrimary collection behavior')
-                            if not in_fs:
-                                w.toggleFullScreen_(None)
-                                _log_diag(f'[ProTube] mac fullscreen on-main ({caller}): toggleFullScreen_ called')
+                            # Keep the window fullscreen-CAPABLE so the green
+                            # traffic-light button + the in-app F shortcut can still
+                            # enter true fullscreen on demand — we just don't enter it
+                            # now. 128 == NSWindowCollectionBehaviorFullScreenPrimary.
+                            # (pywebview's own toggle_fullscreen re-sets this on F, so
+                            # this only matters for the green button before first F.)
+                            try:
+                                cb = w.collectionBehavior()
+                                if not (cb & 128):
+                                    w.setCollectionBehavior_(cb | 128)
+                            except Exception:
+                                pass
+                            try:
+                                from AppKit import NSScreen as _NSScreen
+                                screen = w.screen() or _NSScreen.mainScreen()
+                                if screen is not None:
+                                    w.setFrame_display_(screen.visibleFrame(), True)
+                                    _log_diag(f'[ProTube] mac maximize on-main ({caller}): setFrame to visibleFrame')
+                            except Exception as _e:
+                                _log_diag(f'[ProTube] mac maximize on-main ({caller}) setFrame: {_e}')
                             _did_fs['done'] = True
                             break
                         except Exception as e:

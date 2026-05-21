@@ -18,6 +18,22 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.4.4 — 2026-05-21
+
+A batch of fixes across music, library, channels, search, downloads, and the window.
+
+- Fixes: **Music mode no longer trips YouTube's "confirm you're not a bot" wall as often.** Music search, collection-resolve, and downloads now go through the same throttle + automatic alternate-client retry the video side already had.
+- Fixes: **Repeat-one actually loops a song now.** Switched to the player's native loop so a repeated track replays reliably instead of silently stopping.
+- Fixes: **Deleted videos stay deleted.** Removing a video now also clears it from the download queue, so it no longer comes back in the library on the next launch. A deleted video downloaded from a channel also unlocks in that channel's grid so you can re-download it.
+- Fixes: **Changing a channel's download quality no longer drops your selection.** The quality menu updates in place; the dropdown stays open until you pick or click away.
+- Fixes: **Search suggestions disappear the moment you search** (no more dropdown lingering over the results).
+- Fixes: **Sharper channel thumbnails** — channel grids now show high-resolution (no longer the blurry low-res ones).
+- Fixes: **4K downloads grab true 4K more reliably** for videos that were silently coming down at ~720p.
+- Fixes: **Music download pill** sits neatly just above the music bar instead of floating off.
+- Changes: **The app opens maximized instead of locked into fullscreen, so you can minimize it.** Full-immersive fullscreen is still one click on the green button or the **F** key.
+
+---
+
 ## v1.4.1 — 2026-05-18 (hotfix)
 
 - Fixes: **2K / 4K videos played as a black screen / nothing in the in-app player on Mac.** The v1.3.1 download-quality fix made 2K/4K come down at the right resolution (was silently downgrading to 1080p before), but the resulting AV1-in-MP4 files couldn't be decoded by Mac's WKWebView — AV1 hardware decode is only on M3+ with macOS 14.4+ and even then unreliable. Three fixes layered: (1) on Mac, prefer **VP9-in-WebM** for downloads above 1080p — Safari decodes it natively, so playback is instant with no transcode; (2) the playability check correctly treats AV1 as unplayable on Mac, routing legacy AV1 library files through the on-play transcoder; (3) the on-play transcoder no longer wastes time on a `-c copy` remux that would just produce another unplayable AV1 file — it now jumps straight to a libx264 transcode when the source codec isn't playable in MP4 on this platform. Windows behavior unchanged (Chromium / WebView2 decodes AV1 in MP4 fine).

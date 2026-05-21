@@ -43,7 +43,7 @@ def YoutubeDL(*args, **kwargs):
 # App version. Surfaced in the Settings drawer's About section and used by
 # check_for_updates() to compare against the landing site's version.json.
 # Bump when shipping a build.
-__version__ = '1.4.3'
+__version__ = '1.4.4'
 
 # Where check_for_updates() looks for the release manifest. Points at the
 # landing site's version.json. If you change Netlify subdomain or move to a
@@ -1045,6 +1045,26 @@ class API:
         m = (msg or '').lower()
         return ("confirm you" in m and "not a bot" in m) or "sign in to confirm" in m
 
+    def _ydl_extract(self, url, opts, download=False):
+        """Extract via yt-dlp through the shared throttle gate, with one automatic
+        alternate-client retry on YouTube's no-cookies bot wall. This is the same
+        resilience the video fetch/download paths get inline (_fetch_worker,
+        _resolve_formats_worker, _download_worker); the music paths used to call
+        `with YoutubeDL(opts) as ydl: ydl.extract_info(...)` raw, so they had NO
+        throttle and NO bot-wall fallback — which is exactly why music actions
+        tripped the "Sign in to confirm you're not a bot" wall. Routing them
+        through here fixes that."""
+        with self._ytdlp_gate:
+            try:
+                with YoutubeDL(opts) as ydl:
+                    return ydl.extract_info(url, download=download)
+            except Exception as e:
+                if self._is_bot_check_error(str(e)):
+                    retry = {**opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
+                    with YoutubeDL(retry) as ydl:
+                        return ydl.extract_info(url, download=download)
+                raise
+
     def fetch_url_info(self, url, cookie_mode, cookie_value):
         # Dedupe ONLY the same URL — distinct URLs run concurrently, so
         # rapid clicks across different search cards all succeed instead of
@@ -1185,14 +1205,15 @@ class API:
 
         children = []
         for e in entries:
-            # Prefer mqdefault.jpg (320×180, ~10KB) over yt-dlp's highest-res
-            # entry (often maxresdefault.jpg, ~200KB). Channel grids render
-            # cards at ~260px wide, so mqdefault is the smallest size that
-            # still looks crisp — and an order of magnitude faster to load,
-            # which means thumbs don't flash blank when the user scrolls.
+            # Use hqdefault.jpg (480×360, ~15-25KB) — mqdefault (320×180) was
+            # visibly blurry on Retina/4K displays where channel cards still
+            # render ~260px wide (the user flagged "low-res thumbnails"). hqdefault
+            # always exists for every video, is still light enough that thumbs
+            # don't flash blank while scrolling, and matches the fallback used
+            # everywhere else in the app.
             vid_id = e.get('id')
             if vid_id:
-                thumb = f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg"
+                thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
             else:
                 thumbs = e.get('thumbnails') or []
                 thumb = (thumbs[-1].get('url') if thumbs else e.get('thumbnail')) or ''
@@ -1540,6 +1561,25 @@ class API:
                         # decode AV1 on Macs without M3+/macOS 14.4+ hardware), so we
                         # actively avoid it when a VP9 stream is published. On Windows
                         # Chromium handles AV1-in-MP4 natively, so we keep MP4-first.
+                        #
+                        # 2K/4K-specific fix: for some videos YouTube silently
+                        # PO-token-gates the default `web` client down to <=1080p
+                        # with NO error raised, so the cascade below bottoms out at
+                        # `best[height<=h]` = a muxed 720p — the "I picked 4K and got
+                        # 720p" bug. The `android_vr` client is confirmed (probed
+                        # 2026-05-21) to expose the full VP9-WebM + AV1 4K ladder AND
+                        # WebM/opus audio cookie-free, so we request it alongside the
+                        # defaults for >1080p. Scoped to >1080p so the <=1080p happy
+                        # path is untouched. ('default' keeps yt-dlp's normal client
+                        # set; we just add android_vr on top.)
+                        ea = opts.setdefault('extractor_args', {})
+                        yt_ea = ea.setdefault('youtube', {})
+                        clients = list(yt_ea.get('player_client') or [])
+                        if not clients:
+                            clients = ['default']
+                        if 'android_vr' not in clients:
+                            clients.append('android_vr')
+                        yt_ea['player_client'] = clients
                         if sys.platform == 'darwin':
                             opts['format'] = (
                                 f'bestvideo[height<={h}][ext=webm][vcodec^=vp9]+bestaudio[ext=webm]/'
@@ -3661,8 +3701,7 @@ class API:
                 'skip_download': True,
                 'extract_flat': 'in_playlist',
             })
-            with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+            info = self._ydl_extract(url, opts)
             entries = info.get('entries') or []
             # Some YT Music browse responses wrap tracks under a "Songs" tab; flat-extract
             # exposes them as nested entries with 'entries' key in each parent. Flatten.
@@ -3926,8 +3965,7 @@ class API:
             # the final filename layout and library entry.
             opts = self._get_ydl_opts('browser', 'none')
             opts.update({'quiet': True, 'no_warnings': True, 'skip_download': True})
-            with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+            info = self._ydl_extract(url, opts)
 
             vid = info.get('id') or ''
             if not vid:
@@ -4027,8 +4065,21 @@ class API:
             dl_opts['postprocessor_hooks'] = [pp_hook]
 
             self._send_to_js('updateMusicDownload', vid, 0)
-            with YoutubeDL(dl_opts) as ydl:
-                ydl.download([url])
+            # Bot-wall resilience (mirrors the video _download_worker): on a
+            # no-cookies "confirm you're not a bot" error, retry once through the
+            # alternate player clients. Not gated by _ytdlp_gate — the music queue
+            # processor already serialises downloads, and holding the gate for a
+            # whole download would starve concurrent metadata fetches.
+            try:
+                with YoutubeDL(dl_opts) as ydl:
+                    ydl.download([url])
+            except Exception as e_dl:
+                if self._is_bot_check_error(str(e_dl)):
+                    retry_dl = {**dl_opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
+                    with YoutubeDL(retry_dl) as ydl:
+                        ydl.download([url])
+                else:
+                    raise
 
             final_path = captured_filepath['path'] or ''
             # If postprocessors changed the extension (likely .m4a) the captured path
@@ -6029,6 +6080,44 @@ class API:
                     v['videos'] = [c for c in v.get('videos', []) if c.get('id') != video_id]
         else:
             self.settings['library'] = [v for v in lib if v.get('id') != video_id]
+
+        # Also fix the download QUEUE. A completed download lives in BOTH the
+        # library and the queue (status 'Done'); the frontend re-adds Done queue
+        # items to the library on load, so a delete that only touched the library
+        # resurrected the entry on the next launch (the "deleted videos come back
+        # from the dead" bug).
+        #   - Standalone queued copy: drop it.
+        #   - Channel/playlist child: do NOT remove it — the playlist/channel queue
+        #     entry IS that catalog, so removing the child would make the video
+        #     vanish from the channel grid on restart. Instead clear its 'Done'
+        #     state so (a) it isn't re-added to the library on next load and (b) the
+        #     card unlocks and is selectable/re-downloadable again.
+        queue = self.settings.get('queue', []) or []
+        new_queue = []
+        for q in queue:
+            if q.get('id') == video_id and q.get('type') != 'playlist':
+                continue
+            if q.get('type') == 'playlist':
+                for c in q.get('videos', []) or []:
+                    if c.get('id') == video_id:
+                        c.pop('status', None)
+                        c.pop('progressPct', None)
+                        c.pop('missing', None)
+                        c['selected'] = False
+            new_queue.append(q)
+        self.settings['queue'] = new_queue
+
+        # Drop any archived metadata snapshot too, so a later import-from-folder
+        # can't silently restore the entry the user just deleted "forever".
+        archive = self.settings.get('library_archive')
+        if archive and target.get('filepath'):
+            arc_key = self._archive_key(target.get('filepath'))
+            if arc_key and arc_key in archive:
+                try:
+                    del archive[arc_key]
+                except KeyError:
+                    pass
+
         self._save_settings()
 
         return {
