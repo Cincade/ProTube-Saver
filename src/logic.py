@@ -132,7 +132,7 @@ class API:
         else:
             # Fresh install or settings.json without a download_folder key —
             # use the default and persist it so the UI shows a real value.
-            self.settings["download_folder"] = self.download_folder
+            self._store.set("download_folder", self.download_folder)
 
         self.active_downloads = {}
         self.paused_ids = set()
@@ -2137,8 +2137,7 @@ class API:
         result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
         if result and len(result) > 0:
             self.download_folder = result[0]
-            self.settings['download_folder'] = self.download_folder
-            self._save_settings()
+            self._store.set('download_folder', self.download_folder)
             return self.download_folder
         return self.download_folder
     
@@ -3004,8 +3003,7 @@ class API:
             items = (sr or {}).get('results', []) or []
             items = [i for i in items if isinstance(i, dict) and i.get('type') == 'video'
                      and i.get('id') not in lib_ids][:10]
-            self.settings[cached_key] = {'at': int(time.time()), 'items': items}
-            self._save_settings()
+            self._store.set(cached_key, {'at': int(time.time()), 'items': items})
             return items
         except Exception:
             return []
@@ -3016,8 +3014,7 @@ class API:
         try:
             cur = self.settings.get('video_recent_searches', []) or []
             ql = (query or '').strip().lower()
-            self.settings['video_recent_searches'] = [q for q in cur if (q or '').strip().lower() != ql]
-            self._save_settings()
+            self._store.set('video_recent_searches', [q for q in cur if (q or '').strip().lower() != ql])
             return {'ok': True}
         except Exception as e:
             return {'error': str(e)}
@@ -3067,8 +3064,7 @@ class API:
 
     def clear_video_recent_searches(self):
         try:
-            self.settings['video_recent_searches'] = []
-            self._save_settings()
+            self._store.set('video_recent_searches', [])
             return {'ok': True}
         except Exception as e:
             return {'error': str(e)}
@@ -3134,8 +3130,7 @@ class API:
                         lib_ids = self._build_music_library_id_set()
                         items = [i for i in items if i.get('id') not in lib_ids]
                         result['because_you'] = items[:6]
-                        self.settings[cached_key] = {'at': int(time.time()), 'items': result['because_you']}
-                        self._save_settings()
+                        self._store.set(cached_key, {'at': int(time.time()), 'items': result['because_you']})
                     except Exception:
                         pass
 
@@ -3146,8 +3141,7 @@ class API:
             else:
                 try:
                     result['trending'] = self._fetch_yt_music_trending()
-                    self.settings['music_trending_cache'] = {'at': int(time.time()), 'items': result['trending']}
-                    self._save_settings()
+                    self._store.set('music_trending_cache', {'at': int(time.time()), 'items': result['trending']})
                 except Exception:
                     pass
 
@@ -3540,8 +3534,7 @@ class API:
                     'error': None,
                 }
                 q.append(entry)
-                self.settings['music_queue'] = q
-                self._save_settings()
+                self._store.set('music_queue', q)
                 queue_len = sum(1 for e in q if e.get('status') in ('queued', 'downloading'))
             self._music_queue_wake()
             self._emit_music_queue()
@@ -3785,8 +3778,7 @@ class API:
                     q.append(entry)
                     queued += 1
                     queued_ids.add(vid)
-                self.settings['music_queue'] = q
-                self._save_settings()
+                self._store.set('music_queue', q)
             # Initial 0% events so search-row rings paint immediately.
             for vid in video_ids:
                 if vid not in lib_ids:
@@ -4051,8 +4043,7 @@ class API:
                             new_cover = self._ensure_album_cover_local(alb)
                             if new_cover and new_cover != alb.get('cover_url'):
                                 alb['cover_url'] = new_cover
-                                self.settings['music_albums'] = albums
-                                self._save_settings()  # buffered by deferred ctx
+                                self._store.set('music_albums', albums)
                                 new_cover_marker = new_cover
                     except Exception:
                         pass
@@ -4135,8 +4126,7 @@ class API:
                 else:
                     cleaned.append(e)
             if cleaned != q:
-                self.settings['music_queue'] = cleaned
-                self._save_settings()
+                self._store.set('music_queue', cleaned)
         except Exception as ex:
             print(f'[ProTube/music] queue sanitize failed: {ex}')
 
@@ -4162,8 +4152,7 @@ class API:
                     changed = True
                     break
             if changed:
-                self.settings['music_queue'] = q
-                self._save_settings()
+                self._store.set('music_queue', q)
         if changed:
             self._emit_music_queue()
 
@@ -4210,8 +4199,7 @@ class API:
                 # but doing it inside the lock avoids racing the next iteration).
                 next_entry['status'] = 'downloading'
                 next_entry['started_at'] = int(time.time())
-                self.settings['music_queue'] = q
-                self._save_settings()
+                self._store.set('music_queue', q)
                 self._music_queue_active += 1
             self._emit_music_queue()
             queue_id = next_entry.get('id')
@@ -4251,8 +4239,7 @@ class API:
             was = target.get('status')
             if was == 'queued':
                 # Drop immediately — worker never started for this one.
-                self.settings['music_queue'] = [e for e in q if e.get('id') != track_id]
-                self._save_settings()
+                self._store.set('music_queue', [e for e in q if e.get('id') != track_id])
             elif was == 'downloading':
                 # Worker is running — flag for cancellation. The hook checks
                 # this on every progress tick and raises to abort.
@@ -4270,8 +4257,7 @@ class API:
             kept = [e for e in q if e.get('status') not in ('done', 'cancelled')]
             cleared = len(q) - len(kept)
             if cleared:
-                self.settings['music_queue'] = kept
-                self._save_settings()
+                self._store.set('music_queue', kept)
         if cleared:
             self._emit_music_queue()
         return {'cleared': cleared}
@@ -4293,8 +4279,7 @@ class API:
             target['error'] = None
             target['started_at'] = None
             target['completed_at'] = None
-            self.settings['music_queue'] = q
-            self._save_settings()
+            self._store.set('music_queue', q)
         self._music_queue_wake()
         self._emit_music_queue()
         return {'ok': True}
@@ -4314,8 +4299,7 @@ class API:
                     continue
                 kept.append(e)
             if cancelled:
-                self.settings['music_queue'] = kept
-                self._save_settings()
+                self._store.set('music_queue', kept)
         if cancelled:
             self._emit_music_queue()
         return {'cancelled': cancelled}
@@ -4328,8 +4312,7 @@ class API:
         except Exception:
             return {'ok': False, 'error': 'invalid value'}
         self.max_concurrent_music_downloads = n
-        self.settings['max_concurrent_music_downloads'] = n
-        self._save_settings()
+        self._store.set('max_concurrent_music_downloads', n)
         self._music_queue_wake()
         return {'ok': True, 'value': n}
 
@@ -4365,8 +4348,7 @@ class API:
                     changed = True
             if changed:
                 with self._music_queue_lock:
-                    self.settings['music_library'] = lib
-                    self._save_settings()
+                    self._store.set('music_library', lib)
         except Exception:
             pass
 
@@ -4446,8 +4428,7 @@ class API:
                     a['artist'] = counts.most_common(1)[0][0]
                     changed = True
             if changed:
-                self.settings['music_albums'] = albums
-                self._save_settings()
+                self._store.set('music_albums', albums)
         except Exception:
             pass
 
@@ -4483,12 +4464,13 @@ class API:
                 if vid and tb.startswith('pt:thumb:alb_'):
                     t['thumbnail'] = f'https://i.ytimg.com/vi/{vid}/hqdefault.jpg'
                     changed_lib = True
+            _upd = {}
             if changed_albums:
-                self.settings['music_albums'] = albums
+                _upd['music_albums'] = albums
             if changed_lib:
-                self.settings['music_library'] = lib
-            if changed_albums or changed_lib:
-                self._save_settings()
+                _upd['music_library'] = lib
+            if _upd:
+                self._store.update(_upd)
         except Exception:
             pass
 
@@ -4499,8 +4481,7 @@ class API:
         lib = self.settings.get('music_library', []) or []
         lib = [t for t in lib if t.get('id') != track['id']]
         lib.append(track)
-        self.settings['music_library'] = lib
-        self._save_settings()
+        self._store.set('music_library', lib)
         return True
 
     def mark_music_seen(self, track_id):
@@ -4516,14 +4497,13 @@ class API:
                 changed = True
                 break
         if changed:
-            self._save_settings()
+            self._store.save()
         return {'ok': True}
 
     def remove_from_music_library(self, track_id):
         """Drop a track from the library. Doesn't delete the file on disk."""
         lib = self.settings.get('music_library', []) or []
-        self.settings['music_library'] = [t for t in lib if t.get('id') != track_id]
-        self._save_settings()
+        self._store.set('music_library', [t for t in lib if t.get('id') != track_id])
         return {'ok': True}
 
     def delete_music_track(self, track_id):
@@ -4535,8 +4515,7 @@ class API:
                 os.remove(target['filepath'])
             except OSError as e:
                 print(f'[ProTube/music] failed to delete {target["filepath"]}: {e}')
-        self.settings['music_library'] = [t for t in lib if t.get('id') != track_id]
-        self._save_settings()
+        self._store.set('music_library', [t for t in lib if t.get('id') != track_id])
         return {'ok': True}
 
     def hide_music_track(self, track_id, hidden=True):
@@ -4560,7 +4539,7 @@ class API:
                     changed = True
                 break
         if changed:
-            self._save_settings()
+            self._store.save()
         return {'ok': True, 'hidden': new_state}
 
     def bulk_hide_music_tracks(self, track_ids, hidden=True):
@@ -4584,7 +4563,7 @@ class API:
                     changed = True
                 count += 1
         if changed:
-            self._save_settings()
+            self._store.save()
         return {'ok': True, 'hidden': new_state, 'count': count}
 
     def bulk_remove_music_tracks(self, track_ids):
@@ -4600,8 +4579,7 @@ class API:
         removed = [t.get('id') for t in lib if t.get('id') in ids]
         if not removed:
             return {'ok': True, 'removed': [], 'count': 0}
-        self.settings['music_library'] = [t for t in lib if t.get('id') not in ids]
-        self._save_settings()
+        self._store.set('music_library', [t for t in lib if t.get('id') not in ids])
         return {'ok': True, 'removed': removed, 'count': len(removed)}
 
     def bulk_delete_music_tracks(self, track_ids):
@@ -4630,8 +4608,7 @@ class API:
                 # No file on disk to delete, but still drop the entry — count
                 # it as deleted so the user sees the row vanish.
                 deleted += 1
-        self.settings['music_library'] = [t for t in lib if t.get('id') not in ids]
-        self._save_settings()
+        self._store.set('music_library', [t for t in lib if t.get('id') not in ids])
         return {'ok': True, 'deleted': deleted, 'errors': errors, 'count': deleted + errors}
 
     # ----------------------------------------------------------------- #
@@ -4701,8 +4678,7 @@ class API:
                             os.remove(fp)
                         except OSError as e:
                             print(f'[ProTube/music] failed to delete {fp}: {e}')
-            # Drop those entries from the library.
-            self.settings['music_library'] = [
+            lib = [
                 t for t in lib
                 if not (t.get('id') in track_id_set or t.get('album_id') == album_id)
             ]
@@ -4713,9 +4689,11 @@ class API:
             for t in lib:
                 if t.get('album_id') == album_id:
                     t.pop('album_id', None)
-        # Drop the album record.
-        self.settings['music_albums'] = [a for a in albums if a.get('id') != album_id]
-        self._save_settings()
+        # Drop the album record and persist both changes atomically.
+        self._store.update({
+            'music_library': lib,
+            'music_albums': [a for a in albums if a.get('id') != album_id],
+        })
         return {'ok': True}
 
     def mark_album_seen(self, album_id):
@@ -4731,7 +4709,7 @@ class API:
                 changed = True
                 break
         if changed:
-            self._save_settings()
+            self._store.save()
         return {'ok': True}
 
     # ---- Internal album helpers -------------------------------------- #
@@ -4756,8 +4734,7 @@ class API:
             album_entry['added_at'] = existing.get('added_at') or album_entry.get('added_at')
             albums = [a for a in albums if a.get('id') != album_entry['id']]
         albums.append(album_entry)
-        self.settings['music_albums'] = albums
-        self._save_settings()
+        self._store.set('music_albums', albums)
         return True
 
     def _stamp_existing_tracks_with_album(self, track_ids, album_id):
@@ -4774,8 +4751,7 @@ class API:
                 t['album_id'] = album_id
                 changed = True
         if changed:
-            self.settings['music_library'] = lib
-            self._save_settings()
+            self._store.set('music_library', lib)
 
     def _album_downloaded_count(self, album_id):
         """Count how many of the album's track_ids are currently in the library."""
@@ -4796,7 +4772,7 @@ class API:
         album['downloaded_count'] = self._album_downloaded_count(album_id)
         if album['downloaded_count'] >= album.get('total_tracks', 0) and album.get('total_tracks', 0) > 0:
             album['status'] = 'complete'
-        self._save_settings()
+        self._store.save()
 
     def _bump_album_progress(self, album_id):
         """A track from this album just landed. Increment the counter, emit a
@@ -5294,8 +5270,7 @@ class API:
             n = 2
         self.max_concurrent_downloads = n
         self.download_semaphore = threading.Semaphore(n)
-        self.settings['max_concurrent_downloads'] = n
-        self._save_settings()
+        self._store.set('max_concurrent_downloads', n)
         return n
 
     def _user_default_quality(self):
@@ -5856,8 +5831,7 @@ class API:
 
     def save_library(self, lib):
         """Overwrite the library. Frontend calls this after reorder/remove operations."""
-        self.settings['library'] = lib
-        self._save_settings()
+        self._store.set('library', lib)
 
     def add_to_library(self, video):
         """Append a single video (or playlist with all children Done) to the library."""
@@ -5871,7 +5845,7 @@ class API:
         # Dedupe by id — if somehow already in the library, replace it (latest wins)
         lib = [v for v in lib if v.get('id') != video['id']]
         lib.append(video)
-        self.settings['library'] = lib
+        self.settings['library'] = lib  # noqa: direct-to-live-dict
         # If this was previously removed (archived by filepath), pop the archive
         # entry — the live library is now canonical again.
         archive = self.settings.get('library_archive')
@@ -5882,7 +5856,7 @@ class API:
                     del archive[arc_key]
                 except KeyError:
                     pass
-        self._save_settings()
+        self._store.save()
         return True
 
     def _archive_key(self, filepath):
@@ -5920,8 +5894,7 @@ class API:
             if v.get('id') == video_id:
                 self._archive_entry(v)
                 break
-        self.settings['library'] = [v for v in lib if v.get('id') != video_id]
-        self._save_settings()
+        self._store.set('library', [v for v in lib if v.get('id') != video_id])
         return True
 
     def delete_video_from_library_and_disk(self, video_id):
@@ -6000,7 +5973,7 @@ class API:
                 if v.get('type') == 'playlist':
                     v['videos'] = [c for c in v.get('videos', []) if c.get('id') != video_id]
         else:
-            self.settings['library'] = [v for v in lib if v.get('id') != video_id]
+            self.settings['library'] = [v for v in lib if v.get('id') != video_id]  # noqa: direct-to-live-dict
 
         # Also fix the download QUEUE. A completed download lives in BOTH the
         # library and the queue (status 'Done'); the frontend re-adds Done queue
@@ -6026,7 +5999,7 @@ class API:
                         c.pop('missing', None)
                         c['selected'] = False
             new_queue.append(q)
-        self.settings['queue'] = new_queue
+        self.settings['queue'] = new_queue  # noqa: direct-to-live-dict
 
         # Drop any archived metadata snapshot too, so a later import-from-folder
         # can't silently restore the entry the user just deleted "forever".
@@ -6039,7 +6012,7 @@ class API:
                 except KeyError:
                     pass
 
-        self._save_settings()
+        self._store.save()
 
         return {
             'ok': True,
@@ -6197,8 +6170,7 @@ class API:
         lib = self.settings.get('library', [])
         lib = [v for v in lib if v.get('id') != playlist['id']]
         lib.append(playlist_copy)
-        self.settings['library'] = lib
-        self._save_settings()
+        self._store.set('library', lib)
         return True
 
     def check_playlist_updates(self, playlist_id):
@@ -6625,8 +6597,7 @@ class API:
 
     def force_remigrate(self):
         """Clear migration flag and re-run. For testing / recovery when migration failed."""
-        self.settings['_library_migrated'] = False
-        self._save_settings()
+        self._store.set('_library_migrated', False)
         result = self._migrate_queue_done_to_library()
         return result
 
@@ -6739,8 +6710,7 @@ class API:
                 seen_filepaths[fp_key] = len(new_lib)
             new_lib.append(v)
 
-        self.settings['library'] = new_lib
-        self._save_settings()
+        self._store.set('library', new_lib)
         return {
             'fixed_paths': fixed_paths,
             'dropped_broken': dropped_broken,
@@ -7748,8 +7718,7 @@ class API:
             self._import_progress = {'current': 0, 'total': 0, 'phase': 'error'}
             return {'error': str(e), 'folder': target}
 
-        self.settings['library'] = library
-        self._save_settings()
+        self._store.set('library', library)
         self._import_progress = {'current': total_count, 'total': total_count, 'phase': 'done'}
 
         # Kick off a background pass to extract frame thumbnails for the
@@ -8278,11 +8247,8 @@ class API:
                     # Not done: keep in queue
                     new_queue.append(item)
 
-        # Commit changes
-        self.settings['library'] = library
-        self.settings['queue'] = new_queue
-        self.settings['_library_migrated'] = True
-        self._save_settings()
+        # Commit changes atomically.
+        self._store.update({'library': library, 'queue': new_queue, '_library_migrated': True})
 
         # Announce to UI if anything moved. Frontend listens for this toast on first load.
         if moved_count > 0 or purged_count > 0:
