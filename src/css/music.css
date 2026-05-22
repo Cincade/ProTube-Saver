@@ -1,0 +1,1755 @@
+        /* ================================================== */
+        /* MUSIC VIEW (F10) — Spotify-shaped surface           */
+        /* ================================================== */
+        #music-view { position: relative; padding: 4px 0 0; }
+        .music-page-title {
+            font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+            color: #fff; margin-bottom: 14px;
+        }
+        .music-subtabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid #1f1f1f; flex-shrink: 0; }
+        .music-subtab {
+            padding: 10px 16px;
+            background: transparent; border: none;
+            color: #8a8a8a; font-family: inherit; font-size: 13.5px; font-weight: 600;
+            cursor: pointer; position: relative;
+        }
+        .music-subtab.active { color: #fff; }
+        .music-subtab.active::after {
+            content: ''; position: absolute; left: 16px; right: 16px; bottom: -1px;
+            height: 2px; background: #3b82f6; border-radius: 2px;
+        }
+        .music-subtab:hover:not(.active) { color: #d4d4d4; }
+        .music-pane { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        .music-pane.active { display: flex; }
+
+        /* Music subtab badge — small blue pill on the Downloads tab when items
+           are queued or downloading. Hidden when empty. */
+        .music-subtab-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 6px; margin-left: 8px;
+            background: #3b82f6; color: #fff; border-radius: 9px;
+            font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+            line-height: 1; vertical-align: middle;
+        }
+        .music-subtab-badge[hidden] { display: none; }
+
+        /* ============================================================
+           Music downloads queue (.mq-* — replaces the older .mdl-*).
+           Visually mirrors the video queue's .video-row chrome so the
+           two surfaces feel like one app. Adapts only for music-specific
+           bits: smaller (56×56) art, an album-grouped collapsible header,
+           and an inline error message on failed rows.
+           ============================================================ */
+        .mq-toolbar {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 14px; flex-shrink: 0;
+        }
+        .mq-meta { color: #737373; font-size: 12px; }
+        .mq-clear-done {
+            margin-left: auto;
+            background: transparent; border: 1px solid #2a2a2a;
+            color: #c0c0c0; font-family: inherit; font-size: 12px; font-weight: 500;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+        }
+        .mq-clear-done:hover { border-color: #3b82f6; color: #3b82f6; }
+        .mq-clear-done[hidden] { display: none; }
+
+        .mq-list {
+            flex: 1; overflow-y: auto; padding-bottom: 24px;
+            display: flex; flex-direction: column;
+        }
+        .mq-list:empty { display: none; }
+
+        /* Empty state — copied verbatim from .queue-empty so the music
+           Downloads pane and the video queue's empty state feel identical. */
+        .mq-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .mq-empty > * { max-width: 420px; }
+        .mq-empty-icon {
+            width: 48px; height: 48px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            color: #3b82f6;
+            margin-bottom: 4px;
+        }
+        .mq-empty-icon svg { width: 22px; height: 22px; }
+        .mq-empty-title {
+            font-size: 15px; font-weight: 600;
+            color: #d4d4d4; letter-spacing: -0.01em;
+        }
+        .mq-empty-hint {
+            font-size: 12.5px;
+            color: #737373;
+            max-width: 280px;
+            line-height: 1.5;
+        }
+        /* Hide empty state when the list has rows */
+        #music-pane-downloads:has(.mq-list:not(:empty)) .mq-empty { display: none; }
+
+        /* ----- Row chrome (mirrors .video-row) ----- */
+        .mq-row {
+            padding: 10px 12px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: 12px;
+            transition: all 0.15s;
+            background: #0f0f0f;
+            position: relative;
+            cursor: pointer;
+        }
+        .mq-row:hover {
+            background: #141414;
+            border-color: #262626;
+        }
+
+        /* Status modifiers — same colour language as .video-row.is-error /
+           .video-row.is-done so the two queues read the same. */
+        .mq-row.is-downloading { border-color: rgba(59, 130, 246, 0.25); }
+        .mq-row.is-done { border-color: rgba(16, 185, 129, 0.18); }
+        .mq-row.is-done:hover { border-color: rgba(16, 185, 129, 0.30); }
+        .mq-row.is-failed { border-color: rgba(220, 38, 38, 0.30); }
+        .mq-row.is-failed:hover { border-color: rgba(220, 38, 38, 0.50); }
+        .mq-row.is-cancelled { opacity: 0.7; }
+
+        .mq-art {
+            position: relative;
+            width: 56px; height: 56px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        .mq-art img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+
+        .mq-details {
+            flex: 1;
+            min-width: 0;
+        }
+        .mq-title {
+            font-size: 14px; font-weight: 600;
+            color: #f5f5f5;
+            margin-bottom: 3px;
+            line-height: 1.35;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mq-sub {
+            font-size: 12px;
+            color: #737373;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* Inline error — only visible on failed rows. Shown by default so the
+           user doesn't have to hover or open a panel to read it. */
+        .mq-error {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #dc2626;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .mq-row:not(.is-failed) .mq-error { display: none; }
+        /* Allow click-to-dismiss inline error so the user can collapse it */
+        .mq-row.is-failed.error-dismissed .mq-error { display: none; }
+
+        /* Status pill — mirror .status-badge sizing + colour tokens. */
+        .mq-status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .mq-status-pill.queued {
+            background: rgba(115, 115, 115, 0.12);
+            color: #a0a0a0;
+            border: 1px solid rgba(115, 115, 115, 0.3);
+        }
+        .mq-status-pill.downloading {
+            background: rgba(59, 130, 246, 0.12);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.30);
+        }
+        .mq-status-pill.done {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .mq-status-pill.failed {
+            background: rgba(220, 38, 38, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(220, 38, 38, 0.35);
+        }
+        .mq-status-pill.cancelled {
+            background: rgba(115, 115, 115, 0.12);
+            color: #a0a0a0;
+            border: 1px solid rgba(115, 115, 115, 0.3);
+        }
+        /* Green check badge — same visual identity as .mtr-add.in-library
+           "already in library" indicator. Used in place of a "Done" pill so
+           done-state reads as the same primitive across search + queue. */
+        .mq-done-check {
+            width: 28px; height: 28px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #10b981;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .mq-done-check svg { width: 14px; height: 14px; display: block; }
+
+        /* Cancel/retry icon button — mirrors .status-icon-btn from the video
+           queue (square 22×22, border-radius 5px, same hover token language).
+           The previous round design here didn't match the video queue and
+           the user flagged it. */
+        .mq-action {
+            width: 22px; height: 22px;
+            padding: 0;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 5px;
+            color: #737373;
+            cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .mq-action:hover {
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .mq-action.retry:hover {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.08);
+        }
+        .mq-action svg { width: 12px; height: 12px; display: block; }
+
+        /* Progress group — text + bar stacked, mirrors the video queue's
+           .progress-container which shows percent above the fill bar. Inline
+           below the title/sub instead of floating at the row edge. */
+        .mq-progress {
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 100%;
+        }
+        .mq-progress-text {
+            font-size: 10px;
+            font-weight: 600;
+            color: #3b82f6;
+            font-variant-numeric: tabular-nums;
+        }
+        .mq-progress-bar-bg {
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .mq-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.3s;
+        }
+
+        /* Fade-out for completed rows */
+        .mq-row.fading {
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        /* ----- Album group (the music-specific addition) ----- */
+        /* A fatter version of .mq-row that holds nested rows. Same border-radius,
+           same colour tokens; just wider art + an aggregate progress label +
+           a chevron. Default collapsed. */
+        .mq-album-group {
+            margin-bottom: 6px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            background: #0f0f0f;
+            overflow: hidden;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .mq-album-group:hover { border-color: #262626; }
+        .mq-album-group.expanded { background: #0c0c0c; }
+
+        .mq-album-header {
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: 12px;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: left;
+            color: inherit;
+            font-family: inherit;
+            cursor: pointer;
+            position: relative;
+        }
+        .mq-album-header:hover { background: #141414; }
+
+        .mq-album-art {
+            position: relative;
+            width: 56px; height: 56px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        .mq-album-art img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+        .mq-album-details {
+            flex: 1; min-width: 0;
+        }
+        .mq-album-title {
+            font-size: 14px; font-weight: 600;
+            color: #fff;
+            margin-bottom: 3px;
+            line-height: 1.35;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mq-album-sub {
+            font-size: 12px;
+            color: #8a8a8a;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mq-album-progress-label {
+            color: #c0c0c0;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            min-width: 56px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .mq-album-actions {
+            display: flex; align-items: center; gap: 6px;
+            flex-shrink: 0;
+        }
+        .mq-album-chev {
+            background: transparent; border: none; color: #8a8a8a;
+            cursor: pointer;
+            padding: 4px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: color 0.15s, background 0.15s, transform 0.18s;
+            flex-shrink: 0;
+        }
+        .mq-album-chev:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .mq-album-chev svg { width: 14px; height: 14px; }
+        .mq-album-group.expanded .mq-album-chev { transform: rotate(180deg); }
+
+        /* Aggregate progress on the album header — same 4px height as the
+           per-row .mq-progress-bar-bg so the two read consistently. */
+        .mq-album-progress {
+            margin-top: 6px;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            pointer-events: none;
+            width: 100%;
+        }
+        .mq-album-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.3s;
+        }
+
+        .mq-album-body {
+            display: none;
+            padding: 4px 8px 8px 8px;
+            background: #0a0a0a;
+            border-top: 1px solid #1a1a1a;
+        }
+        .mq-album-group.expanded .mq-album-body { display: block; }
+        /* New album-row primitive uses .playlist-row classes; body sits as the
+           next sibling after the row, shown when the row has .expanded. */
+        .mq-album-pl-row + .mq-album-body { display: none; }
+        .mq-album-pl-row.expanded + .mq-album-body { display: block; }
+        /* Square 68px album cover — sized to match playlist-thumb-stack height
+           so it lines up visually with video playlist rows. */
+        .mq-album-pl-thumb {
+            width: 68px; height: 68px;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .mq-album-pl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        /* Cancel-all stays visible (this row IS the "cancel target" signal),
+           not the usual hover-only .remove-btn behavior on .playlist-row. */
+        .mq-album-pl-row .mq-album-cancel-all { opacity: 1; }
+        /* Expand chevron rotates when row is expanded. Reuse .playlist-open-hint
+           for hover/layout but show only the chevron (no "Open" text). */
+        .mq-album-toggle svg { transition: transform 0.2s; width: 14px; height: 14px; }
+        .mq-album-pl-row.expanded .mq-album-toggle svg { transform: rotate(180deg); }
+        /* Nested rows under an album header sit a touch tighter visually. */
+        .mq-album-body .mq-row { background: #0d0d0d; }
+        .mq-album-body .mq-row:hover { background: #131313; }
+
+        /* Library pane */
+        .music-lib-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-shrink: 0; }
+        .music-lib-sort {
+            background: #141414; border: 1px solid #1f1f1f; border-radius: 7px;
+            padding: 8px 12px; color: #d4d4d4; font-family: inherit; font-size: 12.5px;
+            cursor: pointer; display: flex; align-items: center; gap: 8px;
+        }
+        .music-lib-sort:hover { border-color: #2a2a2a; }
+        .music-lib-meta { margin-left: auto; color: #6e6e6e; font-size: 12px; }
+        .music-grid {
+            flex: 1; overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+            gap: 16px;
+            padding-bottom: 24px;
+            align-content: start;
+        }
+        .music-grid:empty { display: none; }
+        /* Mirror .library-card hover treatment: subtle blue-outline on hover,
+           tiny press-down on active. Keeps the music grid visually consistent
+           with the video library. */
+        .music-card {
+            cursor: pointer; padding: 10px; border-radius: 9px;
+            border: 1px solid transparent;
+            transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+            position: relative;
+        }
+        .music-card:hover {
+            background: #161616;
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        .music-card:active { transform: scale(0.995); transition: transform 0.05s; }
+
+        /* ----- Music library selection mode (mirrors .library-card.is-selectable / .is-selected) -----
+           Activation: right-click a music card OR click the per-card checkbox
+           that appears on hover. Once active, every card click toggles
+           selection instead of playing the track / opening the album. Same
+           blue ring + checkmark visuals as the video library so the two
+           selection modes feel identical. Esc cancels. */
+        .music-card.is-selectable { user-select: none; -webkit-user-select: none; }
+        /* The checkmark lives inside .music-card-art at top-left so it overlays
+           the artwork (not the surrounding card padding). High z-index keeps
+           it on top of the NEW pill / hidden badge during selection. */
+        .music-card-select-mark {
+            display: none;
+            position: absolute;
+            top: 8px; left: 8px;
+            width: 22px; height: 22px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border: 1.5px solid rgba(255, 255, 255, 0.85);
+            border-radius: 50%;
+            align-items: center; justify-content: center;
+            color: #fff;
+            z-index: 5;
+            pointer-events: none;
+            transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+            opacity: 0;
+        }
+        /* Selection mark is hidden until selection mode is active. Entering
+           selection mode happens via right-click → Select (same as the video
+           library card). This avoids the always-on hover checkbox the user
+           flagged as inconsistent with the video side. */
+        .music-card.is-selectable .music-card-select-mark { display: flex; opacity: 1; pointer-events: auto; }
+        /* When the checkmark is visible, dim the NEW pill so the two don't
+           visually fight for the same top-left corner. */
+        .music-card.is-selectable .music-card-new { opacity: 0.35; transition: opacity 0.12s; }
+        .music-card.is-selected .music-card-select-mark {
+            background: #3b82f6; border-color: #3b82f6;
+        }
+        .music-card.is-selected {
+            background: rgba(59, 130, 246, 0.10);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35), 0 8px 16px -4px rgba(0, 0, 0, 0.4);
+        }
+        .music-card.is-selected:hover { background: rgba(59, 130, 246, 0.13); }
+        .music-card-select-mark svg {
+            width: 12px; height: 12px;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+        .music-card.is-selected .music-card-select-mark svg { opacity: 1; }
+        /* Hide the on-hover play button while selection mode is on — the card
+           is now a selection target, not a play surface. */
+        body.in-music-selection-mode .music-card-play { display: none !important; }
+        .music-card-art {
+            width: 100%; aspect-ratio: 1;
+            background: #1a1a1a; border-radius: 6px;
+            overflow: hidden; position: relative;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .music-card-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .music-card-play {
+            position: absolute; bottom: 10px; right: 10px;
+            width: 44px; height: 44px;
+            background: #fff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transform: translateY(8px);
+            transition: opacity 0.18s ease, transform 0.18s ease, background 0.12s ease;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+            color: #0a0a0a;
+        }
+        .music-card:hover .music-card-play { opacity: 1; transform: translateY(0); }
+        .music-card-play:hover { background: #f0f0f0; }
+        .music-card-play svg { width: 16px; height: 16px; display: block; }
+        .music-card-title { font-size: 13.5px; font-weight: 600; color: #f5f5f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+        .music-card-artist { font-size: 12px; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .music-card.now-playing { background: rgba(59, 130, 246, 0.08); }
+        .music-card.now-playing .music-card-title { color: #3b82f6; }
+        /* Hidden-card visual when "Show hidden" is on. Same affordance as
+           .library-card.is-hidden — dimmed plus a small badge on the artwork
+           so the user can tell at a glance which cards are in the hidden
+           state. Without dimming there's no signal that toggling "Show hidden"
+           off would remove these from view. */
+        .music-card.is-hidden { opacity: 0.55; }
+        .music-card.is-hidden:hover { opacity: 0.85; }
+        .music-card-hidden-badge {
+            position: absolute;
+            top: 16px; right: 16px;
+            background: rgba(20, 20, 20, 0.85);
+            color: #d4d4d4;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+        }
+        /* NEW pill — shown for tracks added in the last 24h. Top-left of artwork
+           so it doesn't clash with the bottom-right play button. */
+        .music-card-new {
+            position: absolute; top: 16px; left: 16px;
+            background: #3b82f6; color: #fff;
+            font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em;
+            padding: 3px 7px; border-radius: 4px;
+            text-transform: uppercase;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            pointer-events: none;
+        }
+        /* Album card variant — same .music-card shell, but with a bottom-left
+           "ALBUM · N tracks" pill on the artwork + an aggregate-progress ring
+           overlay while the album is still downloading. */
+        .music-card-album-pill {
+            position: absolute; bottom: 10px; left: 10px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #3b82f6;
+            font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+            padding: 3px 8px; border-radius: 4px;
+            text-transform: uppercase;
+            backdrop-filter: blur(6px);
+            pointer-events: none;
+            max-width: calc(100% - 70px);   /* don't overlap the play button */
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        /* Aggregate-progress ring + % overlay on a downloading album card.
+           Same blue-ring pattern as per-track downloads. r=46 (in a 100×100
+           viewBox) → circumference 2π·46 ≈ 289.03. */
+        /* Dim the cover while downloading so the ring + % overlay reads, but
+           keep the art recognizable — 0.55 felt washed-out (user 2026-05-16:
+           "can barely see the cover"). 0.72 is the sweet spot. */
+        .music-card.album-downloading .music-card-art img { opacity: 0.72; }
+        .music-card.album-downloading .music-card-play { display: none; }
+        /* Hide the "Album · N tracks" pill while downloading — the centered
+           ring + % already conveys "this is an album in progress". Two pieces
+           of overlapping info on the same artwork read as visual noise. */
+        .music-card.album-downloading .music-card-album-pill { display: none; }
+        .mcd-ring-wrap {
+            position: absolute; inset: 0;
+            display: none;
+            align-items: center; justify-content: center;
+            pointer-events: none;
+        }
+        .music-card.album-downloading .mcd-ring-wrap { display: flex; }
+        .mcd-ring-wrap svg { width: 28%; height: 28%; transform: rotate(-90deg); }
+        .mcd-ring-wrap .ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 10; }
+        .mcd-ring-wrap .ring-fg {
+            fill: none; stroke: #3b82f6; stroke-width: 10; stroke-linecap: round;
+            transition: stroke-dashoffset 0.25s ease;
+        }
+        .mcd-ring-pct {
+            position: absolute;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 11px; font-weight: 600; color: #fff;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+        }
+        /* ---- Music Album Detail view (mad-*) ----
+           Spotify-shaped album page: blurred-art hero up top with art + meta +
+           action row, flat track list below. Left-aligned (browsing surface)
+           in contrast to the F3 centered now-playing player. Display rule is
+           scoped to .active so the .view-pane default of display:none wins
+           on other tabs (the "view-pane gotcha" called out in protube-ui). */
+        #music-album-detail-view { padding: 0; }
+        #music-album-detail-view.active { display: flex; }
+        .mad-scroll {
+            flex: 1; overflow-y: auto;
+            display: flex; flex-direction: column;
+            min-height: 0;
+        }
+        .mad-hero {
+            position: relative;
+            padding: 28px 36px 24px;
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+        .mad-hero-backdrop {
+            position: absolute; inset: 0;
+            background-size: cover;
+            background-position: center;
+            filter: blur(70px) saturate(1.4);
+            transform: scale(1.2);
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .mad-hero-scrim {
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, rgba(10, 10, 10, 0.35) 0%, rgba(10, 10, 10, 0.85) 75%, #0a0a0a 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .mad-hero > * { position: relative; z-index: 2; }
+        .mad-back {
+            background: rgba(0, 0, 0, 0.4); border: none; color: #c0c0c0; cursor: pointer;
+            width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: color 0.12s, background 0.12s;
+            align-self: flex-start;
+            margin-bottom: 22px;
+        }
+        .mad-back:hover { color: #fff; background: rgba(0, 0, 0, 0.6); }
+        .mad-back svg { width: 18px; height: 18px; transform: rotate(90deg); }
+        .mad-hero-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 28px;
+        }
+        .mad-art {
+            width: 240px; height: 240px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1a1a1a;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+            flex-shrink: 0;
+        }
+        .mad-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mad-meta {
+            display: flex; flex-direction: column;
+            min-width: 0;
+            padding-bottom: 6px;
+        }
+        .mad-kind {
+            font-size: 11px; font-weight: 700; color: #8a8a8a;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .mad-title {
+            font-size: 38px; font-weight: 700;
+            color: #fff; letter-spacing: -0.02em;
+            line-height: 1.1;
+            margin: 0 0 12px;
+            word-break: break-word;
+        }
+        .mad-submeta {
+            font-size: 13px; color: #c0c0c0;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+        }
+        .mad-submeta-artist { color: #f5f5f5; font-weight: 600; }
+        .mad-submeta-sep { color: #6e6e6e; }
+        .mad-actions {
+            display: flex; align-items: center; gap: 16px;
+            padding: 20px 36px 8px;
+            position: relative;
+            z-index: 2;
+        }
+        .mad-play-all {
+            width: 56px; height: 56px;
+            background: #fff; color: #0a0a0a;
+            border: none; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.12s;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+        }
+        .mad-play-all:hover { background: #f0f0f0; }
+        .mad-play-all:active { background: #e0e0e0; }
+        .mad-play-all:disabled { background: #2a2a2a; color: #6e6e6e; cursor: not-allowed; box-shadow: none; }
+        .mad-play-all svg { width: 24px; height: 24px; display: block; }
+        .mad-action-btn {
+            width: 38px; height: 38px;
+            background: transparent; border: none; color: #c0c0c0; cursor: pointer;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: color 0.12s, background 0.12s;
+        }
+        .mad-action-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+        .mad-action-btn:disabled { color: #444; cursor: not-allowed; background: transparent; }
+        .mad-action-btn svg { width: 18px; height: 18px; }
+        .mad-progress-note {
+            margin-left: 4px;
+            font-size: 12.5px; color: #8a8a8a;
+        }
+        .mad-progress-note strong { color: #3b82f6; font-weight: 600; }
+        /* Aggregate progress bar across the action row — only visible while
+           the album is still downloading. Sits under the action buttons, full
+           width minus the same horizontal padding the action row uses, so it
+           reads as the action row's bottom edge while the album fills in.
+           Mirrors .playlist-progress-bar on the queue's playlist cards. */
+        .mad-progress-bar-wrap {
+            position: absolute;
+            left: 36px; right: 36px;
+            bottom: 0;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .mad-progress-bar-fill {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.3s;
+        }
+        .mad-actions[hidden] { display: none; }
+        .mad-actions.is-downloading { padding-bottom: 18px; }
+        .mad-tracklist {
+            padding: 12px 28px 32px;
+        }
+        .mad-tracklist-head {
+            display: grid;
+            grid-template-columns: 32px 48px 1fr 80px;
+            gap: 14px;
+            padding: 0 12px 8px;
+            border-bottom: 1px solid #1f1f1f;
+            margin-bottom: 6px;
+            position: sticky; top: 0;
+            background: #0a0a0a;
+            color: #8a8a8a;
+            font-size: 11px; font-weight: 600;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            z-index: 3;
+        }
+        .mad-tracklist-head-num { text-align: center; }
+        .mad-tracklist-head-dur { text-align: right; }
+        .mad-row {
+            display: grid;
+            grid-template-columns: 32px 48px 1fr 80px;
+            gap: 14px;
+            align-items: center;
+            height: 56px;
+            padding: 0 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #c0c0c0;
+            transition: background 0.1s;
+        }
+        .mad-row-thumb {
+            width: 44px; height: 44px;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .mad-row-thumb img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .mad-row:hover { background: rgba(255, 255, 255, 0.04); color: #fff; }
+        .mad-row:hover .mad-row-num { color: #fff; }
+        .mad-row-num {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 13px; color: #8a8a8a;
+            text-align: center;
+        }
+        .mad-row-title {
+            font-size: 14.5px; font-weight: 600;
+            color: #f5f5f5;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            display: flex; align-items: center; gap: 10px;
+            min-width: 0;
+        }
+        .mad-row-artist {
+            font-size: 12.5px; color: #8a8a8a;
+            font-weight: 400;
+            margin-left: 6px;
+        }
+        .mad-row-duration {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 13px; color: #8a8a8a;
+            text-align: right;
+        }
+        .mad-row.now-playing { background: rgba(59, 130, 246, 0.08); }
+        .mad-row.now-playing .mad-row-title { color: #3b82f6; }
+        .mad-row.now-playing .mad-row-num { color: #3b82f6; }
+        .mad-row.pending { color: #6e6e6e; cursor: default; }
+        .mad-row.pending:hover { background: transparent; color: #6e6e6e; }
+        .mad-row.pending .mad-row-title { color: #6e6e6e; }
+        .mad-row.pending .mad-row-num { color: #6e6e6e; }
+        .mad-pending-spinner {
+            width: 12px; height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: mad-spin 0.85s linear infinite;
+            display: inline-block;
+        }
+        @keyframes mad-spin { to { transform: rotate(360deg); } }
+        /* Playing dot — small animated bars cluster next to the title */
+        .mad-playing-indicator {
+            display: inline-flex; align-items: flex-end; gap: 2px;
+            width: 14px; height: 14px;
+        }
+        .mad-playing-indicator span {
+            display: block; width: 2.5px; background: #3b82f6;
+            animation: mad-eq 1s ease-in-out infinite;
+            border-radius: 1px;
+        }
+        .mad-playing-indicator span:nth-child(1) { height: 60%; animation-delay: 0s; }
+        .mad-playing-indicator span:nth-child(2) { height: 100%; animation-delay: 0.15s; }
+        .mad-playing-indicator span:nth-child(3) { height: 40%; animation-delay: 0.3s; }
+        @keyframes mad-eq {
+            0%, 100% { transform: scaleY(0.55); transform-origin: bottom; }
+            50% { transform: scaleY(1); transform-origin: bottom; }
+        }
+        /* Right-click context menu — reuse the .music-ctx pattern from the
+           search results pane so the visual is consistent. */
+        .mad-ctx {
+            position: fixed;
+            background: #141414; border: 1px solid #2a2a2a; border-radius: 8px;
+            padding: 4px; min-width: 200px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+        }
+        .mad-ctx button {
+            display: flex; align-items: center; gap: 10px; width: 100%;
+            background: transparent; border: none; color: #c0c0c0;
+            font: inherit; font-size: 13px;
+            padding: 8px 12px; border-radius: 4px; cursor: pointer;
+            text-align: left;
+        }
+        .mad-ctx button:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+        .mad-ctx button svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .mad-ctx-sep { height: 1px; background: #1f1f1f; margin: 4px 0; }
+        .music-lib-empty {
+            display: none;
+            padding: 60px 20px;
+            text-align: center;
+            color: #888; font-size: 14px;
+        }
+        .music-lib-empty.visible { display: block; }
+
+        /* Search pane */
+        .music-search-row { display: flex; gap: 10px; margin-bottom: 16px; flex-shrink: 0; }
+        .music-search-input-wrap { flex: 1; position: relative; }
+        .music-search-input {
+            width: 100%;
+            padding: 13px 40px 13px 42px;
+            background: #141414; border: 1px solid #1f1f1f; border-radius: 9px;
+            color: #fff; font-size: 14px; font-family: inherit; outline: none;
+            transition: border-color 0.15s ease;
+        }
+        .music-search-input:focus { border-color: #3b82f6; }
+        .music-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6e6e6e; pointer-events: none; }
+        .music-search-clear {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: transparent; border: none; cursor: pointer;
+            width: 22px; height: 22px; border-radius: 50%; padding: 0;
+            display: none; align-items: center; justify-content: center;
+            color: #8a8a8a;
+        }
+        .music-search-clear:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .music-search-clear.visible { display: flex; }
+        .music-search-clear svg { width: 12px; height: 12px; }
+        .music-search-btn {
+            padding: 12px 22px;
+            background: #3b82f6; border: none; border-radius: 9px;
+            color: #fff; font-family: inherit; font-size: 13px; font-weight: 600;
+            cursor: pointer;
+        }
+        .music-search-btn:hover { background: #2563eb; }
+        .music-chips { display: flex; gap: 8px; margin-bottom: 18px; align-items: center; flex-shrink: 0; }
+        .music-chip {
+            padding: 7px 14px;
+            background: transparent; border: 1px solid #2a2a2a; border-radius: 18px;
+            color: #a0a0a0; font-family: inherit; font-size: 12.5px; font-weight: 500;
+            cursor: pointer;
+        }
+        .music-chip:hover { color: #fff; border-color: #3a3a3a; }
+        .music-chip.active { background: #fff; border-color: #fff; color: #0a0a0a; font-weight: 600; }
+        .music-results-meta { margin-left: auto; color: #6e6e6e; font-size: 12px; }
+
+        /* Compact track rows (Spotify-style) */
+        .music-results { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+        /* When no search is active, the empty results container would still
+           claim flex:1 space and push the For-You landing far below the fold.
+           Collapse it via :empty so For-You floats up directly under the chips.
+           Same pattern as .music-foryou:empty below. */
+        .music-results:empty { display: none; }
+        /* Mirror .mq-row / .video-row chrome — border, background, border-radius
+           — so search results read as the same primitive as queue rows. The
+           internal grid shape stays (search rows have plays/duration columns
+           that queue rows don't). */
+        .music-track-row {
+            display: grid;
+            grid-template-columns: 56px 1fr auto auto auto;
+            gap: 14px; align-items: center;
+            padding: 10px 12px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            background: #0f0f0f;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .music-track-row:hover {
+            background: #141414;
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        .music-track-row.selected {
+            background: rgba(59, 130, 246, 0.06);
+            border-color: #3b82f6;
+        }
+        .music-track-row.selected:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        /* Artwork lives inside a slightly larger wrapper so the progress ring has
+           room to draw OUTSIDE the artwork bounds. The ring + percent overlay
+           appear when the row is .downloading; play overlay shows on hover otherwise. */
+        .mtr-art-wrap {
+            width: 56px; height: 56px;
+            position: relative; flex-shrink: 0;
+        }
+        .mtr-art {
+            position: absolute; inset: 3px;
+            background: #1a1a1a; border-radius: 4px;
+            overflow: hidden;
+            transition: filter 0.18s ease, transform 0.18s ease;
+        }
+        .mtr-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mtr-play-overlay {
+            position: absolute; inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.12s;
+        }
+        .music-track-row:hover .mtr-play-overlay { opacity: 1; }
+        .mtr-play-overlay svg { width: 18px; height: 18px; color: #fff; display: block; }
+        /* Download ring — full 56px ring outside the artwork. r=26 inside a 56px
+           SVG centered at (28, 28). Circumference = 2π·26 ≈ 163.36. */
+        .mtr-art-ring {
+            position: absolute; inset: 0;
+            display: none;
+            transform: rotate(-90deg);
+            pointer-events: none;
+        }
+        .music-track-row.downloading .mtr-art-ring { display: block; }
+        .mtr-art-ring circle { fill: none; }
+        .mtr-art-ring .ring-bg { stroke: rgba(255,255,255,0.08); stroke-width: 3; }
+        .mtr-art-ring .ring-fg {
+            stroke: #3b82f6;
+            stroke-width: 3;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.25s linear;
+        }
+        .mtr-art-pct {
+            position: absolute; inset: 0;
+            display: none; align-items: center; justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; font-weight: 700; color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .music-track-row.downloading .mtr-art-pct { display: flex; }
+        .music-track-row.downloading .mtr-art { filter: brightness(0.65); }
+        .music-track-row.downloading .mtr-play-overlay { display: none; }
+        .mtr-meta { min-width: 0; }
+        .mtr-title { font-size: 14px; font-weight: 600; color: #f5f5f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+        .mtr-sub { font-size: 12.5px; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mtr-plays { font-size: 12px; color: #6e6e6e; font-variant-numeric: tabular-nums; }
+        .mtr-duration { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8a8a8a; min-width: 40px; text-align: right; }
+        .mtr-add {
+            width: 34px; height: 34px;
+            background: transparent;
+            border: 1px solid #2a2a2a;
+            border-radius: 50%;
+            color: #c0c0c0;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: border-color 0.12s, color 0.12s, background 0.12s;
+        }
+        .mtr-add:hover { border-color: #3b82f6; color: #3b82f6; }
+        .mtr-add svg { width: 14px; height: 14px; display: block; }
+        .music-track-row.in-library .mtr-add {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #10b981;
+            cursor: default;
+        }
+        /* While downloading we hide the button entirely — the artwork ring + % is
+           the progress affordance now. */
+        .music-track-row.downloading .mtr-add { visibility: hidden; }
+        .music-search-status {
+            display: flex; align-items: center; justify-content: center;
+            padding: 40px 20px; color: #888; font-size: 13px; text-align: center;
+        }
+        .music-search-status[hidden] { display: none; }
+
+        /* ===== For You landing ===== */
+        .music-foryou {
+            flex: 1; overflow-y: auto; padding-bottom: 80px;
+            display: flex; flex-direction: column; gap: 28px;
+        }
+        .music-foryou[hidden] { display: none; }
+        .music-foryou:empty { display: none; }
+        /* Video For-You uses the same .myf-* layout as music. Container is
+           block by default so multi-section content stacks vertically. */
+        .video-foryou { display: block; padding: 8px 0 24px; }
+        .video-foryou[hidden] { display: none; }
+        .video-foryou:empty { display: none; }
+        /* When For-You is shown, hide the centered "search empty" status
+           text — the For-You IS our empty state now. */
+        .video-foryou:not(:empty) ~ .search-status .search-empty-default { display: none; }
+        .myf-section { margin-bottom: 28px; }
+        .myf-section:last-child { margin-bottom: 0; }
+        .myf-head { display: flex; align-items: baseline; margin-bottom: 12px; }
+        .myf-head h3 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: #f5f5f5; }
+        .myf-head .myf-sub { font-size: 12px; color: #8a8a8a; margin-left: 10px; font-weight: 500; }
+
+        /* Recent searches: chip row */
+        .myf-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .myf-chip {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 14px;
+            background: #141414; border: 1px solid #1f1f1f;
+            border-radius: 18px;
+            font-size: 12.5px; color: #d0d0d0; font-family: inherit; font-weight: 500;
+            cursor: pointer; transition: background .12s, border-color .12s;
+        }
+        .myf-chip:hover { background: #1a1a1a; border-color: #2a2a2a; color: #fff; }
+        .myf-chip svg { width: 13px; height: 13px; color: #8a8a8a; flex-shrink: 0; }
+
+        /* Card grid (6 per row at 1400px) */
+        .myf-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 14px;
+        }
+        .myf-card {
+            cursor: pointer; padding: 10px; border-radius: 9px;
+            transition: background .12s; position: relative;
+        }
+        .myf-card:hover { background: #141414; }
+        .myf-card-art {
+            width: 100%; aspect-ratio: 1; background: #1a1a1a;
+            border-radius: 6px; overflow: hidden;
+            margin-bottom: 10px; position: relative;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+        }
+        .myf-card-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .myf-card-play {
+            position: absolute; bottom: 8px; right: 8px;
+            width: 38px; height: 38px;
+            background: #fff; color: #0a0a0a; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transform: translateY(6px);
+            transition: opacity .18s ease, transform .18s ease, background .12s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .myf-card:hover .myf-card-play { opacity: 1; transform: translateY(0); }
+        .myf-card-play:hover { background: #f0f0f0; }
+        .myf-card-play svg { width: 14px; height: 14px; }
+        .myf-card-title { font-size: 13px; font-weight: 600; color: #f5f5f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .myf-card-sub { font-size: 12px; color: #8a8a8a; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .myf-badge {
+            position: absolute; top: 8px; left: 8px;
+            font-size: 9px; font-weight: 800; padding: 3px 6px;
+            border-radius: 3px; letter-spacing: .06em; color: #fff;
+            background: rgba(16, 185, 129, 0.18); color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            pointer-events: none;
+        }
+
+        /* ===== Click contract: row selection + checkbox + context menu + action bar ===== */
+        .music-track-row { position: relative; }
+        /* Checkbox removed — selection state is conveyed entirely by the row's
+           blue border + tint (.music-track-row.selected). Keeping the .mtr-check
+           element hidden so JS click handlers still find it without rendering. */
+        .mtr-check { display: none; }
+        /* Selected state now uses the .mq-row / .video-row selected pattern
+           (blue border + faint blue tint), defined above at .music-track-row.selected. */
+        /* Hover-reveal download button (only visible on hover or selection) */
+        .music-track-row .mtr-add { opacity: 0; transition: opacity 0.12s, border-color 0.12s, color 0.12s, background 0.12s; }
+        .music-track-row:hover .mtr-add,
+        .music-track-row.selected .mtr-add,
+        .music-track-row.in-library .mtr-add,
+        .music-track-row.downloading .mtr-add { opacity: 1; }
+
+        /* Music multi-select pill — same primitive as .pd-channel-action-bar
+           and .search-action-bar. Centered, auto-sized, floats above the
+           music dock when it's visible. */
+        .music-actionbar {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 8px 8px 16px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid #232323;
+            border-radius: 999px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+            z-index: 30;
+            white-space: nowrap;
+            animation: mab-slide-up 0.2s ease;
+        }
+        /* Sit just above the 88px music dock (8px gap) — was 106px, which left
+           the pill drifting ~18px above the bar and feeling detached. */
+        body.music-dock-visible .music-actionbar { bottom: 96px; }
+        .music-actionbar[hidden] { display: none; }
+        @keyframes mab-slide-up {
+            from { transform: translateX(-50%) translateY(14px); opacity: 0; }
+            to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+        }
+        .mab-count {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
+        }
+        .mab-count em { color: #3b82f6; font-style: normal; }
+        .mab-clear {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: transparent; border: none;
+            font-family: inherit; font-size: 12.5px; color: #909090; font-weight: 500;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 8px;
+            transition: color 0.12s ease, background 0.12s ease;
+        }
+        .mab-clear:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .mab-clear svg { width: 13px; height: 13px; }
+        .mab-actions { display: inline-flex; gap: 6px; align-items: center; }
+        .mab-divider {
+            width: 1px;
+            align-self: stretch;
+            background: #2a2a2a;
+            margin: 2px 4px;
+        }
+        .mab-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 9px 16px;
+            font-family: inherit; font-size: 13px; font-weight: 600;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.12s ease, transform 0.05s, color 0.12s ease;
+        }
+        .mab-btn svg { width: 13px; height: 13px; }
+        .mab-btn.primary { background: #3b82f6; color: #fff; border: none; }
+        .mab-btn.primary:hover { background: #2563eb; }
+        .mab-btn.primary:active { transform: scale(0.97); }
+        .mab-btn.ghost { background: transparent; color: #c0c0c0; border: none; padding: 9px 14px; }
+        .mab-btn.ghost:hover { color: #fff; background: rgba(255,255,255,0.04); }
+
+        /* Right-click context menu */
+        .music-ctx {
+            position: fixed;
+            background: #1a1a1a; border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 6px;
+            width: 240px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+            z-index: 100;
+        }
+        .music-ctx[hidden] { display: none; }
+        .mctx-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 5px;
+            font-family: inherit; font-size: 13px; color: #d4d4d4;
+            background: transparent; border: none; width: 100%; text-align: left;
+            cursor: pointer;
+        }
+        .mctx-item:hover { background: #2a2a2a; color: #fff; }
+        .mctx-item svg { width: 14px; height: 14px; color: #8a8a8a; flex-shrink: 0; }
+        .mctx-item.primary { color: #3b82f6; }
+        .mctx-item.primary svg { color: #3b82f6; }
+        .mctx-sep { height: 1px; background: #2a2a2a; margin: 4px 0; }
+
+        /* ================================================== */
+        /* MUSIC TRACK DETAIL PANEL — content inside the shared */
+        /* .detail-panel slide-in (#music-detail-panel-body)    */
+        /* ================================================== */
+        .mtd-art {
+            width: 200px; height: 200px;
+            margin: 8px auto 18px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #1a1a1a;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+            flex-shrink: 0;
+        }
+        .mtd-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mtd-title {
+            font-size: 24px; font-weight: 700; color: #f5f5f5;
+            text-align: center; line-height: 1.2;
+            margin: 0 0 6px;
+            letter-spacing: -0.01em;
+        }
+        .mtd-artist {
+            font-size: 16px; font-weight: 500; color: #e0e0e0;
+            text-align: center;
+            margin: 0 0 2px;
+        }
+        .mtd-album {
+            font-size: 13px; color: #8a8a8a;
+            text-align: center;
+            margin: 0 0 18px;
+        }
+        .mtd-actions {
+            display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+            margin: 0 0 22px;
+            position: relative;
+        }
+        .mtd-action-btn {
+            background: #141414; border: 1px solid #1f1f1f; border-radius: 7px;
+            color: #d4d4d4; font-family: inherit; font-size: 12px;
+            padding: 7px 11px;
+            display: inline-flex; align-items: center; gap: 6px;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+        }
+        .mtd-action-btn:hover { background: #1a1a1a; border-color: #2a2a2a; color: #fff; }
+        .mtd-action-btn.primary {
+            background: #3b82f6; border-color: #3b82f6; color: #fff;
+        }
+        .mtd-action-btn.primary:hover { background: #2563eb; border-color: #2563eb; }
+        .mtd-action-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+        /* Inline "More" dropdown — overlays the action row */
+        .mtd-more-wrap { position: relative; }
+        .mtd-more-menu {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
+            padding: 6px; width: 200px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+            z-index: 20;
+        }
+        .mtd-more-menu[hidden] { display: none; }
+        .mtd-meta {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 8px 14px;
+            font-size: 12.5px;
+            margin: 0 0 18px;
+            padding: 14px 0 0;
+            border-top: 1px solid #1a1a1a;
+        }
+        .mtd-meta-key { color: #8a8a8a; }
+        .mtd-meta-val { color: #d4d4d4; word-break: break-word; min-width: 0; }
+        .mtd-source-link {
+            color: #60a5fa; text-decoration: none; cursor: pointer;
+            word-break: break-all;
+        }
+        .mtd-source-link:hover { text-decoration: underline; }
+        .mtd-filepath {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #a0a0a0; word-break: break-all; cursor: pointer;
+            line-height: 1.4;
+        }
+        .mtd-filepath:hover { color: #d4d4d4; }
+        .mtd-about {
+            font-size: 13px; color: #c0c0c0; line-height: 1.55;
+            padding: 14px 0 0;
+            border-top: 1px solid #1a1a1a;
+            white-space: pre-wrap;
+        }
+        .mtd-about-title {
+            font-size: 11px; font-weight: 700; color: #8a8a8a;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            margin: 0 0 8px;
+        }
+
+        /* ================================================== */
+        /* MUSIC DOWNLOAD STRIP — visible only while downloading */
+        /* ================================================== */
+        .music-downloads-strip {
+            background: rgba(59, 130, 246, 0.07);
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+        .music-downloads-strip[hidden] { display: none; }
+        .mds-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 6px 0;
+        }
+        .mds-row + .mds-row { border-top: 1px solid rgba(59, 130, 246, 0.12); margin-top: 4px; }
+        .mds-spinner {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(59, 130, 246, 0.25);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: mds-spin 0.9s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes mds-spin { to { transform: rotate(360deg); } }
+        .mds-title { flex: 1; font-size: 13px; color: #d4d4d4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mds-pct { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #3b82f6; font-weight: 600; min-width: 40px; text-align: right; }
+
+        /* ================================================== */
+        /* MUSIC PLAYER (full now-playing view)                 */
+        /* ================================================== */
+        /* F3 Centered Hero player view. Stage fills the whole viewport; panel is
+           an absolute overlay that slides up from below. Handle pill is
+           z-index'd above the panel and stays put. See protube-ui SKILL.md.
+           Display scoped to .active so the .view-pane default of display:none works. */
+        #music-player-view {
+            padding: 0;
+            min-height: 0;
+            overflow: hidden;
+            position: relative;
+        }
+        #music-player-view.active { display: block; }
+
+        /* Music-player immersive / fullscreen mode — driven by `body.music-player-fullscreen`
+           toggled in _musicToggleFs (F key in music player). Deliberately NOT the
+           video's `player-is-fullscreen` class — that one is video-coupled and
+           previously caused the music view to disappear when F was pressed.
+
+           Three rules: collapse the rail's grid column to 0, hide the rail's
+           contents, and force the music-player view to stay visible (defensive
+           !important so no other rule can hide it during the OS resize). */
+        /* Music-player fullscreen: keep the cockpit's own grid-template-columns
+           alone (so there's no animated grid change when entering/exiting),
+           hide the rail, and span cockpit-main across both grid tracks so
+           it fills the viewport. Tried changing grid-template-columns
+           directly — but the .cockpit base style has a `transition:
+           grid-template-columns 0.22s` that produced a broken animation on
+           EXIT (1fr → 220px+1fr). Span-via-grid-column has no transition
+           and reverts instantly when the class is removed. */
+        body.music-player-fullscreen .rail { display: none; }
+        body.music-player-fullscreen .cockpit-main {
+            grid-column: 1 / -1;
+            padding: 0;
+        }
+        body.music-player-fullscreen .music-dock { display: none !important; }
+        body.music-player-fullscreen #music-player-view { display: block !important; }
+        .mp-stage {
+            position: absolute; inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .mp-backdrop {
+            position: absolute; inset: -40px;
+            background-size: cover; background-position: center;
+            filter: blur(70px) saturate(1.4);
+            opacity: 0; transition: opacity 0.4s ease, background-image 0.4s ease;
+            pointer-events: none;
+        }
+        .mp-backdrop.has-art { opacity: 1; }
+        .mp-scrim {
+            position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(10, 10, 10, 0.35) 0%, rgba(10, 10, 10, 0.92) 100%);
+            pointer-events: none;
+        }
+        /* Top-left back button anchored to the stage */
+        .mp-back {
+            position: absolute; top: 18px; left: 22px; z-index: 5;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.06); border: none;
+            color: #c0c0c0;
+            cursor: pointer; padding: 0;
+            width: 38px; height: 38px; border-radius: 50%;
+            transition: background 0.12s, color 0.12s;
+        }
+        .mp-back:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+        .mp-back svg { width: 18px; height: 18px; display: block; }
+        /* Single centered column: art / title / artist / album / progress / controls.
+           Was max-width 720 → bumped to 880 so the player uses more horizontal
+           space on widescreens (user feedback 2026-05-16: "doesn't fill the
+           screen"). */
+        .mp-col {
+            position: relative; z-index: 2;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 18px 32px;
+            max-width: 880px; width: 100%;
+        }
+        /* Art scales with viewport height — was a fixed 240px which left huge
+           empty space on tall windows. clamp(240, 34vh, 380) gives 240px floor
+           for small windows, 380px ceiling so it never feels gigantic, and
+           34vh in between so it fills the stage naturally on most screens. */
+        .mp-art {
+            width: clamp(240px, 34vh, 380px);
+            height: clamp(240px, 34vh, 380px);
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 6px 20px rgba(0, 0, 0, 0.25);
+            margin-bottom: 18px;
+            flex-shrink: 0;
+        }
+        .mp-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mp-art img:not([src]),
+        .mp-art img[src=""] { display: none; }
+        .mp-title {
+            font-size: 32px; font-weight: 700; letter-spacing: -0.02em;
+            color: #fff; line-height: 1.1; text-align: center;
+            max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .mp-artist { font-size: 16px; color: #e0e0e0; margin-top: 6px; font-weight: 500; }
+        .mp-album { font-size: 12.5px; color: #8a8a8a; margin-top: 4px; }
+        .mp-progress-row { display: flex; align-items: center; gap: 12px; width: 580px; max-width: 100%; margin-top: 18px; }
+        .mp-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0a0; min-width: 38px; text-align: center; }
+        /* Hit area is bigger than the visible bar so it's easy to grab */
+        .mp-seek { flex: 1; height: 16px; display: flex; align-items: center; position: relative; cursor: pointer; touch-action: none; }
+        .mp-seek::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 5px; background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
+        .mp-seek:hover .mp-seek-thumb,
+        .mp-seek.dragging .mp-seek-thumb { opacity: 1; }
+        .mp-seek:hover .mp-seek-fill,
+        .mp-seek.dragging .mp-seek-fill { background: #3b82f6; }
+        .mp-seek-fill {
+            position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            height: 5px; width: 0%; background: #fff; border-radius: 3px;
+            pointer-events: none;
+            /* No transition on width — a requestAnimationFrame loop drives the
+               paint at ~60fps so the bar already moves smoothly. A CSS transition
+               here interfered with the rAF reads and caused visible stuttering
+               (next timeupdate jump arrives before the previous transition
+               finishes, easing curve restarts). */
+            transition: background 0.12s;
+        }
+        .mp-seek-thumb {
+            position: absolute; top: 50%; left: 0%; transform: translate(-50%, -50%);
+            width: 13px; height: 13px; background: #fff; border-radius: 50%;
+            opacity: 0; pointer-events: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            /* Same reasoning as .mp-seek-fill — rAF loop owns the position; no
+               CSS transition on `left`. Opacity transition is fine (only fires
+               on hover/drag state, not on every paint). */
+            transition: opacity 0.15s;
+        }
+        /* Transport row — 3-column grid: shuffle/repeat left, prev/play/next center, volume right */
+        .mp-controls {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 20px;
+            width: 580px; max-width: 100%;
+            flex-shrink: 0;
+        }
+        .mp-mode-left { justify-self: start; display: flex; gap: 6px; }
+        .mp-transport { display: flex; align-items: center; gap: 22px; justify-self: center; }
+        .mp-btn {
+            background: transparent; border: none; color: #c0c0c0; cursor: pointer;
+            padding: 8px; display: flex; align-items: center; justify-content: center;
+            transition: color 0.12s;
+        }
+        .mp-btn:hover { color: #fff; }
+        .mp-btn:disabled { opacity: 0.35; cursor: default; }
+        .mp-btn svg { width: 22px; height: 22px; display: block; }
+        /* Main play button — clean white circle, dark icon. Background tints on hover
+           (no scale → icon never visually drifts). */
+        .mp-btn.mp-play {
+            background: #fff; color: #0a0a0a;
+            width: 52px; height: 52px; border-radius: 50%;
+            transition: background 0.12s;
+        }
+        .mp-btn.mp-play:hover { background: #f0f0f0; }
+        .mp-btn.mp-play:active { background: #e0e0e0; }
+        .mp-btn.mp-play svg { width: 24px; height: 24px; }
+        /* Active shuffle / repeat — blue accent matches the rest of the app */
+        .mp-btn.mp-mode-active { color: #3b82f6; position: relative; }
+        .mp-btn.mp-mode-active::after {
+            content: ""; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 4px; border-radius: 50%; background: #3b82f6;
+        }
+        .mp-repeat-one-badge { position: absolute; font-size: 9px; font-weight: 700; top: 4px; right: 4px; color: #3b82f6; pointer-events: none; }
+        /* Player-view volume — inline in transport row, right-aligned (F3) */
+        .mp-vol {
+            justify-self: end;
+            display: flex; align-items: center; gap: 10px;
+            color: #bcbcbc;
+        }
+        .mp-vol-btn {
+            background: transparent; border: none; cursor: pointer;
+            color: #c0c0c0; padding: 4px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: color 0.12s, background 0.12s;
+        }
+        .mp-vol-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .mp-vol-btn svg { width: 18px; height: 18px; display: block; }
+        .mp-vol-track { width: 120px; height: 14px; display: flex; align-items: center; position: relative; cursor: pointer; touch-action: none; }
+        .mp-vol-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+        .mp-vol-fill { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 4px; width: 80%; background: #fff; border-radius: 2px; pointer-events: none; transition: background 0.12s; }
+        .mp-vol-track:hover .mp-vol-fill,
+        .mp-vol-track.dragging .mp-vol-fill { background: #3b82f6; }
+        .mp-vol-track:hover .mp-vol-thumb,
+        .mp-vol-track.dragging .mp-vol-thumb { opacity: 1; }
+        .mp-vol-thumb {
+            position: absolute; top: 50%; left: 80%; transform: translate(-50%, -50%);
+            width: 11px; height: 11px; background: #fff; border-radius: 50%;
+            opacity: 0; transition: opacity 0.15s;
+            pointer-events: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        }
+
+        /* Bottom panel — absolute-positioned overlay that slides up from below.
+           Stage stays full-viewport; panel covers the bottom ~240px when open. */
+        .mp-panel {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            /* Sized as % of viewport. Was 30vh (then 240px before that). User
+               feedback 2026-05-16: still too tall. 22vh → ~132px on 600px
+               viewport, ~176px on 800px, ~238px on 1080p. Tight enough to
+               leave the stage breathing room; deep enough to fit the tab
+               row + 5 mini-cards. */
+            height: 22vh;
+            background: rgba(10, 10, 10, 0.92);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            padding: 14px 36px 16px;
+            display: flex; flex-direction: column;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            transform: translateY(100%);
+            transition: transform 0.28s ease;
+            z-index: 8;
+        }
+        #music-player-view.panel-open .mp-panel { transform: translateY(0); }
+
+        /* Handle pill — floating on z-axis, ALWAYS bottom-center, ALWAYS on top.
+           Does not move when the panel opens; pill sits over the panel via z-index. */
+        .mp-panel-handle {
+            position: absolute;
+            /* Lifted slightly (was 16px) so the pill sits roughly in the row
+               above the side-rail's settings button instead of being flush at
+               the very bottom of the viewport — user-requested nudge upward. */
+            bottom: 52px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 16px;
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            color: #c0c0c0;
+            cursor: pointer;
+            font-family: inherit; font-size: 12px; font-weight: 600;
+            max-width: 420px;
+            transition: background 0.12s, color 0.12s;
+            white-space: nowrap;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        }
+        .mp-panel-handle:hover { background: rgba(30, 30, 30, 0.95); color: #fff; }
+        .mp-handle-chev { width: 13px; height: 13px; transition: transform 0.28s ease; flex-shrink: 0; }
+        .mp-handle-label { color: #8a8a8a; font-weight: 500; }
+        .mp-handle-next { overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+        #music-player-view.panel-open .mp-handle-chev { transform: rotate(180deg); }
+        .mp-tabs {
+            display: flex; align-items: baseline; gap: 24px;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+        .mp-tab {
+            background: transparent; border: none; padding: 6px 0;
+            font-family: inherit; font-size: 13px; font-weight: 600;
+            color: #8a8a8a; cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color 0.12s, border-color 0.12s;
+        }
+        .mp-tab:hover { color: #ccc; }
+        .mp-tab.on { color: #fff; border-bottom-color: #3b82f6; }
+        .mp-tab-meta { margin-left: auto; font-size: 12px; color: #6e6e6e; }
+        .mp-tab-body { flex: 1; min-height: 0; overflow: hidden; }
+
+        /* Up Next row of mini-cards */
+        .mp-upnext {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+        .mp-mini-card {
+            display: flex; align-items: center; gap: 11px;
+            background: #141414; border: 1px solid #1f1f1f; border-radius: 10px;
+            padding: 9px 12px; min-height: 60px;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s;
+            overflow: hidden;
+        }
+        .mp-mini-card:hover { background: #1a1a1a; border-color: #2a2a2a; }
+        .mp-mini-art { width: 40px; height: 40px; border-radius: 5px; background: #1a1a1a; overflow: hidden; flex-shrink: 0; }
+        .mp-mini-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .mp-mini-text { min-width: 0; flex: 1; }
+        .mp-mini-title { font-size: 12.5px; font-weight: 600; color: #f5f5f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mp-mini-sub { font-size: 11px; color: #8a8a8a; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mp-mini-dur { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #6e6e6e; flex-shrink: 0; }
+        .mp-upnext-empty,
+        .mp-lyrics-empty,
+        .mp-related-empty {
+            padding: 28px 0; text-align: center; color: #6e6e6e; font-size: 13px;
+        }
+
+        /* ================================================== */
+        /* MUSIC DOCK — persistent mini-player                  */
+        /* ================================================== */
+        .music-dock {
+            position: fixed;
+            bottom: 0;
+            left: var(--rail-width, 220px);
+            right: 0;
+            /* Was 78px — user-requested slight bump (still not the full Spotify
+               90px to avoid the dock feeling heavy on small screens). */
+            height: 88px;
+            background: #0f0f0f;
+            border-top: 1px solid #1f1f1f;
+            display: none;       /* hidden until first track plays */
+            align-items: center;
+            padding: 0 18px;
+            gap: 14px;
+            z-index: 50;
+            transition: left 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        body.music-dock-visible .music-dock { display: flex; }
+        /* Bumped from 96 (78+18) → 106 (88+18) to match the taller dock. */
+        body.music-dock-visible .cockpit-main { padding-bottom: 106px; }
+        /* When the user is on the full music-player view, hide the dock —
+           the player view has its own transport controls and the dock just
+           creates wasted layout space at the bottom (the user reported this). */
+        body.music-player-open .music-dock { display: none !important; }
+        body.music-player-open.music-dock-visible .cockpit-main { padding-bottom: 0; }
+        body.player-is-fullscreen .music-dock { display: none; }   /* hide during fullscreen video */
+        .music-dock audio { display: none; }   /* native audio element is invisible; we render our own UI */
+        .music-dock-art { width: 56px; height: 56px; border-radius: 5px; background: #1a1a1a; flex-shrink: 0; overflow: hidden; }
+        .music-dock-art img { width: 100%; height: 100%; object-fit: cover; }
+        .music-dock-art img:not([src]),
+        .music-dock-art img[src=""] { display: none; }
+        .music-dock-info { min-width: 160px; max-width: 240px; flex-shrink: 0; }
+        .music-dock-track { font-size: 13px; font-weight: 600; color: #f5f5f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .music-dock-artist { font-size: 11.5px; color: #8a8a8a; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .music-dock-transport { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+        .music-dock-transport-btns { display: flex; gap: 14px; align-items: center; }
+        .music-dock-btn { background: transparent; border: none; color: #c0c0c0; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
+        .music-dock-btn:hover { color: #fff; }
+        /* Mini play button — white circle, dark icon, no scale on hover so the
+           icon never visually shifts. Just a subtle bg-tint. */
+        .music-dock-btn.play {
+            background: #fff; color: #0a0a0a;
+            width: 34px; height: 34px; border-radius: 50%;
+            transition: background 0.12s;
+        }
+        .music-dock-btn.play:hover { background: #f0f0f0; }
+        .music-dock-btn.play:active { background: #e0e0e0; }
+        .music-dock-btn svg { width: 16px; height: 16px; display: block; }
+        /* Play icon uses a path whose centroid is mathematically (12,12) — no
+           optical nudge needed. See SKILL.md for the path: M8 5v14l12-7z. */
+        .music-dock-btn.play svg { width: 16px; height: 16px; }
+        .music-dock-btn.mp-mode-active { color: #3b82f6; }
+        .music-dock-progress { display: flex; gap: 10px; align-items: center; width: 100%; max-width: 520px; }
+        .music-dock-time { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a8a8a; min-width: 36px; text-align: center; }
+        /* Dock seek + thumb (matches full-player pattern) */
+        .music-dock-seek { flex: 1; height: 14px; display: flex; align-items: center; position: relative; cursor: pointer; touch-action: none; }
+        .music-dock-seek::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+        .music-dock-seek-fill {
+            position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            height: 4px; width: 0%; background: #fff; border-radius: 2px;
+            pointer-events: none;
+            /* No width transition — rAF loop paints continuously. See the
+               equivalent .mp-seek-fill rule above for the why. */
+            transition: background 0.12s;
+        }
+        .music-dock-seek:hover .music-dock-seek-fill,
+        .music-dock-seek.dragging .music-dock-seek-fill { background: #3b82f6; }
+        .music-dock-seek:hover .music-dock-seek-thumb,
+        .music-dock-seek.dragging .music-dock-seek-thumb { opacity: 1; }
+        .music-dock-seek-thumb {
+            position: absolute; top: 50%; left: 0%; transform: translate(-50%, -50%);
+            width: 11px; height: 11px; background: #fff; border-radius: 50%;
+            opacity: 0; pointer-events: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            transition: opacity 0.15s;
+        }
+        .music-dock-volume { display: flex; align-items: center; gap: 6px; min-width: 130px; }
+        .music-dock-vol-btn {
+            background: transparent; border: none; cursor: pointer;
+            color: #c0c0c0; padding: 5px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            transition: color 0.12s, background 0.12s;
+        }
+        .music-dock-vol-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+        .music-dock-vol-btn svg { width: 14px; height: 14px; display: block; }
+        .music-dock-volume-track { flex: 1; height: 14px; display: flex; align-items: center; position: relative; cursor: pointer; touch-action: none; }
+        .music-dock-volume-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+        .music-dock-volume-fill { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 4px; width: 80%; background: #fff; border-radius: 2px; pointer-events: none; transition: background 0.12s; }
+        .music-dock-volume-track:hover .music-dock-volume-fill,
+        .music-dock-volume-track.dragging .music-dock-volume-fill { background: #3b82f6; }
+        .music-dock-volume-track:hover .music-dock-volume-thumb,
+        .music-dock-volume-track.dragging .music-dock-volume-thumb { opacity: 1; }
+        .music-dock-volume-thumb {
+            position: absolute; top: 50%; left: 80%; transform: translate(-50%, -50%);
+            width: 11px; height: 11px; background: #fff; border-radius: 50%;
+            opacity: 0; transition: opacity 0.15s;
+            pointer-events: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        }
+        /* Expand + close buttons at the far right of the dock */
+        .music-dock-expand,
+        .music-dock-close {
+            background: transparent; border: none;
+            color: #8a8a8a; cursor: pointer;
+            padding: 6px; border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .music-dock-expand:hover,
+        .music-dock-close:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+        .music-dock-expand svg,
+        .music-dock-close svg { width: 14px; height: 14px; }
+        /* When the full music-player view is active, the dock would be redundant
+           (you can already see / control everything in the big view). Hide it. */
+        body.music-player-open .music-dock { display: none !important; }
+

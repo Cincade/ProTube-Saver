@@ -1,0 +1,254 @@
+        /* ================================================== */
+        /* LEFT RAIL — clean dark sidebar, collapsible to icon-only */
+        /* ================================================== */
+        .rail {
+            background: #0a0a0a;
+            border-right: 1px solid #161616;
+            display: flex;
+            flex-direction: column;
+            padding: 12px 10px;
+            overflow: hidden;
+            transition: padding 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .cockpit.rail-collapsed .rail {
+            padding: 12px 8px;
+        }
+
+        /* Logo header. The logo + brand name live together; in collapsed state the
+           brand name fades out and the toggle button takes its space (Notion pattern). */
+        .rail-header {
+            display: flex;
+            align-items: center;
+            /* Padding-left is set so the LOGO's HORIZONTAL CENTER lines up
+               with the nav-icon center below (not the left edge). Rail-item
+               has padding-left 10 + icon 16 → icon center at 18px from rail
+               edge. Logo is 28×28, so its center sits at padding-left + 14.
+               Setting padding-left to 4 puts the logo center at 18 = icon
+               center. The brand label drifts a touch left as a side effect;
+               acceptable for the user's "icons + logo aligned" requirement. */
+            gap: 11px;
+            padding: 4px 4px 4px 4px;
+            margin-bottom: 16px;
+            min-height: 32px;
+        }
+
+        .cockpit.rail-collapsed .rail-header {
+            justify-content: center;
+            /* gap: 0 in collapsed mode so the (hidden) brand-text + (hidden)
+               collapse-btn don't push the logo off-center via their flex gap.
+               Matches the same fix on .rail-item in collapsed mode. */
+            gap: 0;
+            padding: 4px 0;
+        }
+
+        .rail-logo-mark {
+            width: 28px;
+            height: 28px;
+            background: #3b82f6;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .rail-logo-mark svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .rail-logo-text {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #ededed;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+            opacity: 1;
+            max-width: 200px;
+            overflow: hidden;
+            transition: opacity 0.14s ease, max-width 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        /* Collapse via opacity + max-width (NOT display:none) so it fades out
+           gracefully alongside the rail width animation. display:none would pop
+           the label out in one frame and the parent grid would visibly jolt. */
+        .cockpit.rail-collapsed .rail-logo-text {
+            opacity: 0;
+            max-width: 0;
+        }
+
+        /* Toggle button — sits in the rail-header on the right when expanded.
+           When collapsed, hides (the user clicks the logo to expand instead).
+           This matches Notion / Linear / VS Code pattern. */
+        .rail-collapse-btn {
+            margin-left: auto;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: #525252;
+            cursor: pointer;
+            border-radius: 5px;
+            padding: 0;
+            font-family: inherit;
+            transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+        }
+
+        .rail-collapse-btn:hover {
+            background: #161616;
+            color: #d4d4d4;
+        }
+
+        .rail-collapse-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* When collapsed, hide the toggle — clicking the logo expands again */
+        .cockpit.rail-collapsed .rail-collapse-btn {
+            display: none;
+        }
+
+        /* When collapsed, the logo mark itself becomes the click target to expand.
+           Add a subtle hover hint so users know it's clickable. */
+        .cockpit.rail-collapsed .rail-logo-mark {
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .cockpit.rail-collapsed .rail-logo-mark:hover {
+            transform: scale(1.05);
+        }
+
+        /* Nav items */
+        .rail-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .rail-item {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 8px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: #8a8a8a;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s ease, color 0.12s ease;
+            text-align: left;
+            width: 100%;
+            position: relative;
+            min-height: 36px;
+        }
+
+        .rail-item svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .rail-item-label {
+            flex: 1;
+            white-space: nowrap;
+            opacity: 1;
+            max-width: 200px;
+            overflow: hidden;
+            transition: opacity 0.14s ease, max-width 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .rail-item:hover {
+            background: #161616;
+            color: #ededed;
+        }
+
+        .rail-item.active {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        /* Collapsed state: center icons, fade labels gracefully (NOT display:none —
+           that pops them out in one frame and forces a layout jolt). max-width:0
+           with overflow:hidden hides them from layout while opacity:0 fades them
+           visually. The two transitions are timed so the fade finishes a hair
+           before the width fully collapses, avoiding the half-faded-but-still-
+           occupying-space visual that long horizontal labels can cause. */
+        .cockpit.rail-collapsed .rail-item {
+            justify-content: center;
+            padding: 8px;
+            gap: 0;
+            transition: padding 0.22s cubic-bezier(0.32, 0.72, 0, 1), gap 0.22s cubic-bezier(0.32, 0.72, 0, 1), background 0.12s ease, color 0.12s ease;
+        }
+        .rail-item {
+            transition: padding 0.22s cubic-bezier(0.32, 0.72, 0, 1), gap 0.22s cubic-bezier(0.32, 0.72, 0, 1), background 0.12s ease, color 0.12s ease;
+        }
+
+        .cockpit.rail-collapsed .rail-item-label {
+            opacity: 0;
+            max-width: 0;
+        }
+
+        /* Badge — full pill in expanded state */
+        .rail-item-badge {
+            font-size: 10.5px;
+            padding: 1px 7px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border-radius: 10px;
+            font-weight: 600;
+            min-width: 20px;
+            text-align: center;
+            transition: all 0.12s ease;
+        }
+
+        /* Collapsed: badge becomes a small dot in top-right of the icon button */
+        .cockpit.rail-collapsed .rail-item-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            min-width: 6px;
+            width: 6px;
+            height: 6px;
+            padding: 0;
+            font-size: 0;
+            color: transparent;
+            background: #3b82f6;
+            border: 1.5px solid #0a0a0a;
+            border-radius: 50%;
+        }
+
+        /* Active dot (downloading indicator) */
+        .rail-item-active-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #3b82f6;
+            animation: rail-dot-pulse 1.5s ease-in-out infinite;
+            display: none;
+            flex-shrink: 0;
+        }
+
+        .rail-item-active-dot.visible {
+            display: inline-block;
+        }
+
+        .cockpit.rail-collapsed .rail-item-active-dot {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+        }
+
+        @keyframes rail-dot-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+

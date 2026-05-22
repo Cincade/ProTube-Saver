@@ -1,0 +1,732 @@
+        /* ================================================== */
+        /* LIBRARY                                            */
+        /* ================================================== */
+        .library-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+            flex-shrink: 0;
+        }
+
+        .library-title-block {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .library-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: -0.02em;
+        }
+
+        .library-subtitle {
+            font-size: 12px;
+            color: #737373;
+        }
+
+        .library-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Generic icon-only button used in the library header (Show hidden toggle).
+           Same visual language as the import button but square-ish and icon-only. */
+        .library-icon-btn {
+            height: 34px;
+            width: 34px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 7px;
+            color: #a0a0a0;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: inherit;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+            flex-shrink: 0;
+        }
+        .library-icon-btn:hover {
+            background: #1a1a1a;
+            border-color: #2a2a2a;
+            color: #d4d4d4;
+        }
+        /* Active state when toggled on — blue tint mirrors the rest of the
+           "this filter is engaged" affordance (chips, settings toggle). */
+        .library-icon-btn.active {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #60a5fa;
+        }
+
+        /* Hidden-card visual when "Show hidden" is on. Dimmed + a small badge
+           in the corner so the user can tell at a glance which cards are in
+           the hidden state. Without dimming there's no signal that toggling
+           "Show hidden" off would remove these cards from view. */
+        .library-card.is-hidden {
+            opacity: 0.55;
+        }
+        .library-card.is-hidden:hover {
+            opacity: 0.85;
+        }
+
+        /* Bulk-hide fade-out. Applied just before app.renderLibrary() runs so
+           the cards being hidden visibly fade and shrink instead of all
+           disappearing in one frame. The 280ms in CSS matches the JS await
+           timer in hideSelected() — keep them in sync if you change either.
+           pointer-events:none stops late hover/click during the animation. */
+        .library-card.hiding-out {
+            opacity: 0;
+            transform: scale(0.94);
+            transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+            pointer-events: none;
+        }
+
+        /* Pin indicator on a pinned library card. Small filled circle with a
+           pin icon, top-left corner of the thumbnail. For playlists the
+           Channel/Playlist badge already sits top-left at 5px,5px — pinned
+           playlist cards shift the playlist badge down 26px so the two don't
+           overlap (see .library-card.is-pinned .library-card-playlist-badge). */
+        .library-card-pin-icon {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.95);
+            color: #fff;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+        .library-card-pin-icon svg {
+            width: 11px;
+            height: 11px;
+        }
+        /* Shift the Channel/Playlist badge down so a pinned playlist's icon
+           doesn't sit on top of it. */
+        .library-card.is-pinned .library-card-playlist-badge {
+            top: 32px;
+        }
+        .library-card-hidden-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(20, 20, 20, 0.85);
+            color: #d4d4d4;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(4px);
+        }
+
+        .library-search {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            height: 34px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 7px;
+            width: 260px;
+            transition: border-color 0.15s;
+            position: relative;
+        }
+
+        .library-search:focus-within {
+            border-color: #3b82f6;
+        }
+
+        .library-search svg {
+            color: #525252;
+            flex-shrink: 0;
+        }
+
+        .library-search input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #ededed;
+            font-size: 12.5px;
+            font-family: inherit;
+            outline: none;
+            min-width: 0;
+        }
+
+        .library-search input::placeholder {
+            color: #525252;
+        }
+
+        .library-search-clear {
+            width: 18px;
+            height: 18px;
+            background: #262626;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0a0a0;
+            cursor: pointer;
+            flex-shrink: 0;
+            padding: 0;
+            transition: background 0.12s;
+        }
+
+        .library-search-clear:hover {
+            background: #3a3a3a;
+            color: #fff;
+        }
+
+        .library-search-clear.hidden {
+            display: none;
+        }
+
+        .library-search-suggestions {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #141414;
+            border: 1px solid #262626;
+            border-radius: 7px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 20;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .library-search-suggestions.hidden {
+            display: none;
+        }
+
+        .library-search-suggestion {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #d4d4d4;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #1a1a1a;
+            transition: background 0.1s;
+        }
+
+        .library-search-suggestion:last-child {
+            border-bottom: none;
+        }
+
+        .library-search-suggestion:hover,
+        .library-search-suggestion.active {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .library-search-suggestion-icon {
+            color: #525252;
+            flex-shrink: 0;
+        }
+
+        .library-search-suggestion-title {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .library-search-suggestion-channel {
+            color: #737373;
+            font-size: 10.5px;
+            flex-shrink: 0;
+        }
+
+        /* Background refetch progress pill — quiet feedback during launch refetch */
+        .refetch-progress {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: #141414;
+            border: 1px solid #262626;
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            font-size: 12px;
+            color: #d4d4d4;
+            max-width: 340px;
+            transform: translateY(calc(100% + 20px));
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .refetch-progress.visible {
+            transform: translateY(0);
+        }
+
+        .refetch-progress-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid #262626;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spinner 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spinner {
+            to { transform: rotate(360deg); }
+        }
+
+        .refetch-progress-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .refetch-progress-title {
+            font-weight: 500;
+            color: #ededed;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .refetch-progress-subtitle {
+            color: #737373;
+            font-size: 10.5px;
+            margin-top: 1px;
+        }
+
+        .library-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+            padding-bottom: 24px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+            align-content: start;
+            /* Each grid row sizes to the tallest card in it; cards self-size */
+            grid-auto-rows: min-content;
+            /* Always reserve scrollbar space, even when content fits without
+               scrolling. Without this, toggling "Show hidden" from few-cards
+               (no scrollbar) to many-cards (scrollbar appears) caused the
+               grid to reflow horizontally by ~6-15px — visible jolt. */
+            scrollbar-gutter: stable;
+        }
+
+        .library-card {
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Hover — subtle blue outline without any positional shift. The card
+           stays in place; only the border tint changes so the user can scan
+           cards without UI jitter. (Active still does a tiny press-down on
+           click for feedback.) */
+        .library-card:hover {
+            border-color: rgba(59, 130, 246, 0.6);
+            background: #161616;
+        }
+
+        .library-card:active {
+            transform: scale(0.995);
+            transition: transform 0.05s;
+        }
+
+        /* Selection mode — entered via right-click on a card or by clicking the
+           per-card checkbox that appears on hover. Cards become selectable;
+           click toggles selection instead of opening detail.
+           Visual cues: subtle blue ring + checkbox top-left when in mode. */
+        .library-card.is-selectable {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .library-card.is-selectable .library-card-select-mark {
+            display: flex;
+        }
+
+        .library-card-select-mark {
+            display: none;
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            width: 22px;
+            height: 22px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border: 1.5px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            z-index: 3;
+            pointer-events: none;
+            transition: background 0.12s, border-color 0.12s;
+        }
+
+        .library-card.is-selected .library-card-select-mark {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .library-card.is-selected {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18), 0 8px 16px -4px rgba(0, 0, 0, 0.4);
+        }
+
+        .library-card.is-selected:hover {
+            border-color: #3b82f6;
+        }
+
+        .library-card-select-mark svg {
+            width: 12px;
+            height: 12px;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+
+        .library-card.is-selected .library-card-select-mark svg {
+            opacity: 1;
+        }
+
+        /* Selection action bar — slides up from bottom when items are selected.
+           Floats above the library grid, dismissable via X or Esc. */
+        .selection-actionbar {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(calc(100% + 40px));
+            background: #161616;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+            min-width: 360px;
+        }
+
+        .selection-actionbar.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .selection-actionbar-count {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            padding: 0 14px 0 10px;
+            border-right: 1px solid #2a2a2a;
+            margin-right: 4px;
+            font-variant-numeric: tabular-nums;
+            /* Big counts (3+ digits) were wrapping to two lines and forcing the
+               whole bar to grow vertically — looked stacked rather than wide.
+               nowrap keeps "49 selected" on a single line and the bar's flex
+               layout grows horizontally to accommodate. */
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .selection-actionbar-btn {
+            height: 32px;
+            padding: 0 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            border: 1px solid transparent;
+            background: transparent;
+            color: #d4d4d4;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: background 0.12s, color 0.12s;
+        }
+
+        .selection-actionbar-btn:hover {
+            background: #1f1f1f;
+            color: #fff;
+        }
+
+        .selection-actionbar-btn.danger {
+            color: #f87171;
+        }
+
+        .selection-actionbar-btn.danger:hover {
+            background: rgba(220, 38, 38, 0.12);
+            color: #ef4444;
+        }
+
+        .selection-actionbar-btn svg {
+            width: 13px;
+            height: 13px;
+        }
+
+        .selection-actionbar-divider {
+            width: 1px;
+            background: #2a2a2a;
+            align-self: stretch;
+            margin: 4px 2px;
+        }
+
+        .library-card-thumb {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #1a1a1a;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .library-card-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            -webkit-user-drag: none;
+            user-select: none;
+            -webkit-user-select: none;
+            pointer-events: none;
+        }
+
+        .library-card-thumb-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #262626;
+        }
+
+        .library-card-duration {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        /* Watch-progress strip — sits at the very bottom of the thumbnail.
+           Width = (last_position / duration) * 100%. Subtle but tells you at a glance
+           which videos you've started watching. */
+        /* "NEW" badge — shown for videos added in the last 48 hours. Top-right of thumb,
+           above duration/playlist badges. High z-index so it's never obscured. */
+        .library-card-new-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #3b82f6;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            z-index: 2;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
+        .library-card-watch-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: #3b82f6;
+            border-bottom-left-radius: 3px;
+        }
+
+        .library-card-playlist-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(59, 130, 246, 0.95);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        /* Channel variant — same shape, different hue (amber) so a glance at the
+           library distinguishes "playlist someone curated" from "channel of an
+           uploader that may grow over time". */
+        .library-card-playlist-badge.is-channel {
+            background: rgba(245, 158, 11, 0.95);
+        }
+
+        .library-card-body {
+            padding: 9px 11px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .library-card-title {
+            color: #ededed;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 3px;
+        }
+
+        .library-card-meta {
+            color: #737373;
+            font-size: 10.5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .library-card.is-missing {
+            opacity: 0.55;
+        }
+
+        .library-card.is-missing .library-card-thumb {
+            filter: grayscale(1);
+        }
+
+        .library-card-missing-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(220, 38, 38, 0.95);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* Empty state — fixed-position centering relative to the viewport. We use
+           `fixed` (not `absolute`) so it doesn't depend on the parent's height
+           computing correctly. Left edge accounts for the rail width (~60px) so
+           the centering looks correct against the visible content area. */
+        /* Library empty state — uses flex:1 to claim the available vertical
+           space inside the .view-pane (which is a flex column), centering
+           horizontally and vertically. Was previously position:fixed with a
+           hardcoded calc(50% + 30px) horizontal offset, which broke when the
+           rail collapsed (the offset assumed a 60px rail). The grid is hidden
+           via display:none whenever this is visible — see renderLibrary. */
+        .library-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .library-empty > * { max-width: 420px; }
+
+        /* Re-enable pointer events on interactive children so the import button
+           still works even though the wrapper is set to pointer-events: none
+           (the wrapper is none-fed so clicks can pass through to underlying UI
+           when it's positioned over content — but it's hidden via .hidden in
+           that case anyway, so this is mostly belt-and-suspenders). */
+        .library-empty .library-empty-action {
+            pointer-events: auto;
+        }
+
+        .library-empty.hidden {
+            display: none;
+        }
+
+        .library-empty-icon {
+            width: 56px;
+            height: 56px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3b82f6;
+            margin-bottom: 6px;
+        }
+
+        .library-empty-icon svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        .library-empty-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #d4d4d4;
+        }
+
+        .library-empty-hint {
+            font-size: 12.5px;
+            color: #737373;
+            max-width: 320px;
+            line-height: 1.5;
+        }
+
+        .library-empty-action {
+            margin-top: 18px;
+            height: 36px;
+            padding: 0 18px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            font-size: 12.5px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .library-empty-action:hover {
+            background: #2563eb;
+        }
+
+        .library-empty-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+

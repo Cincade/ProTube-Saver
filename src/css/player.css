@@ -1,0 +1,1587 @@
+        /* ================================================== */
+        /* ================================================== */
+        /* PLAYER VIEW                                        */
+        /* ================================================== */
+        /* Player view — covers the entire cockpit-main area as an absolute overlay.
+           This is the correct pattern: position:absolute over the relative parent
+           instead of the old negative-margin flex-child hack which broke with
+           CSS containment and caused the library to show through. */
+        #player-view {
+            position: absolute;
+            inset: 0;
+            background: #000;
+            display: none;
+            z-index: 20;
+        }
+
+        #player-view.active {
+            display: block;
+        }
+
+        /* Floating top overlay — sits over the canvas, fades with the controls.
+           Replaces the old border-bottom topbar so the player is one continuous
+           black surface (matches YouTube/Vimeo). */
+        .player-top-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 18px 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(to bottom,
+                        rgba(0, 0, 0, 0.78) 0%,
+                        rgba(0, 0, 0, 0.42) 55%,
+                        rgba(0, 0, 0, 0) 100%);
+            z-index: 5;
+            pointer-events: none;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        .player-top-overlay > * {
+            pointer-events: auto;
+        }
+
+        .player-top-overlay.hidden {
+            opacity: 0;
+            transform: translateY(-6px);
+        }
+
+        .player-back {
+            width: 36px;
+            height: 36px;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+            transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+        }
+
+        .player-back:hover {
+            background: rgba(0, 0, 0, 0.65);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .player-back:active {
+            transform: scale(0.92);
+        }
+
+        .player-titles {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .player-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: -0.01em;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+        }
+
+        .player-meta {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.78);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+        }
+
+        .player-external {
+            height: 32px;
+            padding: 0 14px;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 11.5px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: inherit;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+        }
+
+        .player-external:hover {
+            background: rgba(0, 0, 0, 0.7);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .player-canvas {
+            position: absolute;
+            inset: 0;
+            background: #000;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .player-canvas.controls-hidden {
+            cursor: none;
+        }
+
+        #player-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #000;
+        }
+
+        /* Player fullscreen — driven by .player-is-fullscreen on body. We use OS-window
+           borderless via pywebview (window.toggle_fullscreen). The rail collapses and
+           cockpit-main loses its padding so the canvas goes truly edge-to-edge.
+
+           Critical: transition: none on the cockpit grid here. Animating
+           grid-template-columns concurrently with the OS resize/WebView2 repaint
+           previously blanked the video pipeline (WebView2 issue #2256). Static
+           collapse keeps the layout change out of the same animation frame as the
+           OS toggle. */
+        body.player-is-fullscreen {
+            background: #000;
+        }
+        body.player-is-fullscreen .cockpit {
+            grid-template-columns: 0 minmax(0, 1fr);
+            transition: none;
+        }
+        body.player-is-fullscreen .rail {
+            /* Keep .rail in flow (don't display: none) — removing the element
+               from layout fires a heavier reflow that races with the OS toggle
+               and blanks WebView2. The 0-width grid column above already hides
+               it visually; overflow: hidden clips its contents cleanly. */
+            overflow: hidden;
+            pointer-events: none;
+        }
+        body.player-is-fullscreen .cockpit-main {
+            padding: 0;
+        }
+
+        /* Subtitle overlay — custom CC display so we get DM Sans + our look instead of
+           the browser's native <track> rendering (which uses OS-default fonts and is
+           unstyleable across browsers). Positioned above the controls so they don't
+           overlap the cue when controls fade in. */
+        .player-subtitle {
+            position: absolute;
+            left: 50%;
+            bottom: 12%;
+            transform: translateX(-50%);
+            /* Single-line display per user preference: no wrapping, ever. Overflow is
+               clipped via overflow:hidden + text-overflow:ellipsis if a cue is unusually
+               long; the next cue (or the rolling-dedup chain) usually contains the rest. */
+            max-width: 95%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 6px 14px;
+            background: rgba(0, 0, 0, 0.72);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'DM Sans', sans-serif;
+            font-size: clamp(14px, 1.6vw, 22px);
+            font-weight: 500;
+            line-height: 1.35;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+            pointer-events: none;
+            z-index: 8;
+        }
+        .player-subtitle[hidden] { display: none; }
+        /* When fullscreen we lift the subtitle a bit so it stays clear of the bottom edge */
+        body.player-is-fullscreen .player-subtitle { bottom: 14%; }
+        /* CC button — uses the literal letters "CC" so it's instantly recognizable.
+           Inherits 36x36 size + hover background from .player-btn; we only style the
+           text inside (mono font for crispness, semi-bold so it reads at small size).
+           When active, a small underline bar appears below "CC" matching how YouTube
+           and most video apps signal "captions on". */
+        .player-cc-btn {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            line-height: 1;
+            position: relative;
+        }
+        .player-cc-btn.active { color: #3b82f6; }
+        .player-cc-btn.active::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 6px;
+            width: 14px;
+            height: 2px;
+            background: #3b82f6;
+            border-radius: 1px;
+        }
+        /* Dimmed when no subs available — clicks still register so the user gets a
+           toast explaining why nothing happens (vs. a hidden button which felt broken). */
+        .player-cc-btn.no-subs { opacity: 0.4; }
+
+        .player-big-play {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.92);
+            width: 72px;
+            height: 72px;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .player-big-play.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Loading spinner — visible during initial buffer / network fetch */
+        .player-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        .player-spinner[hidden] {
+            display: none !important;
+        }
+
+        .player-spinner-ring {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: rgba(255, 255, 255, 0.85);
+            border-radius: 50%;
+            animation: player-spin 0.8s linear infinite;
+        }
+
+        @keyframes player-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Resume-from-position toast — slides in from top-left, auto-dismisses */
+        /* Volume HUD — vertical-bar style indicator that appears briefly on volume change.
+           Inspired by phone media controls (volume = right swipe on phones). Auto-hides ~1s
+           after last change. Centered on the right edge of the player canvas. */
+        .player-vol-hud {
+            position: absolute;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 14px;
+            background: rgba(15, 15, 15, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: #ededed;
+            z-index: 6;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+            min-width: 60px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .player-vol-hud[hidden] {
+            display: none !important;
+        }
+
+        .player-vol-hud.visible {
+            opacity: 1;
+        }
+
+        .player-vol-hud-icon {
+            color: #a0a0a0;
+        }
+
+        .player-vol-hud-bar {
+            width: 4px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .player-vol-hud-fill {
+            width: 100%;
+            background: #ededed;
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .player-vol-hud-percent {
+            font-size: 11px;
+            font-weight: 600;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
+            min-width: 38px;
+            text-align: center;
+        }
+
+        .player-resume-toast {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px 8px 14px;
+            background: rgba(15, 15, 15, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #ededed;
+            font-size: 12.5px;
+            font-weight: 500;
+            z-index: 6;
+            opacity: 0;
+            transform: translateX(-12px);
+            transition: opacity 0.22s ease, transform 0.22s ease;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .player-resume-toast[hidden] {
+            display: none !important;
+        }
+
+        .player-resume-toast.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .player-resume-restart {
+            background: transparent;
+            border: none;
+            color: #60a5fa;
+            font-size: 12.5px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0 4px;
+            transition: color 0.12s;
+        }
+
+        .player-resume-restart:hover {
+            color: #93c5fd;
+        }
+
+        /* ================================================== */
+        /* UP NEXT SIDE PANEL — slides in from right edge.
+           Floats over video with semi-transparent background. */
+        /* ================================================== */
+        .player-side-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 340px;
+            background: rgba(10, 10, 10, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            flex-direction: column;
+            z-index: 5;
+            transform: translateX(100%);
+            transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+            box-shadow: -16px 0 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .player-side-panel[hidden] {
+            display: none !important;
+        }
+
+        .player-side-panel.visible {
+            transform: translateX(0);
+        }
+
+        .player-side-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 14px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            flex-shrink: 0;
+        }
+
+        .player-side-panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ededed;
+            letter-spacing: -0.01em;
+        }
+
+        .player-side-panel-meta {
+            font-size: 10.5px;
+            color: #8a8a8a;
+            margin-left: auto;
+        }
+
+        .player-side-panel-close {
+            width: 24px;
+            height: 24px;
+            background: transparent;
+            border: none;
+            color: #8a8a8a;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            padding: 0;
+            font-family: inherit;
+            transition: background 0.12s, color 0.12s;
+        }
+
+        .player-side-panel-close:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #ededed;
+        }
+
+        .player-side-panel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 8px;
+        }
+
+        /* AI summary side panel — slide-in from right. The bottom is offset so the panel
+           ENDS above the player controls bar instead of overlapping it. That way the chat
+           input sits at the natural height users expect (where YouTube's "Ask" input is),
+           and the play/seek/volume controls remain visible underneath. z-index: 12 keeps
+           the panel above the controls (z-index: 6) when they DO visually overlap during
+           the slide animation. */
+        .player-summary-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 90px;  /* clears the controls bar */
+            width: 380px;
+            background: rgba(10, 10, 10, 0.97);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom-left-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            z-index: 12;
+            transform: translateX(100%);
+            transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+            box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+        }
+        .player-summary-panel[hidden] { display: none !important; }
+        .player-summary-panel.visible { transform: translateX(0); }
+
+        /* Header action buttons — copy, regenerate. Compact icon buttons inline with title. */
+        .player-summary-action {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #a0a0a0;
+            border-radius: 5px;
+            padding: 4px 6px;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .player-summary-action + .player-summary-action { margin-left: 4px; }
+        .player-summary-action:first-of-type { margin-left: auto; }
+        .player-summary-action:hover {
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        .player-summary-action.flash-ok { color: #10b981; border-color: #10b981; }
+
+        /* Scroll container holds summary + chat history; the chat input form is sticky outside it. */
+        .player-summary-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 18px 16px;
+        }
+        .player-summary-scroll::-webkit-scrollbar { width: 6px; }
+        .player-summary-scroll::-webkit-scrollbar-track { background: transparent; }
+        .player-summary-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .player-summary-body {
+            font-family: 'DM Sans', sans-serif;
+            color: #d4d4d4;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+        .player-summary-body h2,
+        .player-summary-body h3 {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            margin: 18px 0 8px;
+            letter-spacing: -0.01em;
+        }
+        .player-summary-body h2:first-child,
+        .player-summary-body h3:first-child { margin-top: 0; }
+        .player-summary-body p {
+            margin: 0 0 12px;
+        }
+        .player-summary-body strong {
+            color: #fff;
+            font-weight: 600;
+        }
+        .player-summary-body em {
+            font-style: italic;
+            color: #c0c0c0;
+        }
+        .player-summary-body ul,
+        .player-summary-body ol {
+            margin: 0 0 12px;
+            padding-left: 20px;
+        }
+        .player-summary-body li {
+            margin-bottom: 4px;
+        }
+        .player-summary-body .summary-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+            gap: 12px;
+        }
+        .player-summary-body .summary-loading .spinner {
+            width: 28px;
+            height: 28px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: summary-spin 0.9s linear infinite;
+        }
+        @keyframes summary-spin { to { transform: rotate(360deg); } }
+        .player-summary-body .summary-empty {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #aaa;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .player-summary-body .summary-empty button {
+            padding: 10px 16px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .player-summary-body .summary-empty button:hover {
+            border-color: #3b82f6;
+        }
+
+        /* Chat history — appears below summary as user asks questions. */
+        .player-chat-history {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .player-chat-history[hidden] { display: none; }
+        .player-chat-msg {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            line-height: 1.55;
+            border-radius: 8px;
+            padding: 9px 12px;
+            max-width: 100%;
+            word-wrap: break-word;
+        }
+        .player-chat-msg.user {
+            align-self: flex-end;
+            background: #1e3a5f;
+            color: #e5e5e5;
+            max-width: 85%;
+        }
+        .player-chat-msg.assistant {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: #d4d4d4;
+            max-width: 95%;
+        }
+        .player-chat-msg.assistant p { margin: 0 0 8px; }
+        .player-chat-msg.assistant p:last-child { margin-bottom: 0; }
+        .player-chat-msg.assistant strong { color: #fff; font-weight: 600; }
+        .player-chat-msg.assistant ul,
+        .player-chat-msg.assistant ol { margin: 4px 0 8px; padding-left: 18px; }
+        .player-chat-msg.thinking {
+            color: #888;
+            font-style: italic;
+        }
+        .player-chat-msg.thinking::after {
+            content: '…';
+            display: inline-block;
+            animation: thinking-dots 1.2s infinite;
+        }
+        @keyframes thinking-dots {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* Sticky chat input at the bottom of the panel. The panel itself stops above
+           the player controls bar (see .player-summary-panel { bottom: 90px }) so a
+           normal 12px bottom padding here puts the input at a comfortable height. */
+        .player-chat-form {
+            display: flex;
+            gap: 8px;
+            padding: 12px 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom-left-radius: 8px;
+            flex-shrink: 0;
+        }
+        .player-chat-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        .player-chat-input:focus {
+            border-color: #3b82f6;
+        }
+        .player-chat-input::placeholder { color: #6e6e6e; }
+        .player-chat-send {
+            background: #3b82f6;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s ease;
+        }
+        .player-chat-send:hover { background: #2563eb; }
+        .player-chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+        .player-chat-send svg { transform: translateX(-1px); }
+
+        /* AI button — sparkle icon. Glows blue when the summary panel is open. The
+           4-point star + smaller star is the de-facto AI affordance now (Gemini, Copilot,
+           Notion AI all use it). */
+        .player-ai-btn { padding: 0; }
+        .player-ai-btn svg { display: block; }
+        .player-ai-btn.active { color: #3b82f6; }
+        .player-ai-btn.active svg path { filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5)); }
+
+        /* Brief blue pulse used to draw the eye to a queue card when "Add channel"
+           detects the channel is already there and scrolls to it. */
+        @keyframes flash-highlight-pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+            50%  { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.18); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .flash-highlight {
+            animation: flash-highlight-pulse 1.5s ease-out;
+        }
+
+        /* Custom scrollbar — subtle */
+        .player-side-panel-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .player-side-panel-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .player-side-panel-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        .player-side-panel-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .player-side-row {
+            display: flex;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            align-items: flex-start;
+            transition: background 0.12s ease;
+            background: transparent;
+            border: none;
+            text-align: left;
+            width: 100%;
+            font-family: inherit;
+            color: inherit;
+            margin-bottom: 1px;
+        }
+
+        .player-side-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .player-side-row.is-current {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .player-side-row.is-current:hover {
+            background: rgba(59, 130, 246, 0.14);
+        }
+
+        .player-side-row-thumb {
+            width: 100px;
+            aspect-ratio: 16 / 9;
+            background: #1a1a1a;
+            border-radius: 4px;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .player-side-row-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            -webkit-user-drag: none;
+            user-select: none;
+            -webkit-user-select: none;
+            pointer-events: none;
+        }
+
+        .player-side-row-duration {
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+
+        .player-side-row-now {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            background: #3b82f6;
+            color: #fff;
+            font-size: 8.5px;
+            font-weight: 700;
+            padding: 2px 5px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .player-side-row-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: #3b82f6;
+        }
+
+        .player-side-row-body {
+            flex: 1;
+            min-width: 0;
+            padding-top: 2px;
+        }
+
+        .player-side-row-title {
+            font-size: 11.5px;
+            font-weight: 500;
+            color: #ededed;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .player-side-row-meta {
+            font-size: 10.5px;
+            color: #8a8a8a;
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-side-panel-empty {
+            padding: 32px 16px;
+            text-align: center;
+            color: #525252;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .player-error {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-align: center;
+            padding: 30px;
+            z-index: 30;
+        }
+
+        /* The [hidden] attribute is overridden by the explicit display:flex above unless
+           we force it. This is the CSS gotcha that was making the error overlay
+           appear permanently. Belt-and-suspenders: !important + explicit attribute selector. */
+        .player-error[hidden] {
+            display: none !important;
+        }
+
+        .player-error-icon {
+            color: #f87171;
+            margin-bottom: 4px;
+        }
+
+        .player-error-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #ededed;
+        }
+
+        .player-error-hint {
+            font-size: 12.5px;
+            color: #a0a0a0;
+            max-width: 360px;
+            line-height: 1.5;
+        }
+
+        .player-error-action {
+            margin-top: 8px;
+            height: 36px;
+            padding: 0 18px;
+            background: #3b82f6;
+            border: none;
+            border-radius: 7px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .player-error-action:hover {
+            background: #2563eb;
+        }
+
+        .player-controls {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 22px 22px 18px;
+            background: linear-gradient(to top,
+                        rgba(0, 0, 0, 0.92) 0%,
+                        rgba(0, 0, 0, 0.65) 55%,
+                        rgba(0, 0, 0, 0) 100%);
+            transition: opacity 0.22s ease, transform 0.22s ease;
+            color: #fff;
+            z-index: 6;
+        }
+
+        .player-controls.hidden {
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+
+        .player-seek {
+            margin-bottom: 10px;
+            position: relative;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 6px 0;
+        }
+
+        .player-seek-track {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.22);
+            border-radius: 999px;
+            position: relative;
+            transition: height 0.15s ease;
+        }
+
+        .player-seek:hover .player-seek-track {
+            height: 6px;
+        }
+
+        .player-seek-buffered {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.38);
+            border-radius: 999px;
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+
+        .player-seek-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: #3b82f6;
+            border-radius: 999px;
+            width: 0%;
+        }
+
+        .player-seek-thumb {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 13px;
+            height: 13px;
+            background: #3b82f6;
+            border-radius: 50%;
+            left: 0%;
+            opacity: 0;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+
+        .player-seek:hover .player-seek-thumb {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .player-control-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .player-btn {
+            width: 36px;
+            height: 36px;
+            background: transparent;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border-radius: 6px;
+            transition: background 0.12s ease, transform 0.12s ease;
+        }
+
+        .player-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .player-btn:active {
+            transform: scale(0.94);
+        }
+
+        /* Play/Pause icon swap — driven by .is-playing class on the button */
+        .player-play-btn .icon-pause { display: none; }
+        .player-play-btn.is-playing .icon-play { display: none; }
+        .player-play-btn.is-playing .icon-pause { display: block; }
+
+        /* Mute/volume icons — driven by data-vol-state on the button (high/low/muted) */
+        .player-mute-btn .icon-vol-low,
+        .player-mute-btn .icon-vol-muted { display: none; }
+        .player-mute-btn[data-vol-state="low"] .icon-vol-high { display: none; }
+        .player-mute-btn[data-vol-state="low"] .icon-vol-low { display: block; }
+        .player-mute-btn[data-vol-state="muted"] .icon-vol-high { display: none; }
+        .player-mute-btn[data-vol-state="muted"] .icon-vol-muted { display: block; }
+
+        /* Play button gets emphasis as primary action */
+        #player-play-btn {
+            margin-right: 4px;
+        }
+
+        .player-volume {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-left: 2px;
+            padding-right: 6px;
+        }
+
+        .player-volume-slider {
+            width: 0;
+            overflow: hidden;
+            transition: width 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .player-volume:hover .player-volume-slider,
+        .player-volume:focus-within .player-volume-slider {
+            width: 78px;
+        }
+
+        .player-volume-track {
+            width: 64px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.22);
+            border-radius: 999px;
+            margin-left: 8px;
+            cursor: pointer;
+            position: relative;
+            transition: height 0.15s ease;
+        }
+
+        .player-volume:hover .player-volume-track {
+            height: 6px;
+        }
+
+        .player-volume-fill {
+            height: 100%;
+            background: #fff;
+            border-radius: 999px;
+            width: 100%;
+        }
+
+        .player-volume-thumb {
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            opacity: 0;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            pointer-events: none;
+        }
+
+        .player-volume-track:hover .player-volume-thumb,
+        .player-volume:hover .player-volume-thumb {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .player-time {
+            font-size: 12px;
+            color: #d4d4d4;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            letter-spacing: 0.01em;
+            padding: 0 8px 0 4px;
+        }
+
+        .player-speed-btn {
+            height: 28px;
+            min-width: 44px;
+            padding: 0 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s ease;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .player-speed-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .player-speed-btn:active {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .player-speed-menu {
+            position: absolute;
+            right: 60px;
+            bottom: 78px;
+            background: rgba(15, 15, 15, 0.96);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            z-index: 20;
+            min-width: 92px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .player-speed-menu[hidden] {
+            display: none !important;
+        }
+
+        .player-speed-option {
+            background: transparent;
+            border: none;
+            color: #d4d4d4;
+            font-size: 12.5px;
+            font-family: inherit;
+            font-variant-numeric: tabular-nums;
+            padding: 7px 14px;
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: left;
+            transition: background 0.1s ease;
+        }
+
+        .player-speed-option:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .player-speed-option.active {
+            background: rgba(59, 130, 246, 0.22);
+            color: #93c5fd;
+            font-weight: 600;
+        }
+
+        /* ================================================== */
+        /* The detail panel lives inside library-view so it can slide in over the grid.
+           library-view is `position: relative` so the empty-state child can absolutely
+           position within it. We deliberately don't set min-height: 100% here — that
+           was making the view taller than its content + breaking grid layout when
+           lots of cards render. The empty state has its own centering rules below. */
+        #library-view {
+            position: relative;
+        }
+
+        .detail-panel-backdrop {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: rgba(0, 0, 0, 0.45);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease;
+            z-index: 5;
+        }
+
+        .detail-panel-backdrop.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .detail-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 400px;
+            max-width: 92vw;
+            background: #0f0f0f;
+            border-left: 1px solid #1f1f1f;
+            transform: translateX(100%);
+            transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Panel is hidden by default (off-screen and non-interactive) */
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .detail-panel.visible {
+            transform: translateX(0);
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        /* When the panel closes, let the transition finish before hiding it so it slides out. */
+        .detail-panel.closing {
+            visibility: visible;
+        }
+
+        .detail-panel-header {
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 12px;
+            flex-shrink: 0;
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        .detail-panel-close {
+            width: 32px;
+            height: 32px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: #a0a0a0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .detail-panel-close:hover {
+            background: #1f1f1f;
+            color: #fff;
+        }
+
+        .detail-panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 20px 24px;
+        }
+
+        .detail-thumb {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .detail-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            -webkit-user-drag: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .detail-thumb-duration {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 7px;
+            border-radius: 3px;
+        }
+
+        .detail-thumb-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .detail-thumb-placeholder svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .detail-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #ededed;
+            line-height: 1.3;
+            margin-bottom: 6px;
+            letter-spacing: -0.01em;
+        }
+
+        .detail-channel {
+            font-size: 13px;
+            color: #a0a0a0;
+            margin-bottom: 16px;
+        }
+
+        .detail-channel.muted {
+            color: #525252;
+            font-style: italic;
+        }
+
+        .detail-meta-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .detail-meta-cell {
+            background: #141414;
+            border: 1px solid #1a1a1a;
+            border-radius: 7px;
+            padding: 9px 11px;
+        }
+
+        .detail-meta-label {
+            font-size: 10px;
+            color: #525252;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 3px;
+        }
+
+        .detail-meta-value {
+            font-size: 12.5px;
+            color: #ededed;
+            font-weight: 500;
+        }
+
+        .detail-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* AI summary block in the detail panel — sits below the action buttons.
+           States: empty (Generate button), present (article + regenerate), no-key hint. */
+        .detail-ai-summary {
+            margin-top: 16px;
+            padding: 14px;
+            background: #0f0f0f;
+            border: 1px solid #1f1f1f;
+            border-radius: 8px;
+        }
+        .detail-ai-summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .detail-ai-summary-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #3b82f6;
+        }
+        .detail-ai-summary-regen {
+            background: transparent;
+            border: 1px solid #2a2a2a;
+            color: #a0a0a0;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .detail-ai-summary-regen:hover { color: #fff; border-color: #3a3a3a; }
+        .detail-ai-summary-body p {
+            margin: 0 0 10px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #d4d4d4;
+        }
+        .detail-ai-summary-body p:last-child { margin-bottom: 0; }
+        .detail-ai-summary-generate {
+            width: 100%;
+            padding: 10px 14px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.12s ease, border-color 0.12s ease;
+        }
+        .detail-ai-summary-generate:hover { background: #222; border-color: #3b82f6; }
+        .detail-ai-summary-generate:disabled { opacity: 0.6; cursor: wait; }
+        .detail-ai-summary-hint {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.5;
+        }
+
+        .detail-action-btn {
+            height: 38px;
+            padding: 0 14px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 7px;
+            color: #ededed;
+            font-size: 12.5px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.12s, border-color 0.12s;
+            text-align: left;
+        }
+
+        .detail-action-btn:hover {
+            background: #1a1a1a;
+            border-color: #262626;
+        }
+
+        .detail-action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .detail-action-btn:disabled:hover {
+            background: #141414;
+            border-color: #1f1f1f;
+        }
+
+        .detail-action-btn.primary {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: #fff;
+        }
+
+        .detail-action-btn.primary:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+
+        .detail-action-btn.danger {
+            color: #f87171;
+        }
+
+        .detail-action-btn.danger:hover {
+            background: rgba(220, 38, 38, 0.08);
+            border-color: rgba(220, 38, 38, 0.3);
+        }
+
+        .detail-action-btn svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        .detail-missing-banner {
+            background: rgba(220, 38, 38, 0.08);
+            border: 1px solid rgba(220, 38, 38, 0.25);
+            border-radius: 7px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            color: #fca5a5;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .detail-imported-banner {
+            background: rgba(59, 130, 246, 0.06);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 7px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            color: #93c5fd;
+            font-size: 11.5px;
+            line-height: 1.4;
+        }
+
+        .rail-bottom {
+            margin-top: auto;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .rail-settings-btn {
+            justify-content: center;
+            padding: 8px;
+            color: #525252;
+        }
+
+        .rail-settings-btn:hover {
+            color: #d4d4d4;
+        }
+
+        .rail-settings-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Main content area */
+        .cockpit-main {
+            padding: 20px 28px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+            position: relative;
+        }
+
+        .view-pane {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .view-pane.active {
+            display: flex;
+        }
+

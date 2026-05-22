@@ -1,0 +1,429 @@
+        /* ---- Search view (F9) ---- */
+        #search-view { padding: 24px 28px 0; }
+        .search-view-title {
+            font-size: 22px; font-weight: 600; letter-spacing: -0.015em;
+            color: #fff; margin-bottom: 14px;
+        }
+        .search-input-row { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
+        .search-input-wrap { flex: 1; position: relative; }
+        .search-input {
+            width: 100%;
+            padding: 13px 40px 13px 42px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 9px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .search-input:focus { border-color: #3b82f6; background: #161616; }
+        .search-input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6e6e6e; pointer-events: none; }
+        .search-clear-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: transparent; border: none; cursor: pointer;
+            width: 22px; height: 22px; border-radius: 50%;
+            display: none; align-items: center; justify-content: center;
+            color: #8a8a8a; padding: 0;
+        }
+        .search-clear-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .search-clear-btn.visible { display: flex; }
+        .search-clear-btn svg { width: 12px; height: 12px; }
+        .search-go-btn {
+            padding: 12px 22px;
+            background: #3b82f6;
+            border: none; border-radius: 9px;
+            color: #fff; font-family: inherit; font-size: 13px; font-weight: 600;
+            cursor: pointer;
+            transition: background 0.12s ease;
+        }
+        .search-go-btn:hover { background: #2563eb; }
+        .search-go-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Autocomplete dropdown */
+        .search-suggestions {
+            position: absolute;
+            left: 0; right: 0; top: calc(100% + 6px);
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            border-radius: 9px;
+            padding: 6px;
+            z-index: 20;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .search-suggestions[hidden] { display: none; }
+        .sugg-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px;
+            border-radius: 6px;
+            color: #d4d4d4;
+            cursor: pointer;
+            font-size: 13.5px;
+        }
+        .sugg-item:hover, .sugg-item.hover { background: #1f1f1f; color: #fff; }
+        .sugg-item svg { width: 13px; height: 13px; color: #6e6e6e; flex-shrink: 0; }
+        /* Filter chips */
+        .search-filter-row { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-shrink: 0; }
+        .search-chip {
+            padding: 7px 14px;
+            background: transparent;
+            border: 1px solid #2a2a2a;
+            border-radius: 18px;
+            color: #a0a0a0;
+            font-family: inherit; font-size: 12.5px; font-weight: 500;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .search-chip:hover { color: #fff; border-color: #3a3a3a; }
+        .search-chip.active { background: #fff; border-color: #fff; color: #0a0a0a; font-weight: 600; }
+        .search-meta { margin-left: auto; color: #6e6e6e; font-size: 12px; }
+        /* Results scroller */
+        .search-results-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 20px;
+            min-height: 0;
+        }
+        .search-results { display: flex; flex-direction: column; gap: 8px; }
+        /* ---- Result cards (YouTube-style) ----
+           Layout mirrors YouTube's own search results desktop view: large 16:9 thumb on
+           the left, title (2-line), stats row (views · time-ago), channel row (small
+           circular avatar + name + verified ✓), then a 2-line description snippet. */
+        .search-result-card {
+            display: flex; gap: 16px;
+            padding: 8px 4px;
+            background: transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.12s ease;
+            align-items: flex-start;
+        }
+        .search-result-card:hover { background: rgba(255, 255, 255, 0.04); }
+        .search-result-card.adding { opacity: 0.55; pointer-events: none; }
+        .sr-thumb {
+            width: 246px; height: 138px;       /* 16:9 — close to YouTube's own size */
+            background: #1a1a1a;
+            border-radius: 10px;
+            position: relative;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .sr-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .sr-duration {
+            position: absolute; right: 6px; bottom: 6px;
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+            padding: 3px 6px; border-radius: 4px;
+            line-height: 1;
+        }
+        .sr-type-badge {
+            position: absolute; left: 6px; top: 6px;
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 7px; border-radius: 4px;
+        }
+        .sr-meta { flex: 1; display: flex; flex-direction: column; padding-top: 2px; min-width: 0; }
+        .sr-title {
+            font-size: 16px; font-weight: 500; color: #f5f5f5;
+            line-height: 1.35;
+            margin-bottom: 6px;
+            letter-spacing: -0.005em;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        /* Stats row: "1.2M views · 2 years ago" — dimmer, sits right under the title */
+        .sr-stats {
+            font-size: 12.5px;
+            color: #8a8a8a;
+            margin-bottom: 10px;
+        }
+        /* Channel row: small avatar + channel name + verified check.
+           This row mirrors YouTube's "creator with avatar" style. */
+        .sr-channel-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        /* Clickable creator row → opens the read-only channel preview. */
+        .sr-channel-row.sr-channel-clickable {
+            cursor: pointer; width: fit-content; max-width: 100%;
+            border-radius: 8px; padding: 2px 8px 2px 2px; margin-left: -2px;
+            transition: background 0.12s ease;
+        }
+        .sr-channel-row.sr-channel-clickable:hover { background: rgba(255,255,255,0.06); }
+        .sr-channel-row.sr-channel-clickable:hover .sr-channel-name { color: #fff; }
+        /* "Subscribe to save" pill shown in the channel hero during a preview. */
+        .pd-channel-subscribe-btn {
+            margin-top: 10px;
+            align-self: flex-start;   /* don't stretch full-width in the flex column */
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 14px;
+            background: #f1f1f1; color: #0f0f0f;
+            border: none; border-radius: 999px;
+            font-family: inherit; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: background 0.12s ease;
+        }
+        .pd-channel-subscribe-btn:hover { background: #fff; }
+        .pd-channel-subscribe-btn svg { width: 15px; height: 15px; }
+        .pd-channel-card-stats {
+            font-size: 12px; color: #8b8b8b; margin-top: 3px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        /* Search-landing: removable recent-search chip × */
+        .myf-chip-label { display: inline; }
+        .myf-chip-x {
+            background: transparent; border: none; color: #8a8a8a; cursor: pointer;
+            font-size: 15px; line-height: 1; padding: 0; margin-left: 7px;
+        }
+        .myf-chip-x:hover { color: #fff; }
+        /* Search-landing: "Recommended for you" grid — reuses the .library-card
+           component (same as channel/library mode); this is just the wrapping grid. */
+        .vfy-rec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 14px;
+            padding: 2px 0 8px;
+        }
+        .vfy-rec-card { cursor: pointer; }
+        .sr-channel-avatar {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: #1a1a1a;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .sr-channel-avatar-empty {
+            background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
+        }
+        .sr-channel-name {
+            font-size: 12.5px;
+            color: #c0c0c0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sr-verified {
+            width: 13px; height: 13px;
+            color: #8a8a8a;
+            flex-shrink: 0;
+        }
+        /* Description snippet — 2-line clamped, gray, smaller. Same role as the
+           description preview on YouTube's results. */
+        .sr-description {
+            font-size: 12.5px;
+            color: #8a8a8a;
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        /* Kept for playlists which still use a single subline. Channels also reuse this. */
+        .sr-channel { font-size: 12.5px; color: #a0a0a0; margin-bottom: 6px; }
+        .sr-action { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+        .sr-already {
+            font-size: 12px; font-weight: 600;
+            color: #10b981;
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 3px 9px; border-radius: 4px;
+        }
+        .sr-already svg { width: 12px; height: 12px; }
+        /* Pending state shown between "click + to add" and backend confirming
+           the video actually landed in the queue. Subtler than .sr-already
+           (no green checkmark) so the user can tell at a glance it's still
+           in flight. */
+        .sr-pending {
+            font-size: 12px; font-weight: 600;
+            color: #8a8a8a;
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(115, 115, 115, 0.12);
+            padding: 3px 9px; border-radius: 4px;
+        }
+        /* Channel result — distinct from video/playlist:
+           - circular avatar (smaller, vertically centered with text)
+           - title slightly heavier
+           - description line is 2-line clamped and dimmer
+           - no duration / type-badge overlays on the avatar
+           This matches how YouTube's own search renders channel rows. */
+        .search-result-card.channel {
+            align-items: center;
+        }
+        .search-result-card.channel .sr-thumb {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .search-result-card.channel .sr-thumb img {
+            border-radius: 50%;
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .search-result-card.channel .sr-meta { padding-top: 0; }
+        .search-result-card.channel .sr-title {
+            font-weight: 600;
+            -webkit-line-clamp: 1;
+        }
+        .search-result-card.channel .sr-channel {
+            color: #c0c0c0;       /* "@handle · 248K subscribers" — slightly brighter */
+            font-size: 12.5px;
+            margin-bottom: 6px;
+        }
+        .search-result-card.channel .sr-stats {
+            color: #8a8a8a;       /* description — dimmer, 2-line clamped */
+            font-size: 12px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        /* Subscribe button — pill on the right of channel cards. White/dark switch
+           matches YouTube's own Subscribe button. */
+        .sr-subscribe-btn {
+            align-self: center;
+            padding: 10px 16px;
+            background: #fff;
+            border: none;
+            border-radius: 18px;
+            color: #0a0a0a;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.12s ease;
+        }
+        .sr-subscribe-btn:hover { background: #e0e0e0; }
+        .sr-subscribe-btn:disabled { opacity: 0.6; cursor: wait; }
+        /* When a channel card is in-queue/library, the action chip replaces the button */
+        .search-result-card.channel .sr-action { align-self: center; flex-shrink: 0; }
+        /* Status / loading / empty / error blocks */
+        .search-status {
+            display: flex; align-items: center; justify-content: center;
+            padding: 40px 20px;
+            color: #888;
+            font-size: 13px;
+            text-align: center;
+        }
+        .search-status[hidden] { display: none; }
+        .search-empty-default { max-width: 360px; line-height: 1.55; }
+        .search-loading {
+            display: flex; align-items: center; gap: 10px;
+            color: #888; font-size: 13px;
+        }
+        .search-loading .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: search-spin 0.8s linear infinite;
+        }
+        @keyframes search-spin { to { transform: rotate(360deg); } }
+        .search-loadmore-sentinel { height: 60px; }
+        .search-loadmore-sentinel.loading {
+            display: flex; align-items: center; justify-content: center;
+            color: #888; font-size: 12px; gap: 8px;
+        }
+
+        /* Selection state for result cards — blue ring + check overlay.
+           Channels are NEVER selectable (they have their own Subscribe button), so
+           the channel-specific override below ensures the selected styles can't apply. */
+        .search-result-card.selected {
+            background: #0c1726;
+            border-color: #3b82f6;
+        }
+        .search-result-card.channel.selected { background: transparent; border-color: transparent; }
+        .search-result-card.channel.selected::before { display: none; }
+        .search-result-card.channel.selected .sr-thumb::after { display: none; }
+        .search-result-card.selected::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border: 2px solid #3b82f6;
+            border-radius: 11px;
+            pointer-events: none;
+        }
+        .search-result-card { position: relative; }
+        /* Selected checkmark badge removed — the row's blue border + tint at
+           .search-result-card.selected (above) is enough to convey selection. */
+
+        /* Centered floating pill — same primitive as .pd-channel-action-bar.
+           Auto-sizes to its contents, sits ~20px above the bottom of the
+           search view, slides up from below when items are selected. */
+        .search-action-bar {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%) translateY(160%);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 8px 8px 16px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid #232323;
+            border-radius: 999px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        .search-action-bar.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .search-action-count {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
+        }
+        .search-action-bar-spacer {
+            width: 1px;
+            align-self: stretch;
+            background: #2a2a2a;
+            margin: 2px 4px;
+        }
+        .search-action-clear {
+            background: transparent;
+            border: none;
+            color: #909090;
+            padding: 6px 10px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: color 0.12s ease, background 0.12s ease;
+        }
+        .search-action-clear:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .search-action-add {
+            background: #3b82f6;
+            border: none;
+            color: #fff;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.12s ease, transform 0.05s;
+        }
+        .search-action-add:hover { background: #2563eb; }
+        .search-action-add:active { transform: scale(0.97); }
+        /* Position search-view as relative so the action bar's bottom positioning anchors here */
+        #search-view { position: relative; }
+

@@ -1,0 +1,2737 @@
+        /* URL bar at top */
+        .url-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            height: 40px;
+            padding: 0 6px 0 14px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 9px;
+            margin-bottom: 6px;
+            transition: border-color 0.15s;
+        }
+
+        .url-bar:focus-within {
+            border-color: #3b82f6;
+        }
+
+        .url-bar-icon {
+            width: 14px;
+            height: 14px;
+            color: #525252;
+            flex-shrink: 0;
+        }
+
+        .url-bar-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #ededed;
+            font-size: 13px;
+            font-family: inherit;
+            min-width: 0;
+        }
+
+        .url-bar-input:focus {
+            outline: none;
+        }
+
+        .url-bar-input::placeholder {
+            color: #525252;
+        }
+
+        .url-bar-button {
+            height: 30px;
+            padding: 0 18px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+            flex-shrink: 0;
+            min-width: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .url-bar-button:hover {
+            background: #2563eb;
+        }
+
+        .url-bar-button:disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .url-bar-status {
+            font-size: 11px;
+            color: #3b82f6;
+            min-height: 16px;
+            margin-bottom: 8px;
+            padding: 0 2px;
+        }
+
+        .loading-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Filter chip row */
+        .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        /* Subtle link below the queue that takes you to Library. Replaces the old
+           "Done" filter chip — Library is now the home of completed downloads. */
+        .queue-completed-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            margin: 8px auto 0;
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid #1f1f1f;
+            border-radius: 6px;
+            color: #737373;
+            font-size: 11.5px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+        }
+
+        .queue-completed-link[hidden] {
+            display: none !important;
+        }
+
+        .queue-completed-link:hover {
+            background: #141414;
+            color: #ededed;
+            border-color: #2a2a2a;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 12px;
+            background: transparent;
+            color: #a0a0a0;
+            border: 1px solid #1f1f1f;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-chip:hover {
+            border-color: #2a2a2a;
+            color: #d4d4d4;
+        }
+
+        .filter-chip.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.35);
+            color: #3b82f6;
+        }
+
+        .chip-count {
+            font-size: 10.5px;
+            color: #525252;
+            font-weight: 600;
+        }
+
+        .filter-chip.active .chip-count {
+            color: rgba(59, 130, 246, 0.8);
+        }
+
+        .filter-row-spacer {
+            flex: 1;
+        }
+
+        .filter-stats {
+            font-size: 11px;
+            color: #525252;
+            font-weight: 500;
+            padding: 0 4px;
+        }
+
+        /* Empty state — fills the remaining space inside .queue-box (which is
+           a flex column) and centers its inner content. Avoids absolute
+           positioning so we don't have to make queue-box a containing block,
+           which would clip the absolute-positioned quality menu inside it. */
+        .queue-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .queue-empty > * { max-width: 420px; }
+
+        .queue-empty.hidden {
+            display: none;
+        }
+
+        .queue-empty-icon {
+            width: 48px;
+            height: 48px;
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3b82f6;
+            margin-bottom: 4px;
+        }
+
+        .queue-empty-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .queue-empty-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #d4d4d4;
+            letter-spacing: -0.01em;
+        }
+
+        .queue-empty-hint {
+            font-size: 12.5px;
+            color: #737373;
+            max-width: 280px;
+            line-height: 1.5;
+        }
+
+        /* Pill still used inside the playlist detail view hero */
+        .stat-pill {
+            padding: 5px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .stat-pill.pill-selected { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
+
+        /* Queue */
+        .queue-box {
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            flex: 1;
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+            /* Intentionally NOT position: relative. Making queue-box a containing
+               block while it has overflow:hidden caused the absolute-positioned
+               quality menu to be clipped within queue-box bounds, defeating the
+               flip-up logic which measures against the viewport. queue-empty
+               centers via flex below instead of absolute positioning. */
+        }
+
+        .queue-top {
+            padding: 10px 14px;
+            border-bottom: 1px solid #1a1a1a;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .queue-top-spacer {
+            flex: 1;
+        }
+
+        /* Select-all pill button */
+        .select-all-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 30px;
+            padding: 0 12px;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 15px;
+            color: #a0a0a0;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .select-all-pill:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .select-all-pill.some-selected,
+        .select-all-pill.all-selected {
+            background: rgba(59, 130, 246, 0.08);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #3b82f6;
+        }
+
+        .sa-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        .sa-icon svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Small icon-only button shown next to select-all */
+        .queue-action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 15px;
+            color: #737373;
+            cursor: pointer;
+            transition: all 0.15s;
+            flex-shrink: 0;
+            padding: 0;
+        }
+
+        .queue-action-btn:hover {
+            color: #dc2626;
+            border-color: rgba(220, 38, 38, 0.5);
+        }
+
+        .video-list-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        /* Update modal — opens when the user clicks the corner pill. Lets
+           them read release notes BEFORE choosing to download, so an update
+           isn't a "click and find out what changed later" leap of faith. */
+        .update-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            z-index: 9300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            opacity: 1;
+            transition: opacity 0.18s ease;
+        }
+        .update-modal-backdrop[hidden] { display: none; }
+
+        .update-modal {
+            background: #141414;
+            border: 1px solid #262626;
+            border-radius: 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 460px;
+            color: #ededed;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 48px);
+        }
+        .update-modal-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 18px 18px 14px;
+            border-bottom: 1px solid #1f1f1f;
+        }
+        .update-modal-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.14);
+            color: #60a5fa;
+            flex-shrink: 0;
+        }
+        .update-modal-icon svg { width: 18px; height: 18px; }
+        .update-modal-titles {
+            flex: 1;
+            min-width: 0;
+        }
+        .update-modal-title {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.005em;
+            color: #ededed;
+            margin-bottom: 2px;
+        }
+        .update-modal-version {
+            font-size: 12px;
+            color: #737373;
+            font-family: 'JetBrainsMono', 'JetBrains Mono', monospace;
+        }
+        .update-modal-close {
+            background: transparent;
+            border: none;
+            color: #737373;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 0.12s, color 0.12s;
+        }
+        .update-modal-close:hover {
+            background: #1f1f1f;
+            color: #ededed;
+        }
+        .update-modal-body {
+            padding: 16px 18px 12px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+        .update-modal-section-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: #737373;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+        }
+        .update-modal-notes {
+            font-size: 13px;
+            color: #d4d4d4;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .update-modal-meta {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #1f1f1f;
+            font-size: 11.5px;
+            color: #737373;
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .update-modal-meta:empty {
+            display: none;
+        }
+        .update-modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            padding: 12px 18px 16px;
+            border-top: 1px solid #1f1f1f;
+        }
+        .update-modal-btn {
+            background: transparent;
+            border: 1px solid #2a2a2a;
+            color: #d4d4d4;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 9px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+        }
+        .update-modal-btn:hover {
+            background: #1a1a1a;
+            border-color: #3a3a3a;
+            color: #ededed;
+        }
+        .update-modal-btn.primary {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: #fff;
+        }
+        .update-modal-btn.primary:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+        .update-modal-btn[disabled] {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .update-modal-progress {
+            padding: 0 20px 14px;
+            display: none;
+        }
+        .update-modal-progress.visible { display: block; }
+        .update-modal-progress-text {
+            font-size: 12px;
+            color: #b8b8b8;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .update-modal-progress-text .pct { color: #ededed; font-variant-numeric: tabular-nums; }
+        .update-modal-progress-bar-bg {
+            width: 100%;
+            height: 5px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .update-modal-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0;
+            transition: width 0.25s ease;
+        }
+        .update-modal-progress.indeterminate .update-modal-progress-bar {
+            width: 35%;
+            animation: updateModalIndeterminate 1.2s ease-in-out infinite;
+        }
+        @keyframes updateModalIndeterminate {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(285%); }
+        }
+        .update-modal-error {
+            color: #ef4444;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        /* "Update available" pill — bottom-right corner. Same dark-surface
+           language as toasts and the queue-new-pill. Click anywhere on the
+           main body opens the download URL; the X dismisses for the session. */
+        .update-available-pill {
+            position: fixed;
+            bottom: 22px;
+            right: 22px;
+            z-index: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 6px 10px 14px;
+            background: #141414;
+            color: #ededed;
+            border: 1px solid #262626;
+            border-radius: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(14px);
+            transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.15s, background 0.15s;
+            text-align: left;
+        }
+        .update-available-pill[hidden] { display: none; }
+        .update-available-pill.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        .update-available-pill:hover {
+            background: #1a1a1a;
+            border-color: #2f2f2f;
+        }
+        .update-pill-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.14);
+            color: #60a5fa;
+            flex-shrink: 0;
+        }
+        .update-pill-icon svg { width: 14px; height: 14px; }
+        .update-pill-body {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            min-width: 0;
+        }
+        .update-pill-title {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            line-height: 1.2;
+        }
+        .update-pill-version {
+            font-size: 11px;
+            color: #737373;
+            font-family: 'JetBrainsMono', 'JetBrains Mono', monospace;
+            line-height: 1.2;
+        }
+        .update-pill-close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            color: #737373;
+            margin-left: 4px;
+            transition: background 0.12s, color 0.12s;
+        }
+        .update-pill-close:hover {
+            background: #1f1f1f;
+            color: #ededed;
+        }
+        .update-pill-close svg { width: 12px; height: 12px; }
+
+        /* "↓ N new" pill — fixed-position; same surface language as toasts and
+           confirm modals (dark #141414 base + subtle border + soft drop shadow).
+           Blue lives only on the small leading icon as accent — the surface
+           itself stays calm. Slide-in from below, hover lift. */
+        .queue-new-pill {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(14px);
+            z-index: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px 10px 14px;
+            background: #141414;
+            color: #ededed;
+            border: 1px solid #262626;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            letter-spacing: -0.003em;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.15s, background 0.15s;
+        }
+        .queue-new-pill[hidden] { display: none; }
+        .queue-new-pill.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+        .queue-new-pill:hover {
+            background: #1a1a1a;
+            border-color: #2f2f2f;
+            transform: translateX(-50%) translateY(-1px);
+        }
+        /* The arrow is the only blue thing — small accent, doesn't dominate. */
+        .queue-new-pill-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.14);
+            color: #60a5fa;
+            flex-shrink: 0;
+        }
+        .queue-new-pill-icon svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .video-list-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .video-list-container::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 10px;
+        }
+
+        .video-row {
+            padding: 10px 12px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.15s;
+            background: #0f0f0f;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .video-row.selected {
+            background: rgba(59, 130, 246, 0.05);
+            border-color: #3b82f6;
+        }
+
+        .video-row.selected:hover {
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .video-checkbox {
+            display: none;
+        }
+
+        .video-row:hover {
+            background: #141414;
+            border-color: #262626;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .video-thumb {
+            position: relative;
+            width: 120px;
+            height: 68px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        .video-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-time {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .video-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .video-heading {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 3px;
+            line-height: 1.35;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .video-meta-line {
+            font-size: 12px;
+            color: #737373;
+        }
+
+        .video-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Custom quality dropdown */
+        .quality-picker {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .quality-trigger {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 34px;
+            padding: 0 12px;
+            background: #0a0a0a;
+            color: #d4d4d4;
+            border: 1px solid #262626;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .quality-trigger:hover {
+            border-color: #333;
+        }
+
+        .quality-picker.open .quality-trigger {
+            border-color: #3b82f6;
+        }
+
+        .quality-trigger .caret {
+            width: 10px;
+            height: 6px;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        .quality-picker.open .caret {
+            transform: rotate(180deg);
+        }
+
+        .quality-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: #141414;
+            border: 1px solid #262626;
+            border-radius: 8px;
+            padding: 4px;
+            min-width: 140px;
+            z-index: 50;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+        }
+
+        /* Flip variant — applied dynamically by openMenu() when there isn't enough
+           room below the trigger. Anchors to the bottom of the trigger and grows up.
+           Identical look, just inverted vertical anchor. */
+        .quality-picker.flip-up .quality-menu {
+            top: auto;
+            bottom: calc(100% + 6px);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.6);
+        }
+
+        .quality-picker.open .quality-menu {
+            display: block;
+        }
+
+        .quality-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 5px;
+            color: #a0a0a0;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s;
+        }
+
+        .quality-option:hover {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .quality-option.selected {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .quality-option .opt-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .quality-option .opt-hint {
+            font-size: 10px;
+            color: #525252;
+        }
+
+        .quality-option.selected .opt-hint {
+            color: rgba(59, 130, 246, 0.6);
+        }
+
+        .quality-option .check-icon {
+            width: 12px;
+            height: 12px;
+            flex-shrink: 0;
+        }
+
+        .quality-menu-divider {
+            height: 1px;
+            background: #262626;
+            margin: 4px 6px;
+        }
+        .video-status {
+            min-width: 120px;
+            flex-shrink: 0;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .progress-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .progress-text {
+            font-size: 10px;
+            font-weight: 600;
+            color: #3b82f6;
+            text-align: right;
+        }
+
+        .status-badge.status-paused {
+            background: rgba(115, 115, 115, 0.12);
+            color: #a0a0a0;
+            border: 1px solid rgba(115, 115, 115, 0.3);
+        }
+
+        .pause-mq-btn {
+            flex-shrink: 0;
+        }
+
+        .pause-mq-btn:hover {
+            color: #3b82f6;
+            border-color: rgba(59, 130, 246, 0.5);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s;
+            width: 0;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-done {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-error {
+            background: rgba(220, 38, 38, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(220, 38, 38, 0.35);
+            cursor: help;
+        }
+
+        .status-retrying {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .retry-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #f59e0b;
+            animation: retry-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes retry-pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .status-error-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-icon-btn.retry-btn:hover {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .video-row.is-error {
+            border-color: rgba(220, 38, 38, 0.2);
+        }
+
+        .status-done-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-icon-btn {
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 5px;
+            color: #737373;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .status-icon-btn:hover {
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .video-row.is-done {
+            cursor: pointer;
+        }
+
+        .video-row.is-done:hover {
+            border-color: rgba(16, 185, 129, 0.25);
+        }
+
+        /* Hover menu for thumbnail/subtitle toggles */
+        .extras-wrapper {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .extras-trigger {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 7px;
+            color: #737373;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .extras-trigger:hover,
+        .extras-trigger.has-active {
+            color: #3b82f6;
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .extras-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: #141414;
+            border: 1px solid #262626;
+            border-radius: 8px;
+            padding: 6px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 100;
+            min-width: 140px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        /* Flip variant — opens upward when there's no room below */
+        .extras-wrapper.flip-up .extras-menu {
+            top: auto;
+            bottom: calc(100% + 4px);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
+        }
+
+        .extras-menu.open {
+            display: flex;
+        }
+
+        .extra-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #a0a0a0;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: left;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .extra-toggle:hover {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .extra-toggle.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .extra-toggle svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* ========== Playlist card (main queue) ========== */
+        .playlist-row {
+            padding: 10px 12px;
+            border: 1px solid #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.15s;
+            background: #0f0f0f;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .playlist-row:hover {
+            background: #141414;
+            border-color: #262626;
+        }
+
+        .playlist-row.selected {
+            background: rgba(59, 130, 246, 0.06);
+            border-color: #3b82f6;
+        }
+
+        .playlist-row.selected:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* Stacked thumbnail collage — 3 images slightly offset */
+        .playlist-thumb-stack {
+            position: relative;
+            width: 120px;
+            height: 68px;
+            flex-shrink: 0;
+        }
+
+        .playlist-thumb-stack .pt {
+            position: absolute;
+            inset: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a1a;
+            border: 1px solid #0a0a0a;
+        }
+
+        .playlist-thumb-stack .pt img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .playlist-thumb-stack .pt-back {
+            transform: translateX(8px) translateY(-4px) scale(0.94);
+            opacity: 0.5;
+            z-index: 1;
+        }
+
+        .playlist-thumb-stack .pt-mid {
+            transform: translateX(4px) translateY(-2px) scale(0.97);
+            opacity: 0.75;
+            z-index: 2;
+        }
+
+        .playlist-thumb-stack .pt-front {
+            z-index: 3;
+        }
+
+        .playlist-video-count {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            z-index: 4;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .playlist-video-count svg {
+            width: 10px;
+            height: 10px;
+        }
+
+        .playlist-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-right: 6px;
+        }
+        /* Channel variant of the inline pill in queue cards / detail panels.
+           Amber to mirror the library-card variant. */
+        .playlist-badge.is-channel {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+
+        .playlist-open-hint {
+            color: #737373;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0 4px;
+            transition: color 0.15s;
+        }
+
+        .playlist-row:hover .playlist-open-hint {
+            color: #3b82f6;
+        }
+
+        .playlist-open-hint svg {
+            width: 12px;
+            height: 12px;
+            transition: transform 0.15s;
+        }
+
+        .playlist-row:hover .playlist-open-hint svg {
+            transform: translateX(2px);
+        }
+
+        /* Playlist download progress on the playlist card */
+        .playlist-progress-wrap {
+            width: 140px;
+            flex-shrink: 0;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .playlist-progress-wrap.visible {
+            display: flex;
+        }
+
+        .playlist-progress-text {
+            font-size: 10px;
+            font-weight: 600;
+            color: #3b82f6;
+            text-align: right;
+        }
+
+        .playlist-progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .playlist-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s;
+            width: 0;
+        }
+
+        .playlist-complete-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        /* Per-video status/progress inside detail view */
+        .pd-video-status {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 10px;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+
+        .pd-video-status.s-downloading { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+        .pd-video-status.s-done { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .pd-video-status.s-error { background: rgba(220, 38, 38, 0.15); color: #dc2626; }
+        .pd-video-status.s-cancelled { background: rgba(115, 115, 115, 0.15); color: #a0a0a0; }
+        .pd-video-status.s-retrying { background: rgba(245, 158, 11, 0.1); color: #f59e0b; display: inline-flex; align-items: center; gap: 6px; }
+
+        .pd-video-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 100px;
+            flex-shrink: 0;
+        }
+
+        .pd-video-progress-text {
+            font-size: 9px;
+            font-weight: 600;
+            color: #3b82f6;
+            text-align: right;
+        }
+
+        .pd-video-progress-bar-bg {
+            width: 100%;
+            height: 3px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .pd-video-progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s;
+            width: 0;
+        }
+
+        /* Pause/Resume button — appears on downloading/paused items */
+        .pause-btn {
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 6px;
+            color: #a0a0a0;
+            cursor: pointer;
+            transition: all 0.15s;
+            flex-shrink: 0;
+            padding: 0;
+        }
+
+        .pause-btn:hover {
+            color: #3b82f6;
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .pause-btn.is-paused {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .pause-btn.is-paused:hover {
+            color: #3b82f6;
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .pause-btn svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* ========== Playlist detail view ========== */
+        .playlist-detail-view {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .playlist-detail-view.visible {
+            display: flex;
+        }
+
+        /* Floating circular back button — mirrors .pd-channel-refresh-btn
+           on the opposite side of the banner area. No row of its own; the
+           detail view starts at the top of the panel. */
+        #playlist-detail-view { position: relative; }
+        .pd-back-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s ease, transform 0.05s;
+            z-index: 4;
+        }
+        .pd-back-btn:hover { background: rgba(0, 0, 0, 0.75); }
+        .pd-back-btn:active { transform: scale(0.94); }
+        .pd-back-btn svg { width: 16px; height: 16px; }
+
+        .pd-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .pd-hero {
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            align-self: start;
+        }
+
+        .pd-hero-thumb {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 14px;
+            background: #1a1a1a;
+        }
+
+        .pd-hero-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .pd-hero-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%);
+            display: flex;
+            align-items: flex-end;
+            padding: 10px;
+        }
+
+        .pd-hero-count {
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0,0,0,0.6);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .pd-hero-count svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .pd-hero-title {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .pd-hero-uploader {
+            font-size: 12px;
+            color: #a0a0a0;
+            margin-bottom: 16px;
+        }
+
+        .pd-hero-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .pd-hero-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .pd-quality-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            background: #0a0a0a;
+            border: 1px solid #1f1f1f;
+            border-radius: 8px;
+        }
+
+        .pd-quality-row-label {
+            font-size: 11px;
+            color: #737373;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        /* Right pane: video list */
+        .pd-videos {
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .pd-videos-top {
+            padding: 10px 14px;
+            border-bottom: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .pd-videos-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .pd-videos-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .pd-videos-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .pd-videos-list::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 10px;
+        }
+
+        /* ==================================================================
+           CHANNEL MODE — playlist-detail-view variant for channel-type
+           entries (classifyPlaylistEntry === 'channel'). Goal: read like a
+           YouTube channel page — clean grid of thumbnails, no checkmarks,
+           no pre-selection. Clicking a card toggles selection (blue ring
+           only); a bottom action bar slides up with quality + Download.
+           Regular playlists keep their list layout unchanged.
+           ================================================================== */
+
+        /* Channel mode: hero is replaced by .pd-channel-header (a separate
+           markup branch rendered when classifyPlaylistEntry(pl) === 'channel'),
+           so the only thing the channel-mode layout needs to do is stack
+           that header on top of the grid and suppress the select-all pill
+           the regular playlist view shows.
+
+           grid-template-rows: auto 1fr — header sizes to content, grid takes
+           the rest. .pd-videos gets min-height:0 so its child .library-grid
+           can scroll INSIDE it instead of overflowing past the hero. The old
+           `grid-auto-rows: min-content 1fr` was invalid (auto-rows takes one
+           value) and let the grid scroll over the header. */
+        /* Single-page scroll, YouTube-style — the WHOLE channel detail view
+           scrolls as one document. The banner + avatar + stats + bio scroll
+           up with the grid, instead of staying pinned while the grid slides
+           under them (which read as "two pages" rather than one channel
+           page). The floating action bar stays fixed at the visual bottom
+           because it anchors to #playlist-detail-view, not the scroll. */
+        .pd-layout.channel-mode {
+            display: block;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: 100px;   /* breathing room so the last row of
+                                       cards never sits under the action bar */
+        }
+        .pd-layout.channel-mode .pd-videos {
+            display: block;
+            overflow: visible;
+        }
+        .pd-layout.channel-mode .library-grid.is-channel-grid {
+            overflow: visible;
+            flex: none;
+        }
+        .pd-layout.channel-mode .pd-videos-top { display: none; }
+
+        /* YouTube-style channel header — mirrors youtube.com/@channel:
+           a rounded banner band on top, then a row of [144px avatar | name +
+           stats + bio + Subscribe-style pill]. The Subscribe pill is repurposed
+           as "Check for new videos" since the channel is already in queue. */
+        .pd-channel-header {
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px 8px;
+        }
+        .pd-channel-banner-wrap {
+            position: relative;
+            margin-bottom: 18px;
+        }
+        .pd-channel-banner {
+            width: 100%;
+            aspect-ratio: 6.2 / 1;
+            max-height: 220px;
+            min-height: 120px;
+            background-color: #161616;
+            background-size: cover;
+            background-position: center;
+            border-radius: 12px;
+        }
+        /* If the channel has no banner, render a subtle gradient instead of a
+           flat dark slab — feels intentional rather than empty. */
+        .pd-channel-banner-empty {
+            background-image: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 60%, #1a1a1a 100%);
+        }
+        /* Twin circular controls on the banner — refresh on the right,
+           back on the left. Both scroll with the banner (they're inside
+           .pd-channel-banner-wrap), so when the banner scrolls out of view
+           the .pd-sticky-header takes over with its own back + refresh. */
+        .pd-channel-refresh-btn,
+        .pd-channel-back-btn {
+            position: absolute;
+            top: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s ease, transform 0.05s;
+            z-index: 2;
+        }
+        .pd-channel-refresh-btn { right: 12px; }
+        .pd-channel-back-btn { left: 12px; }
+        .pd-channel-refresh-btn:hover,
+        .pd-channel-back-btn:hover { background: rgba(0, 0, 0, 0.75); }
+        .pd-channel-refresh-btn:active,
+        .pd-channel-back-btn:active { transform: scale(0.94); }
+        .pd-channel-refresh-btn svg,
+        .pd-channel-back-btn svg { width: 16px; height: 16px; }
+
+        /* Sticky compact header — slides in from the top when the channel
+           banner has scrolled out of view. Shows the controls (back/refresh)
+           plus a slim avatar + name so the user always knows what channel
+           they're scrolling on. */
+        .pd-sticky-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: rgba(15, 15, 15, 0.85);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            z-index: 6;
+            transform: translateY(-100%);
+            opacity: 0;
+            transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease;
+            pointer-events: none;
+        }
+        .pd-sticky-header.is-visible {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .pd-sticky-header[hidden] { display: none; }
+        .pd-sticky-back,
+        .pd-sticky-refresh {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: #ededed;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s ease;
+        }
+        .pd-sticky-back svg,
+        .pd-sticky-refresh svg { width: 16px; height: 16px; }
+        .pd-sticky-back:hover,
+        .pd-sticky-refresh:hover { background: rgba(255,255,255,0.08); }
+        .pd-sticky-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #1a1a1a center / cover no-repeat;
+            flex-shrink: 0;
+        }
+        .pd-sticky-name {
+            flex: 1;
+            font-size: 14.5px;
+            font-weight: 600;
+            color: #ededed;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pd-channel-meta {
+            display: grid;
+            grid-template-columns: 144px 1fr;
+            gap: 24px;
+            align-items: start;
+            padding: 4px 0 8px;
+        }
+        .pd-channel-avatar {
+            width: 144px;
+            height: 144px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #1a1a1a;
+            flex-shrink: 0;
+        }
+        .pd-channel-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .pd-channel-info {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            padding-top: 4px;
+        }
+        .pd-channel-name {
+            color: #fff;
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: -0.5px;
+        }
+        .pd-channel-stats {
+            color: #a3a3a3;
+            font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .pd-channel-handle {
+            color: #ededed;
+            font-weight: 500;
+        }
+        .pd-channel-stats-sep {
+            opacity: 0.55;
+        }
+        .pd-channel-bio {
+            color: #a3a3a3;
+            font-size: 13.5px;
+            line-height: 1.4;
+            max-width: 680px;
+        }
+        .pd-channel-bio-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .pd-channel-bio.is-expanded .pd-channel-bio-text {
+            -webkit-line-clamp: unset;
+            display: block;
+        }
+        .pd-channel-bio-toggle {
+            color: #ededed;
+            font-weight: 500;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 2px 0 0;
+            font-family: inherit;
+            font-size: inherit;
+            margin-top: 2px;
+        }
+        .pd-channel-bio-toggle:hover {
+            text-decoration: underline;
+        }
+
+        /* Channel-mode grid reuses .library-grid; this modifier just adds the
+           padding the library grid skips (library page has its own outer pad). */
+        .library-grid.is-channel-grid {
+            padding: 14px 14px 24px;
+        }
+        .library-grid.is-channel-grid::-webkit-scrollbar { width: 8px; }
+        .library-grid.is-channel-grid::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
+
+        /* Resolving state — card half-faded and non-interactive while its
+           formats are still loading. Used by the channel grid only. */
+        .library-card.is-resolving {
+            pointer-events: none;
+            opacity: 0.45;
+        }
+        /* Downloaded videos in a channel: single-click is locked out so the
+           user can't re-select something already in their library. Hover is
+           still allowed (visual inspection / double-click play). */
+        .library-card.is-downloaded {
+            cursor: default;
+        }
+        .library-card.is-downloaded:hover {
+            border-color: #1f1f1f;
+            background: #141414;
+        }
+
+        /* Top-right state badge on a library-card thumb — used by the channel
+           grid to show Downloaded / Downloading% / Retrying / Paused / Cancelled
+           / Error. Tiny and minimal so the thumb itself is the focus.
+             - .s-owned: 18px green circle with a check icon, no text
+             - .s-downloading: tiny percentage chip
+             - other states: tiny colored dot, no text (status comes from a
+               native tooltip via data-tip)
+           Layered above duration but below the watch-progress strip. */
+        .library-card-state-badge {
+            position: absolute;
+            top: 4px; right: 4px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 9.5px;
+            font-weight: 700;
+            line-height: 1;
+            border-radius: 999px;
+            z-index: 3;
+            letter-spacing: 0.2px;
+        }
+        .library-card-state-badge.s-owned {
+            width: 18px; height: 18px;
+            background: rgba(16,185,129,0.95);
+            color: #061a13;
+            padding: 0;
+        }
+        .library-card-state-badge.s-owned svg { width: 11px; height: 11px; }
+        .library-card-state-badge.s-downloading {
+            padding: 2px 6px;
+            background: rgba(59,130,246,0.95);
+            color: #fff;
+            border-radius: 4px;
+        }
+        .library-card-state-badge.s-error,
+        .library-card-state-badge.s-cancelled,
+        .library-card-state-badge.s-paused,
+        .library-card-state-badge.s-retrying {
+            width: 10px; height: 10px;
+            padding: 0;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.45);
+        }
+        .library-card-state-badge.s-error       { background: #dc2626; cursor: help; }
+        .library-card-state-badge.s-cancelled,
+        .library-card-state-badge.s-paused      { background: #737373; }
+        .library-card-state-badge.s-retrying    { background: #eab308; animation: librarycard-state-pulse 0.9s ease-in-out infinite; }
+        @keyframes librarycard-state-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* ==================================================================
+           Bottom action bar — only visible when at least one card is picked.
+           Slides up from the bottom of the playlist-detail-view. Mirrors
+           .search-action-bar so users get the same gesture across views.
+           ================================================================== */
+        #playlist-detail-view { position: relative; }
+        /* Centered, pill-shaped, content-sized — no longer spans the full
+           detail view. Sits above the grid with a soft halo so it reads as
+           a floating control card rather than a footer bar. */
+        .pd-channel-action-bar {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%) translateY(160%);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 8px 8px 16px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid #232323;
+            border-radius: 999px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        .pd-channel-action-bar.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .pd-channel-action-count {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #ededed;
+            font-variant-numeric: tabular-nums;
+        }
+        .pd-channel-action-spacer {
+            width: 1px;
+            align-self: stretch;
+            background: #2a2a2a;
+            margin: 2px 4px;
+        }
+        .pd-channel-action-quality {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            color: #c0c0c0;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.12s ease;
+            position: relative;
+            border-radius: 8px;
+        }
+        .pd-channel-action-quality:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .pd-channel-action-quality .caret { width: 10px; height: 6px; opacity: 0.7; }
+        .pd-channel-action-clear {
+            background: transparent;
+            border: none;
+            color: #909090;
+            padding: 6px 10px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: color 0.12s ease, background 0.12s ease;
+        }
+        .pd-channel-action-clear:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .pd-channel-action-go {
+            background: #3b82f6;
+            border: none;
+            color: #fff;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.12s ease, transform 0.05s;
+        }
+        .pd-channel-action-go:hover { background: #2563eb; }
+        .pd-channel-action-go:active { transform: scale(0.97); }
+        /* Compact quality popup hung above the action bar's quality chip. */
+        .pd-channel-quality-menu {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            right: 0;
+            min-width: 160px;
+            background: #181818;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 4px;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        .pd-channel-action-quality.open .pd-channel-quality-menu { display: block; }
+        .pd-channel-quality-menu .quality-option {
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            color: #c0c0c0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .pd-channel-quality-menu .quality-option:hover { background: #232323; color: #fff; }
+        .pd-channel-quality-menu .quality-option.selected { color: #fff; }
+        .pd-channel-quality-menu .quality-option.selected .check-icon { width: 12px; height: 12px; }
+
+        /* Subscribe button mid-flight — replaces the white pill with a darker
+           "Fetching channel…" indicator so the user sees the action took. */
+        .sr-subscribe-btn.fetching {
+            background: rgba(255,255,255,0.08);
+            color: #cfcfcf;
+            cursor: wait;
+        }
+        .sr-subscribe-btn.fetching:hover { background: rgba(255,255,255,0.08); }
+        .sr-subscribe-btn .sub-spin {
+            display: inline-block;
+            width: 11px; height: 11px;
+            margin-right: 6px;
+            vertical-align: -1px;
+            border: 1.6px solid rgba(255,255,255,0.25);
+            border-top-color: #cfcfcf;
+            border-radius: 50%;
+            animation: search-spin 0.8s linear infinite;
+        }
+
+        .pd-video-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            margin-bottom: 4px;
+            transition: all 0.15s;
+            cursor: pointer;
+            background: #0f0f0f;
+        }
+
+        .pd-video-row:hover {
+            background: #181818;
+            border-color: #262626;
+        }
+
+        .pd-video-row.unpicked {
+            opacity: 0.45;
+        }
+
+        .pd-video-num {
+            width: 22px;
+            text-align: center;
+            color: #737373;
+            font-size: 11px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .pd-video-check {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1.5px solid #404040;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            background: transparent;
+        }
+
+        .pd-video-row.picked .pd-video-check {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .pd-video-check svg {
+            width: 11px;
+            height: 11px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .pd-video-row.picked .pd-video-check svg {
+            opacity: 1;
+        }
+
+        .pd-video-thumb {
+            position: relative;
+            width: 88px;
+            height: 50px;
+            border-radius: 5px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: #1a1a1a;
+        }
+
+        .pd-video-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .pd-video-thumb-time {
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .pd-video-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pd-video-title {
+            font-size: 13px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 2px;
+        }
+
+        .pd-video-sub {
+            font-size: 11px;
+            color: #737373;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pd-video-resolving {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #3b82f6;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .pd-resolve-spinner {
+            width: 10px;
+            height: 10px;
+            border: 1.5px solid rgba(59, 130, 246, 0.3);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        .pd-download-btn {
+            height: 42px;
+            padding: 0 22px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+            /* flex-basis 160px lets each button request 160px; flex-grow 1 lets
+               them split any leftover width 50/50; flex-wrap on the parent kicks
+               in when the row can't hold both at 160px+gap, dropping each onto
+               its own line at full width. Result: balanced when wide, stacked
+               when narrow, never the squished-by-the-sibling look. */
+            flex: 1 1 160px;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        .pd-download-btn:hover {
+            background: #2563eb;
+        }
+
+        .pd-download-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Secondary action — sits next to "Download N" in the queue playlist
+           hero. Less visually loud (transparent + border, not solid blue) so it
+           doesn't compete with the primary download CTA. */
+        .pd-update-btn {
+            height: 42px;
+            padding: 0 18px;
+            background: transparent;
+            color: #d4d4d4;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            /* Same flex math as .pd-download-btn so they split the row 50/50
+               and wrap together when narrow instead of one squeezing the other. */
+            flex: 1 1 160px;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .pd-update-btn:hover {
+            background: #1a1a1a;
+            border-color: #3a3a3a;
+            color: #ededed;
+        }
+
+        /* Drag Handle */
+        .drag-handle {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #404040;
+            flex-shrink: 0;
+            cursor: grab;
+            transition: color 0.2s;
+            opacity: 0;
+        }
+
+        .drag-handle svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .video-row:hover .drag-handle {
+            color: #737373;
+            opacity: 1;
+        }
+
+        /* Show drag handle only when 2+ videos */
+        .video-list.draggable .drag-handle {
+            opacity: 0;
+        }
+
+        .video-list.draggable .video-row:hover .drag-handle {
+            opacity: 1;
+        }
+
+        /* Sortable states */
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        .remove-btn {
+            padding: 4px;
+            color: #737373;
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .video-row:hover .remove-btn,
+        .playlist-row:hover .remove-btn {
+            opacity: 1;
+        }
+
+        .remove-btn:hover {
+            color: #dc2626;
+        }
+
+        .remove-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Path */
+        .path-box {
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 10px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .path-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .path-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #737373;
+            margin-bottom: 4px;
+        }
+
+        .path-location {
+            font-size: 13px;
+            color: #a0a0a0;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .path-button {
+            height: 36px;
+            padding: 0 18px;
+            background: #1a1a1a;
+            color: #d4d4d4;
+            border: 1px solid #262626;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .path-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .path-icon-btn {
+            width: 36px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0a0a0;
+        }
+
+        .path-icon-btn:hover {
+            color: #3b82f6;
+            border-color: rgba(59, 130, 246, 0.5);
+            background: #1a1a1a;
+        }
+
+        .path-button:hover {
+            background: #262626;
+            border-color: #333333;
+        }
+
+        /* Actions */
+        .actions-row {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .download-button {
+            height: 44px;
+            padding: 0 32px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .download-button:hover {
+            background: #2563eb;
+        }
+
+        .download-button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .cancel-button {
+            height: 44px;
+            padding: 0 32px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .cancel-button:hover {
+            background: #b91c1c;
+            box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .cancel-button {
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+            font-weight: 700;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #141414;
+            border: 1px solid #1f1f1f;
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .modal-close {
+            margin-top: 20px;
+            height: 44px;
+            padding: 0 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #a0a0a0;
+            background: transparent;
+            border: 1px solid #262626;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .modal-close:hover {
+            background: #1a1a1a;
+            border-color: #333333;
+            color: #ffffff;
+        }
+
+        #modal-fetch-status:empty {
+            display: none;
+            margin-top: 0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Floating tooltip — rendered in document.body by JS, escapes every overflow:hidden parent.
+           Any element with data-tip / data-tip-right / data-tip-down / data-tip-wrap triggers it. */
+        #global-tooltip {
+            position: fixed;
+            background: #1f1f1f;
+            color: #d4d4d4;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 5px 9px;
+            border-radius: 6px;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 10000;
+            border: 1px solid #2a2a2a;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.12s, transform 0.12s;
+            max-width: 340px;
+        }
+
+        #global-tooltip.wrap {
+            white-space: normal;
+            line-height: 1.4;
+            padding: 6px 10px;
+        }
+
+        #global-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Offline pill — floats bottom-center, above the download bar. position:fixed
+           means it never pushes layout. The previous placement (top-right) collided with
+           the URL input's Add button on narrow widths; bottom-center is symmetrical and
+           sits in dead space between the rail and the download CTA. */
+        #offline-banner {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px 4px 9px;
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.22);
+            border-radius: 100px;
+            color: rgba(245, 158, 11, 0.85);
+            font-size: 10.5px;
+            font-weight: 500;
+            letter-spacing: 0.1px;
+            z-index: 9000;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: offline-pill-in 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+            pointer-events: none;
+        }
+
+        #offline-banner svg {
+            flex-shrink: 0;
+            opacity: 0.8;
+        }
+
+        #offline-banner .offline-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
+            flex-shrink: 0;
+        }
+
+        @keyframes offline-pill-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Green variant of the pill — used briefly when the connection is
+           restored. Mirrors the offline pill's structure exactly so we can just
+           toggle a class to morph the existing element in place. Auto-removed
+           by JS after ~1.8s. */
+        #offline-banner.online {
+            background: rgba(34, 197, 94, 0.10);
+            border-color: rgba(34, 197, 94, 0.28);
+            color: rgba(34, 197, 94, 0.92);
+        }
+        #offline-banner.online .offline-dot {
+            background: #22c55e;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18);
+        }
+        #offline-banner.fade-out {
+            opacity: 0;
+            transition: opacity 0.32s ease-out;
+        }
+
+        /* Offline-mode UI gating. body.is-offline is toggled by
+           updateOfflineBanner so the whole UI can react via pure CSS, no
+           per-button JS wiring. Keep this list narrow — only network-required
+           controls. Library playback, file open, settings etc. still work. */
+        body.is-offline .url-bar-button {
+            opacity: 0.45;
+            cursor: not-allowed;
+            background: #2f2f2f;
+        }
+        body.is-offline .url-bar-input {
+            opacity: 0.6;
+        }
+        body.is-offline .url-bar-input::placeholder {
+            color: #404040;
+        }
+        body.is-offline .pd-update-btn {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        /* Hide "Update available" pill while offline — clicking it would just
+           open a download URL the browser can't reach. Re-appears automatically
+           when connection returns (it's class-driven, not JS-removed). */
+        body.is-offline .update-available-pill {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Library import progress card. Shown while import_from_folder runs;
+           JS polls get_import_progress() every 200ms and updates the count/bar. */
+        #import-progress {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 280px;
+            max-width: 380px;
+            padding: 10px 14px;
+            background: rgba(20, 20, 22, 0.96);
+            border: 1px solid #2a2a2e;
+            border-radius: 10px;
+            z-index: 9100;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+            color: #e5e5e5;
+            font-size: 12px;
+            animation: ipro-in 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        #import-progress[hidden] { display: none; }
+        #import-progress .ipro-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        #import-progress .ipro-text {
+            flex: 1;
+            color: #d8d8d8;
+        }
+        #import-progress .ipro-count {
+            color: #888;
+            font-variant-numeric: tabular-nums;
+            font-size: 11px;
+        }
+        #import-progress .ipro-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(59, 130, 246, 0.85);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: ipro-spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+        #import-progress .ipro-bar {
+            height: 3px;
+            background: #1f1f23;
+            border-radius: 100px;
+            overflow: hidden;
+        }
+        #import-progress .ipro-bar-fill {
+            height: 100%;
+            background: #3b82f6;
+            border-radius: 100px;
+            width: 0%;
+            transition: width 0.2s ease-out;
+        }
+        /* Indeterminate variant — used by operations whose total isn't known
+           ahead of time (e.g. yt-dlp flat-playlist re-fetch on a channel). The
+           fill becomes a 30%-wide strip that sweeps across the track on a loop.
+           The width transition is disabled so the keyframes drive movement. */
+        #import-progress .ipro-bar.indeterminate .ipro-bar-fill {
+            width: 30%;
+            transition: none;
+            animation: ipro-sweep 1.2s ease-in-out infinite;
+        }
+        @keyframes ipro-sweep {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(333%); }
+        }
+        @keyframes ipro-spin { to { transform: rotate(360deg); } }
+        @keyframes ipro-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Broken thumbnail placeholder — when an <img> fails to load,
+           its parent thumb container gets .thumb-broken and we paint a
+           neutral surface with a small icon instead of the browser's
+           default missing-image icon. */
+        .thumb-broken {
+            background: #141414 !important;
+            position: relative;
+        }
+
+        .thumb-broken::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23404040' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 40%;
+            opacity: 0.8;
+        }
+
+        /* Toast Notification */
