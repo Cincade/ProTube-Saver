@@ -12,6 +12,7 @@ for _s in (sys.stdout, sys.stderr):
         except Exception: pass
 
 from updater import YtDlpUpdater
+from settings_store import SettingsStore
 import requests
 from packaging.version import parse
 
@@ -112,7 +113,14 @@ class API:
         self.thumbnail_cache_dir = thumbnails_dir()
         self.download_folder = default_downloads_dir()
 
-        self.settings = self._load_settings()
+        # All persistent settings go through ONE locked door — SettingsStore.
+        # `self.settings` stays bound to the store's live dict so the many
+        # existing read sites (`self.settings.get(...)`) keep working unchanged.
+        # New/changed code should WRITE via self._store.set/update/mutate/defer
+        # so each change is mutated and persisted atomically under one lock.
+        self._store = SettingsStore(self.settings_file)
+        self._store.load()
+        self.settings = self._store.data
         # Honor the user's saved download_folder if present and still valid.
         # If the saved path no longer exists (e.g. external drive unplugged),
         # we DON'T silently reset — instead we keep the saved value so the UI
@@ -2107,160 +2115,23 @@ class API:
         return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
     def _load_settings(self):
-        """Load settings.json. Resilient to corruption / empty files — returns {} rather than
-        crashing the app. If the file exists but is malformed, attempt recovery by
-        trimming trailing garbage (the most common failure mode is one or two stray
-        bytes from a partial write or a sync/AV write hook). Only if recovery also
-        fails do we back up as settings.json.corrupt and start fresh."""
-        if not os.path.exists(self.settings_file):
-            return {}
-        try:
-            with open(self.settings_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            if not content.strip():
-                # Empty file — treat as fresh start
-                return {}
-            return json.loads(content)
-        except json.JSONDecodeError as e:
-            # The most common corruption pattern is a trailing byte (extra '}', '\\0',
-            # or whitespace) from a partial write — the JSON proper is intact, just
-            # has garbage glued to the end. Try to scan for the first complete top-
-            # level object and re-parse. Recovers ALL the user's library/queue data
-            # instead of dropping them into a fresh install.
-            try:
-                recovered = self._try_recover_truncated_json(content)
-                if recovered is not None:
-                    print(f'[ProTube] settings.json had trailing garbage; recovered cleanly. Error was: {e}')
-                    return recovered
-            except Exception:
-                pass
-            # Recovery failed — back up the file rather than silently lose the data.
-            try:
-                backup = self.settings_file + '.corrupt'
-                if os.path.exists(backup):
-                    backup = self.settings_file + f'.corrupt.{int(time.time())}'
-                os.rename(self.settings_file, backup)
-                print(f'[ProTube] settings.json was corrupt; backed up to {backup}. Error: {e}')
-            except OSError:
-                pass
-            return {}
-        except OSError as e:
-            print(f'[ProTube] settings.json unreadable: {e}')
-            return {}
-
-    def _try_recover_truncated_json(self, content):
-        """Scan for the first complete top-level JSON object and try to parse it.
-        Returns the parsed dict on success, None on failure. Used by _load_settings
-        when the raw file fails json.loads — covers the common partial-write case
-        where the JSON is intact but a stray byte (extra '}' / null / newline) got
-        appended after the final closing brace."""
-        depth = 0
-        in_str = False
-        escape = False
-        for i, ch in enumerate(content):
-            if escape:
-                escape = False
-                continue
-            if in_str:
-                if ch == '\\':
-                    escape = True
-                elif ch == '"':
-                    in_str = False
-                continue
-            if ch == '"':
-                in_str = True
-            elif ch == '{':
-                depth += 1
-            elif ch == '}':
-                depth -= 1
-                if depth == 0:
-                    candidate = content[:i + 1]
-                    return json.loads(candidate)
-        return None
+        """Back-compat shim. Settings loading + corruption recovery now live in
+        SettingsStore (the single locked door). Kept so any caller still works."""
+        return self._store.load()
 
     def _save_settings(self):
-        """Atomic write: dump to a temp file, then rename. On any OS, the rename is atomic
-        within the same directory — so readers never see a half-written file. If the write
-        fails mid-way, the original settings.json stays intact.
-
-        When inside a `_deferred_save()` context, the actual write is skipped
-        and the dirty flag is set instead — the context manager flushes once
-        on exit. Used to coalesce the 4 writes/track on the album download
-        hot path (library add + album bump + cover ensure + queue patch) down
-        to a single write per track.
-
-        Race-safety: a shared `settings.json.tmp` filename used to corrupt the
-        file when two threads called `_save_settings` simultaneously — both
-        opened the same tmp path with mode='w' (truncating each other's
-        in-progress writes) and then both renamed, leaving the survivor with
-        interleaved bytes. The combination of (a) a process-wide lock and
-        (b) a per-write unique tmp suffix below makes a concurrent corruption
-        impossible: only one writer at a time, and even if the lock were
-        ever bypassed the tmp paths wouldn't collide."""
-        if getattr(self, '_save_deferred', False):
-            self._save_dirty = True
-            return
-        # Lazily init the lock so frozen builds without a fresh attribute on
-        # an older pickle keep working.
-        if not hasattr(self, '_save_lock') or self._save_lock is None:
-            self._save_lock = threading.Lock()
-        with self._save_lock:
-            # Snapshot via JSON-encode to a string FIRST, then write the
-            # bytes. `json.dumps(self.settings)` iterates the live dict and
-            # we'd hit "dictionary changed size during iteration" whenever
-            # another thread is mutating self.settings (very common — every
-            # add_to_library / save_queue / download tick touches it). Retry
-            # a small number of times under the lock; mutations are quick so
-            # this almost always succeeds on the first or second pass.
-            payload = None
-            for _ in range(6):
-                try:
-                    payload = json.dumps(self.settings)
-                    break
-                except RuntimeError:
-                    time.sleep(0.005)
-            if payload is None:
-                # Last resort: deep-copy then encode. Slower but immune to
-                # concurrent mutation during the dump itself.
-                import copy
-                payload = json.dumps(copy.deepcopy(self.settings))
-
-            tmp = f'{self.settings_file}.tmp.{os.getpid()}.{threading.get_ident()}'
-            try:
-                with open(tmp, 'w', encoding='utf-8') as f:
-                    f.write(payload)
-                    f.flush()
-                    os.fsync(f.fileno())
-                # Atomic replace on Windows + POSIX
-                os.replace(tmp, self.settings_file)
-            except OSError as e:
-                # Clean up the temp file on failure; leave original settings.json untouched
-                try:
-                    if os.path.exists(tmp):
-                        os.remove(tmp)
-                except OSError:
-                    pass
-                print(f'[ProTube] settings save failed: {e}')
+        """Back-compat shim. Every persist now goes through the one locked door
+        in SettingsStore, so two threads can no longer interleave a write and
+        corrupt the file. Kept under the old name so the ~30 existing callers in
+        this file don't all need editing at once — they migrate to
+        self._store.set/update/mutate incrementally."""
+        self._store.save()
 
     @contextlib.contextmanager
     def _deferred_save(self):
-        """Coalesce multiple _save_settings calls into a single write at
-        context exit. Re-entrant — nested deferrals flush only at the outer-
-        most exit. Use on hot paths that mutate settings several times in
-        succession (album download finalize, batch repair, etc.)."""
-        if getattr(self, '_save_deferred', False):
-            # Already deferring (nested) — just yield, outer scope flushes.
+        """Back-compat shim — write-coalescing now lives in SettingsStore.defer()."""
+        with self._store.defer():
             yield
-            return
-        self._save_deferred = True
-        self._save_dirty = False
-        try:
-            yield
-        finally:
-            self._save_deferred = False
-            if self._save_dirty:
-                self._save_dirty = False
-                self._save_settings()
     def on_dom_ready(self): pass
     def choose_folder(self):
         result = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
@@ -2286,15 +2157,15 @@ class API:
     def reset_onboarding(self):
         """Clear the _onboarded flag so the welcome modal shows on next launch.
         Useful for re-triggering onboarding while testing."""
-        self.settings.pop('_onboarded', None)
-        self._save_settings()
+        # Migrated to the single door: delete-and-persist is one atomic step.
+        self._store.delete('_onboarded')
         return {'ok': True}
-    def save_queue(self, q): self.settings['queue'] = q; self._save_settings()
-    def load_queue(self): return self.settings.get('queue', [])
+    def save_queue(self, q): self._store.set('queue', q)
+    def load_queue(self): return self._store.get('queue', [])
 
     def get_setting(self, key):
         """Generic settings read for frontend use (feature flags, one-time migration markers)."""
-        return self.settings.get(key)
+        return self._store.get(key)
 
     def get_subtitles_for_video(self, video_id):
         """Read the subtitle .vtt file for a library video and return its raw text.
@@ -3037,11 +2908,13 @@ class API:
             q = (query or '').strip()
             if not q:
                 return {'ok': True}
-            lst = self.settings.get('music_recent_searches', []) or []
-            lst = [x for x in lst if x.lower() != q.lower()]
-            lst.insert(0, q)
-            self.settings['music_recent_searches'] = lst[:12]
-            self._save_settings()
+            # Atomic read-modify-write: read the list, prepend, trim, and persist
+            # all under one lock so two rapid searches can't clobber each other.
+            with self._store.mutate() as s:
+                lst = s.get('music_recent_searches', []) or []
+                lst = [x for x in lst if x.lower() != q.lower()]
+                lst.insert(0, q)
+                s['music_recent_searches'] = lst[:12]
             return {'ok': True}
         except Exception as e:
             return {'error': str(e)}
@@ -3052,11 +2925,11 @@ class API:
             q = (query or '').strip()
             if not q:
                 return {'ok': True}
-            lst = self.settings.get('video_recent_searches', []) or []
-            lst = [x for x in lst if x.lower() != q.lower()]
-            lst.insert(0, q)
-            self.settings['video_recent_searches'] = lst[:12]
-            self._save_settings()
+            with self._store.mutate() as s:
+                lst = s.get('video_recent_searches', []) or []
+                lst = [x for x in lst if x.lower() != q.lower()]
+                lst.insert(0, q)
+                s['video_recent_searches'] = lst[:12]
             return {'ok': True}
         except Exception as e:
             return {'error': str(e)}
@@ -5284,9 +5157,9 @@ class API:
             return {'error': f'chat failed: {e}'}
 
     def set_setting(self, key, value):
-        """Generic settings write. Frontend uses this for things like migration markers."""
-        self.settings[key] = value
-        self._save_settings()
+        """Generic settings write. Frontend uses this for things like migration markers.
+        Migrated to the single door: mutation + persist happen atomically under one lock."""
+        self._store.set(key, value)
         return True
 
     def set_video_hidden(self, video_id, hidden=True):
