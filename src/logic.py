@@ -1,4 +1,4 @@
-import os, threading, webview, re, json, sys, time, subprocess, shutil, importlib.metadata, traceback, contextlib
+import sys, threading
 
 # Defense-in-depth UTF-8 reconfigure (main.py also does this). Belongs here too
 # so logic.py is safe to import even when launched via paths that don't run our
@@ -23,88 +23,7 @@ from channel_mixin import ChannelMixin
 from repair_mixin import RepairMixin
 from import_mixin import ImportMixin
 from ui_mixin import UiMixin
-import requests
-
-
-# Lazy-import wrapper for yt_dlp.YoutubeDL.
-#
-# yt_dlp's __init__ eagerly imports ~1800 extractor modules at module load,
-# which costs ~4.5s on cold start (measured: 86% of backend startup time).
-# Most ProTube launches go several seconds before the user pastes a URL —
-# sometimes the user just browses their library and never fetches at all.
-# Deferring the import until first actual use turns "open the app" from a
-# multi-second wait into a near-instant one.
-#
-# Call sites keep their plain `with YoutubeDL(opts) as ydl:` syntax — the
-# wrapper resolves the real class on first call (cached for the rest of
-# the process via `_YoutubeDL_class`). Subsequent calls hit Python's module
-# cache so the cost is microseconds. Thread-safe enough: worst case is two
-# threads racing on the very first import, both succeed, second one is a
-# no-op against Python's `sys.modules` cache.
-_YoutubeDL_class = None
-def YoutubeDL(*args, **kwargs):
-    global _YoutubeDL_class
-    if _YoutubeDL_class is None:
-        from yt_dlp import YoutubeDL as _Y
-        _YoutubeDL_class = _Y
-    return _YoutubeDL_class(*args, **kwargs)
-
-
-# App version. Surfaced in the Settings drawer's About section and used by
-# check_for_updates() to compare against the landing site's version.json.
-# Bump when shipping a build.
-__version__ = '1.4.5'
-
-# Where check_for_updates() looks for the release manifest. Points at the
-# landing site's version.json. If you change Netlify subdomain or move to a
-# custom domain, set 'update_check_url' in settings to override without
-# rebuilding the exe.
-LANDING_VERSION_URL_DEFAULT = 'https://protubesaver.netlify.app/version.json'
-
-# Alternative update source: GitHub Releases. When settings['update_source']
-# is 'github', check_for_updates() polls this endpoint instead. The response
-# shape is GitHub's own — we adapt it to the same {latest, downloadUrl,
-# releaseNotes, releasedAt} contract the frontend already consumes.
-GITHUB_RELEASES_URL_DEFAULT = 'https://api.github.com/repos/Cincade/ProTube-Saver/releases/latest'
-
-
-def _resolve_ffmpeg_location():
-    """
-    Locate ffmpeg. When running as a PyInstaller bundle, ffmpeg(.exe) and
-    ffprobe(.exe) are packed next to the executable in sys._MEIPASS. During
-    development on Mac we also look in assets/mac/. Windows dev falls through
-    to PATH (yt-dlp handles that).
-    """
-    _exe = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
-    if hasattr(sys, '_MEIPASS'):
-        bundled = os.path.join(sys._MEIPASS, _exe)
-        if os.path.exists(bundled):
-            return sys._MEIPASS  # yt-dlp wants the DIRECTORY, not the exe path
-    if sys.platform == 'darwin':
-        _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        _mac_dir = os.path.join(_root, 'assets', 'mac')
-        if os.path.isfile(os.path.join(_mac_dir, 'ffmpeg')):
-            return _mac_dir
-    return None  # Dev mode — let yt-dlp use PATH
-
-
-class _MusicDownloadCancelled(Exception):
-    """Raised inside the music download progress hook when the user has clicked
-    cancel on a queue item. Caught by `_music_download_worker` so it can mark
-    the entry as 'cancelled' and clean up any partial file."""
-    pass
-
-
-def _richness(video):
-    """Score how 'rich' a library entry is — more metadata = higher score. Used to pick
-    the better of two duplicate entries when deduping."""
-    score = 0
-    for key in ('url', 'thumbnail', 'uploader', 'duration_string', 'filepath'):
-        if video.get(key):
-            score += 1
-    if video.get('formats'):
-        score += 1
-    return score
+from ydl_utils import _resolve_ffmpeg_location
 
 
 class API(SettingsMixin, VideoLibraryMixin, ChannelMixin, RepairMixin, ImportMixin, UiMixin, MusicMixin, SearchMixin, StreamingMixin, DownloadMixin):
