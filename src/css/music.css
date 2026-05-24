@@ -1661,7 +1661,24 @@
             color: rgba(255, 255, 255, 0.45);
             text-transform: uppercase; letter-spacing: 0.08em;
         }
-        .mp-tab-body { flex: 1; min-height: 0; overflow-y: auto; }
+        /* Single scrollable container for all tab contents. Was previously
+           nested (mp-tab-body auto + mp-lyrics-scroll auto inside) which made
+           scrollIntoView ambiguous and let smooth-scroll animations propagate
+           into the parent layout — the "page shifts when lyrics scroll" bug.
+           `contain: strict` isolates the scroll/paint to this box so nothing
+           leaks out. */
+        .mp-tab-body {
+            flex: 1; min-height: 0;
+            overflow-y: auto;
+            contain: strict;
+            /* Fade top + bottom edges so lines dissolve into the panel instead
+               of clipping. Moved here from .mp-lyrics-scroll since this is
+               now the only scrollable container. */
+            mask-image: linear-gradient(to bottom,
+                transparent 0%, black 6%, black 92%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom,
+                transparent 0%, black 6%, black 92%, transparent 100%);
+        }
 
         /* Up Next — vertical stack in the side panel (was 5-col horizontal grid
            for the old bottom drawer) */
@@ -1695,16 +1712,12 @@
             padding: 36px 0; text-align: center;
             color: rgba(255, 255, 255, 0.45); font-size: 13px;
         }
+        /* Lyrics content lives directly inside the scrollable .mp-tab-body —
+           no inner overflow, no inner height:100%. The mask + scroll-isolation
+           live on .mp-tab-body now. */
         .mp-lyrics-scroll {
-            height: 100%; overflow-y: auto;
             padding: 8px 0 60px;
-            scrollbar-width: none;
-            mask-image: linear-gradient(to bottom,
-                transparent 0%, black 6%, black 92%, transparent 100%);
-            -webkit-mask-image: linear-gradient(to bottom,
-                transparent 0%, black 6%, black 92%, transparent 100%);
         }
-        .mp-lyrics-scroll::-webkit-scrollbar { display: none; }
         .mp-lyric-line {
             padding: 9px 4px;
             font-size: 18px; line-height: 1.35;

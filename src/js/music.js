@@ -3578,7 +3578,7 @@
         // is already mid-syllable. 0.35s is the sweet spot in testing — early
         // enough to read into the line, late enough that it's not "ahead" of
         // the song.
-        const LYRICS_LEAD_SECONDS = 0.35;
+        const LYRICS_LEAD_SECONDS = 0.7;
 
         function _paintLyricsProgress() {
             if (_mpPanelTab !== 'lyrics') return;
