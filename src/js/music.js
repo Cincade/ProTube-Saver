@@ -3620,10 +3620,29 @@
             const { lines, plain } = _mpLyricsState;
             const cur = _musicPlayer.currentTrack;
             if (lines.length) {
-                // Synced
+                // Synced — each line carries its timestamp so a click can seek
                 body.innerHTML = '<div class="mp-lyrics-scroll">' +
-                    lines.map(l => `<div class="mp-lyric-line">${l.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('') +
+                    lines.map(l => `<div class="mp-lyric-line" data-mp-lyric-time="${l.time}">${l.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('') +
                     '</div>';
+                // Click anywhere on a lyric line -> seek the audio to that timestamp.
+                // Mousedown not click, so drag-to-select doesn't fire seek as a
+                // side effect — but only fire on simple clicks (no drag).
+                body.querySelectorAll('.mp-lyric-line').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        // If the user is selecting text, don't seek
+                        const sel = window.getSelection?.();
+                        if (sel && sel.toString().length > 0) return;
+                        const t = parseFloat(el.getAttribute('data-mp-lyric-time'));
+                        if (isNaN(t) || !_musicPlayer.audio) return;
+                        // Subtract the lead so when the line is sung the
+                        // highlight matches; the user clicked the line they
+                        // wanted to *hear*, not the line they wanted to read
+                        // ahead of
+                        const trackOffset = _musicPlayer.currentTrack?.lyrics_offset || 0;
+                        _musicPlayer.audio.currentTime = Math.max(0, t - LYRICS_LEAD_SECONDS - trackOffset);
+                        if (_musicPlayer.audio.paused) _musicPlayer.audio.play().catch(() => {});
+                    });
+                });
                 if (meta) _renderLyricsSyncMeta(meta);
                 _lyricsActiveLine = -1;
                 _paintLyricsProgress(); // immediately highlight the right line

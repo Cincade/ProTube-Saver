@@ -1654,12 +1654,29 @@ class MusicMixin(Service):
             r'\s*-\s*(english|japanese|korean|spanish|french)\s+(cover|version|opening|ending|dub|sub)\b.*$',
             '', t, flags=re.IGNORECASE,
         )
-        t = re.sub(r'\s*-\s*cover by\b.*$', '', t, flags=re.IGNORECASE)
+        # Any " - <stuff>cover by <name>" trailing — was too narrow before, only matched "- cover by"
+        t = re.sub(r'\s*-\s*[^-]*\bcover\b[^-]*$', '', t, flags=re.IGNORECASE)
         t = re.sub(r'\s+', ' ', t).strip(' -|.').strip()
         return t or title
 
+    def _clean_artist_for_lyrics(self, artist):
+        """Strip channel suffixes that YouTube/YT Music add to artist names —
+        'Artist - Topic', 'ArtistVEVO', 'Artist Official', etc. lrclib indexes
+        the bare artist."""
+        if not artist:
+            return ''
+        a = artist
+        a = re.sub(r'\s*-\s*Topic\s*$', '', a, flags=re.IGNORECASE)
+        a = re.sub(r'\s*VEVO\s*$', '', a, flags=re.IGNORECASE)
+        a = re.sub(r'\s*Official\s*$', '', a, flags=re.IGNORECASE)
+        a = re.sub(r'\s*Music\s*$', '', a, flags=re.IGNORECASE)
+        # If multiple artists ("A, B, C" or "A & B"), keep just the primary
+        a = re.split(r'\s*[,&]\s*|\s+x\s+|\s+feat\.?\s+|\s+ft\.?\s+', a, maxsplit=1, flags=re.IGNORECASE)[0]
+        return a.strip() or artist
+
     def _lrclib_lookup(self, title, artist, duration):
-        """3-strategy lyrics lookup. Returns (synced, plain) or ('', '')."""
+        """Multi-strategy lyrics lookup. Walks from most-specific to most-
+        lenient until something hits. Returns (synced, plain) or ('', '')."""
         headers = {'User-Agent': 'ProTube Saver/1.0'}
 
         def _try_get(track_name, artist_name, dur):
@@ -1678,34 +1695,55 @@ class MusicMixin(Service):
                 print(f'[ProTube/lyrics] GET error: {e}')
             return '', ''
 
-        # 1. Raw title (lrclib is often forgiving)
-        s, p = _try_get(title, artist, duration)
-        if s or p:
-            return s, p
+        def _try_search(query, dur):
+            try:
+                r = requests.get('https://lrclib.net/api/search',
+                                 params={'q': query}, headers=headers, timeout=10)
+                if not r.ok:
+                    return '', ''
+                results = r.json() or []
+                # Sort by absolute duration delta; tighter matches first
+                results.sort(key=lambda e: abs((e.get('duration') or 0) - (dur or 0)))
+                for entry in results[:8]:
+                    s = (entry.get('syncedLyrics') or '').strip()
+                    p = (entry.get('plainLyrics') or '').strip()
+                    if s or p:
+                        return s, p
+            except Exception as e:
+                print(f'[ProTube/lyrics] SEARCH error: {e}')
+            return '', ''
 
-        # 2. Cleaned title
-        clean = self._clean_title_for_lyrics(title)
-        if clean and clean.lower() != (title or '').lower():
-            s, p = _try_get(clean, artist, duration)
+        clean_title = self._clean_title_for_lyrics(title)
+        clean_artist = self._clean_artist_for_lyrics(artist)
+
+        # Strategy ladder — stop at first hit
+        attempts = []
+        # 1. Most specific: raw title + raw artist + duration
+        attempts.append(('get', title, artist, duration))
+        # 2. Clean title, raw artist
+        if clean_title.lower() != (title or '').lower():
+            attempts.append(('get', clean_title, artist, duration))
+        # 3. Clean title + clean artist
+        if clean_artist.lower() != (artist or '').lower():
+            attempts.append(('get', clean_title, clean_artist, duration))
+        # 4. Clean title, NO artist (sometimes the artist field is just wrong)
+        attempts.append(('get', clean_title, '', duration))
+        # 5. Clean title, NO artist, NO duration (looser match)
+        attempts.append(('get', clean_title, '', 0))
+        # 6. Search fallback: "title artist"
+        if clean_title or clean_artist:
+            attempts.append(('search', f'{clean_title} {clean_artist}'.strip(), None, duration))
+        # 7. Search fallback: title only
+        if clean_title:
+            attempts.append(('search', clean_title, None, duration))
+
+        for kind, q1, q2, dur in attempts:
+            if kind == 'get':
+                s, p = _try_get(q1, q2, dur)
+            else:
+                s, p = _try_search(q1, dur)
             if s or p:
                 return s, p
-
-        # 3. Fuzzy search, pick by smallest duration delta
-        try:
-            q = f'{clean} {artist}'.strip() if clean else (title or '')
-            if q:
-                r = requests.get('https://lrclib.net/api/search',
-                                 params={'q': q}, headers=headers, timeout=10)
-                if r.ok:
-                    results = r.json() or []
-                    results.sort(key=lambda e: abs((e.get('duration') or 0) - (duration or 0)))
-                    for entry in results[:5]:
-                        s = (entry.get('syncedLyrics') or '').strip()
-                        p = (entry.get('plainLyrics') or '').strip()
-                        if s or p:
-                            return s, p
-        except Exception as e:
-            print(f'[ProTube/lyrics] SEARCH error: {e}')
 
         return '', ''
 
@@ -1724,9 +1762,15 @@ class MusicMixin(Service):
         if not track:
             return {'ok': False, 'reason': 'not_in_library'}
 
+        # Cache version — bump when the lookup logic gets smarter so existing
+        # negative caches automatically re-attempt instead of being stuck on
+        # an old "not found" forever.
+        LYRICS_CACHE_VERSION = 3
+
         if 'lyrics' in track:
             cached = track['lyrics']
             has_content = bool(cached.get('plain') or cached.get('synced'))
+            cache_version = cached.get('version') or 0
             if has_content:
                 return {
                     'ok': True,
@@ -1734,17 +1778,27 @@ class MusicMixin(Service):
                     'plain': cached.get('plain') or '',
                     'reason': '',
                 }
-            stale_seconds = time.time() - (cached.get('fetched_at') or 0)
-            if stale_seconds < 300:
-                return {'ok': False, 'reason': 'not_found', 'synced': '', 'plain': ''}
-            # Old empty cache — fall through and retry with the new strategies
+            # Old version: always retry once with the new logic.
+            if cache_version < LYRICS_CACHE_VERSION:
+                pass  # fall through to re-fetch
+            else:
+                # Same version, empty result — throttle: only re-attempt
+                # after 5 minutes so we don't spam lrclib for truly-missing
+                # tracks while still allowing user re-tries.
+                stale_seconds = time.time() - (cached.get('fetched_at') or 0)
+                if stale_seconds < 300:
+                    return {'ok': False, 'reason': 'not_found', 'synced': '', 'plain': ''}
 
         title = (track.get('title') or '').strip()
         artist = (track.get('artist') or '').strip()
         duration = track.get('duration') or track.get('duration_seconds') or 0
 
         synced, plain = self._lrclib_lookup(title, artist, duration)
-        track['lyrics'] = {'synced': synced, 'plain': plain, 'fetched_at': int(time.time())}
+        track['lyrics'] = {
+            'synced': synced, 'plain': plain,
+            'fetched_at': int(time.time()),
+            'version': LYRICS_CACHE_VERSION,
+        }
         self._store.save()
         return {
             'ok': bool(synced or plain),
