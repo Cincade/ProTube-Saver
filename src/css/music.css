@@ -1428,7 +1428,7 @@
             will-change: transform;
         }
         #music-player-view.panel-open .mp-col {
-            transform: translateX(-190px); /* half the 380px panel width */
+            transform: translateX(-210px); /* half the 420px panel width */
         }
         /* Art scales with viewport height — was a fixed 240px which left huge
            empty space on tall windows. clamp(240, 34vh, 380) gives 240px floor
@@ -1565,7 +1565,7 @@
            bleed through for visual continuity with the stage. */
         .mp-panel {
             position: absolute; top: 0; right: 0; bottom: 0; left: auto;
-            width: 380px;
+            width: 420px;
             background: linear-gradient(90deg,
                 rgba(10, 10, 10, 0.50) 0%,
                 rgba(10, 10, 10, 0.78) 50%,
@@ -1631,7 +1631,7 @@
            pill needs to sit just outside the panel's left edge, so it
            translates -380px in X. Y stays at -50% for vertical centering. */
         #music-player-view.panel-open .mp-panel-handle {
-            transform: translate(-380px, -50%);
+            transform: translate(-420px, -50%);
         }
         #music-player-view.panel-open .mp-handle-chev { transform: rotate(90deg); /* points right (close me) */ }
         /* The "Up next: <title>" peek text only made sense for the bottom drawer;
@@ -1660,7 +1660,27 @@
             font-size: 10.5px; font-weight: 600;
             color: rgba(255, 255, 255, 0.45);
             text-transform: uppercase; letter-spacing: 0.08em;
+            display: flex; align-items: center; gap: 2px;
         }
+        /* Lyrics sync-offset nudges — small pill of −/value/+ in the tab-meta slot */
+        .mp-lyrics-sync-btn,
+        .mp-lyrics-sync-val {
+            background: rgba(255, 255, 255, 0.06);
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 10.5px; font-weight: 700;
+            letter-spacing: 0;
+            text-transform: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.12s, color 0.12s;
+        }
+        .mp-lyrics-sync-btn { padding: 4px 6px; min-width: 22px; }
+        .mp-lyrics-sync-val { min-width: 44px; text-align: center; }
+        .mp-lyrics-sync-btn:hover,
+        .mp-lyrics-sync-val:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
         /* Single scrollable container for all tab contents. Was previously
            nested (mp-tab-body auto + mp-lyrics-scroll auto inside) which made
            scrollIntoView ambiguous and let smooth-scroll animations propagate
@@ -1670,7 +1690,10 @@
         .mp-tab-body {
             flex: 1; min-height: 0;
             overflow-y: auto;
-            contain: strict;
+            /* layout + paint only — `strict` adds `size`, which forces the
+               element's size to ignore its content, and in a flex column
+               that can cause its own layout quirks. */
+            contain: layout paint;
             /* Fade top + bottom edges so lines dissolve into the panel instead
                of clipping. Moved here from .mp-lyrics-scroll since this is
                now the only scrollable container. */
@@ -1719,19 +1742,18 @@
             padding: 8px 0 60px;
         }
         .mp-lyric-line {
-            padding: 9px 4px;
-            font-size: 18px; line-height: 1.35;
+            padding: 8px 4px;
+            font-size: 16px; line-height: 1.4;
             font-weight: 700; letter-spacing: -0.01em;
             color: rgba(255, 255, 255, 0.28);
             cursor: text;
-            /* Selectable — was inheriting a non-selectable default somewhere up
-               the chain. Explicit `text` cursor + user-select so users can
-               copy a lyric line. */
             user-select: text;
             -webkit-user-select: text;
-            transition: color 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s;
+            /* No transform transition — scale was being animated alongside the
+               container's smooth-scroll, which is what made the whole hero
+               feel like it was nudging every beat. Just color fades now. */
+            transition: color 0.35s ease;
             white-space: pre-wrap; word-break: break-word;
-            transform-origin: left center;
         }
         .mp-lyrics-plain, .mp-lyrics-scroll {
             user-select: text;
@@ -1740,8 +1762,10 @@
         .mp-lyric-line.near { color: rgba(255, 255, 255, 0.50); }
         .mp-lyric-line.active {
             color: #fff;
-            transform: scale(1.06);
             text-shadow: 0 0 24px rgba(255, 255, 255, 0.18);
+            /* No scale transform — it was causing both layout-shift perception
+               and overflow on long lines that already wrapped tightly. The
+               brightness + glow + bold weight is plenty of active-line pop. */
         }
         .mp-lyrics-plain {
             padding: 8px 4px 40px;

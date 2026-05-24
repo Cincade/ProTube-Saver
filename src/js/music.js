@@ -3584,7 +3584,8 @@
             if (_mpPanelTab !== 'lyrics') return;
             const lines = _mpLyricsState.lines;
             if (!lines.length) return;
-            const t = (_musicPlayer.audio?.currentTime || 0) + LYRICS_LEAD_SECONDS;
+            const trackOffset = _musicPlayer.currentTrack?.lyrics_offset || 0;
+            const t = (_musicPlayer.audio?.currentTime || 0) + LYRICS_LEAD_SECONDS + trackOffset;
             let active = 0;
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].time <= t) active = i; else break;
@@ -3606,18 +3607,24 @@
             const target = els[active];
             if (body && target) {
                 const offset = target.offsetTop - body.clientHeight / 2 + target.offsetHeight / 2;
-                body.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+                // Instant scroll, NOT smooth. The smooth animation was the
+                // visual "everything shifts on the beat" the user kept seeing —
+                // the per-line scroll distance is so small that smooth made
+                // the panel feel like it was breathing every line change.
+                // Apple Music + Spotify also snap instantly.
+                body.scrollTop = Math.max(0, offset);
             }
         }
 
         function _renderLyrics(body, meta) {
             const { lines, plain } = _mpLyricsState;
+            const cur = _musicPlayer.currentTrack;
             if (lines.length) {
                 // Synced
                 body.innerHTML = '<div class="mp-lyrics-scroll">' +
                     lines.map(l => `<div class="mp-lyric-line">${l.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('') +
                     '</div>';
-                if (meta) meta.textContent = 'synced';
+                if (meta) _renderLyricsSyncMeta(meta);
                 _lyricsActiveLine = -1;
                 _paintLyricsProgress(); // immediately highlight the right line
             } else if (plain) {
@@ -3628,6 +3635,56 @@
                 body.innerHTML = '<div class="mp-lyrics-empty">No lyrics found for this track.</div>';
                 if (meta) meta.textContent = '';
             }
+        }
+
+        // Paint the sync-offset control into the tab-meta slot. Shows the
+        // current per-track offset (in 0.1s steps), with − / + nudges and a
+        // click-to-reset on the value. The offset is added on top of the
+        // global LYRICS_LEAD_SECONDS in _paintLyricsProgress.
+        function _renderLyricsSyncMeta(meta) {
+            const cur = _musicPlayer.currentTrack;
+            const off = cur?.lyrics_offset || 0;
+            const sign = off > 0 ? '+' : (off < 0 ? '' : '±');
+            meta.innerHTML = `
+                <button class="mp-lyrics-sync-btn" data-mp-sync="-0.1" title="Highlight later (vocal is ahead)">−</button>
+                <button class="mp-lyrics-sync-val" title="Click to reset">${sign}${off.toFixed(1)}s</button>
+                <button class="mp-lyrics-sync-btn" data-mp-sync="+0.1" title="Highlight earlier (vocal is behind)">+</button>
+            `;
+            meta.querySelectorAll('.mp-lyrics-sync-btn').forEach(b => {
+                b.addEventListener('click', () => {
+                    _adjustLyricsOffset(parseFloat(b.getAttribute('data-mp-sync')));
+                });
+            });
+            const valBtn = meta.querySelector('.mp-lyrics-sync-val');
+            if (valBtn) valBtn.addEventListener('click', () => _setLyricsOffset(0));
+        }
+
+        function _adjustLyricsOffset(delta) {
+            const cur = _musicPlayer.currentTrack;
+            if (!cur) return;
+            const next = Math.max(-5, Math.min(5, (cur.lyrics_offset || 0) + delta));
+            // Round to 1 decimal to avoid 0.1 + 0.2 floating drift in the UI
+            _setLyricsOffset(Math.round(next * 10) / 10);
+        }
+
+        function _setLyricsOffset(value) {
+            const cur = _musicPlayer.currentTrack;
+            if (!cur) return;
+            cur.lyrics_offset = value;
+            // Also reflect on the library entry so the next play picks it up
+            const lib = _musicState.library || [];
+            const t = lib.find(x => x.id === cur.id);
+            if (t) t.lyrics_offset = value;
+            // Refresh the meta display
+            const meta = document.getElementById('mp-tab-meta');
+            if (meta && _mpPanelTab === 'lyrics' && _mpLyricsState.lines.length) {
+                _renderLyricsSyncMeta(meta);
+            }
+            // Force a re-evaluation of the active line at the new offset
+            _lyricsActiveLine = -1;
+            _paintLyricsProgress();
+            // Persist
+            try { pywebview.api.set_lyrics_offset(cur.id, value); } catch (_) {}
         }
 
         function _setMpPanelOpen(open, persist) {

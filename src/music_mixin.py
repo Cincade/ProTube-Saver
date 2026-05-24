@@ -1697,6 +1697,28 @@ class MusicMixin(Service):
             print(f'[ProTube/lyrics] fetch failed for {track_id}: {e}')
             return {'ok': False, 'reason': 'error', 'synced': '', 'plain': ''}
 
+    def set_lyrics_offset(self, track_id, offset_seconds):
+        """Persist a per-track lyrics sync offset in seconds.
+        Positive = highlight earlier (anticipate the vocal); negative = later.
+        Clamped to [-5, 5]. Stored as `lyrics_offset` on the track entry."""
+        if not track_id:
+            return {'ok': False}
+        try:
+            offset = float(offset_seconds or 0)
+        except (TypeError, ValueError):
+            offset = 0.0
+        offset = max(-5.0, min(5.0, offset))
+        lib = self.settings.get('music_library', []) or []
+        for t in lib:
+            if t.get('id') == track_id:
+                if offset == 0:
+                    t.pop('lyrics_offset', None)
+                else:
+                    t['lyrics_offset'] = offset
+                self._store.save()
+                return {'ok': True, 'offset': offset}
+        return {'ok': False}
+
     def add_to_music_library(self, track):
         """Append/replace a track in the music library. Dedup by id (latest wins)."""
         if not track or not track.get('id'):
