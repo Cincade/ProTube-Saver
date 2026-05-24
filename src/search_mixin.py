@@ -9,9 +9,18 @@ import time
 
 import requests
 
+from service_base import Service
 
-class SearchMixin:
+
+class SearchMixin(Service):
     """YouTube and YT Music Innertube search, suggestions, and for-you logic."""
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._settings_svc = None   # wired: _normalize_channel_url_str
+
+    def wire(self, *, settings_svc, **_):
+        self._settings_svc = settings_svc
 
     # ---- YouTube search (F9) ---------------------------------------------------------
     # Hits YouTube's internal "Innertube" API directly — the same JSON endpoint
@@ -109,7 +118,7 @@ class SearchMixin:
                 if pid:
                     queue_playlist_ids.add(pid)
                 if q_item.get('subtype') == 'channel' and q_item.get('url'):
-                    queue_channel_urls.add(self._normalize_channel_url_str(q_item['url']))
+                    queue_channel_urls.add(self._settings_svc._normalize_channel_url_str(q_item['url']))
                 for c in (q_item.get('videos') or []):
                     if c.get('id'):
                         queue_video_ids.add(c['id'])
@@ -124,7 +133,7 @@ class SearchMixin:
                 if pid:
                     lib_playlist_ids.add(pid)
                 if l_item.get('subtype') == 'channel' and l_item.get('url'):
-                    lib_channel_urls.add(self._normalize_channel_url_str(l_item['url']))
+                    lib_channel_urls.add(self._settings_svc._normalize_channel_url_str(l_item['url']))
                 for c in (l_item.get('videos') or []):
                     if c.get('id'):
                         lib_video_ids.add(c['id'])
@@ -275,7 +284,7 @@ class SearchMixin:
         thumb = thumbs[-1].get('url') if thumbs else ''
         if thumb.startswith('//'):
             thumb = 'https:' + thumb
-        norm = self._normalize_channel_url_str(url)
+        norm = self._settings_svc._normalize_channel_url_str(url)
         # uploader field carries the description for the channel-card subtitle line —
         # frontend already renders this as the secondary text under the title.
         # view_count_string carries "@handle · 2.28K subscribers" so the bottom stats

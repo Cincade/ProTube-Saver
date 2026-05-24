@@ -1,8 +1,19 @@
 import os, re, requests
 from ydl_utils import YoutubeDL, _richness
+from service_base import Service
 
 
-class RepairMixin:
+class RepairMixin(Service):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._channel_svc = None    # wired: _is_file_missing
+        self._import_svc = None     # wired: _apply_refetched_thumbnail
+        self._download_svc = None   # wired: _format_duration
+
+    def wire(self, *, channel_svc, import_svc, download_svc, **_):
+        self._channel_svc = channel_svc
+        self._import_svc = import_svc
+        self._download_svc = download_svc
     def debug_queue_status(self):
         """Dump what's in queue and library for debugging. Called by frontend on demand."""
         queue = self.settings.get('queue', [])
@@ -101,7 +112,7 @@ class RepairMixin:
                 # Heal each child's filepath + drop children we can't find
                 good_children = []
                 for c in children:
-                    is_missing = self._is_file_missing(c)  # may heal filepath in-place
+                    is_missing = self._channel_svc._is_file_missing(c)  # may heal filepath in-place
                     if c.get('filepath') and is_missing:
                         # Path is genuinely broken — drop the child
                         continue
@@ -134,7 +145,7 @@ class RepairMixin:
 
             # Single video
             prev_fp = v.get('filepath')
-            is_missing = self._is_file_missing(v)  # self-heals filepath
+            is_missing = self._channel_svc._is_file_missing(v)  # self-heals filepath
             if v.get('filepath') != prev_fp:
                 fixed_paths += 1
 
@@ -259,7 +270,7 @@ class RepairMixin:
             'url': info.get('webpage_url') or f'https://www.youtube.com/watch?v={video_id}',
             'thumbnail': thumbnail,
             'uploader': info.get('uploader') or info.get('channel') or '',
-            'duration_string': info.get('duration_string') or self._format_duration(info.get('duration')) or '',
+            'duration_string': info.get('duration_string') or self._download_svc._format_duration(info.get('duration')) or '',
             'matched_title': info.get('title') or '',
             'duration_seconds': info.get('duration') or 0,
             'method': 'id',
@@ -357,7 +368,7 @@ class RepairMixin:
             'url': best.get('webpage_url') or best.get('url') or '',
             'thumbnail': thumbnail,
             'uploader': best.get('uploader') or best.get('channel') or '',
-            'duration_string': best.get('duration_string') or self._format_duration(best.get('duration')) or '',
+            'duration_string': best.get('duration_string') or self._download_svc._format_duration(best.get('duration')) or '',
             'matched_title': best.get('title') or '',
             'duration_seconds': best.get('duration') or 0,
             'method': 'search',
@@ -444,7 +455,7 @@ class RepairMixin:
         if result.get('thumbnail'):
             # Helper respects frame_thumbnail_forced (user-pinned frames stay)
             # and clears frame_thumbnail_auto (real thumb beats the fallback).
-            self._apply_refetched_thumbnail(target, result['thumbnail'])
+            self._import_svc._apply_refetched_thumbnail(target, result['thumbnail'])
         if result.get('uploader'):
             target['uploader'] = result['uploader']
         if result.get('duration_string') and not target.get('duration_string'):
@@ -508,7 +519,7 @@ class RepairMixin:
         if result.get('thumbnail'):
             # force_refresh — user explicitly asked for the new thumbnail; bypass
             # the "already cached" shortcut so we actually re-download.
-            self._apply_refetched_thumbnail(target, result['thumbnail'], force_refresh=True)
+            self._import_svc._apply_refetched_thumbnail(target, result['thumbnail'], force_refresh=True)
         if result.get('uploader'):
             target['uploader'] = result['uploader']
         if result.get('duration_string'):
@@ -588,7 +599,7 @@ class RepairMixin:
                 if result.get('url'):
                     target['url'] = result['url']
                 if result.get('thumbnail'):
-                    self._apply_refetched_thumbnail(target, result['thumbnail'])
+                    self._import_svc._apply_refetched_thumbnail(target, result['thumbnail'])
                 if result.get('uploader'):
                     target['uploader'] = result['uploader']
                 if result.get('duration_string') and not target.get('duration_string'):

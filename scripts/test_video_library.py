@@ -2,8 +2,8 @@
 Tests for VideoLibraryMixin — add, remove, load, archive, delete.
 
 Uses a minimal stub that provides only what the mixin needs:
-  - real SettingsStore backed by a tmp file (so atomicity + persistence are live)
-  - cross-mixin methods (frame extraction, queue migration) stubbed as no-ops
+  - real SettingsStore + AppContext backed by a tmp file
+  - cross-service dependencies (frame extraction, queue migration) stubbed as no-ops
 """
 import sys
 import os
@@ -14,25 +14,28 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from settings_store import SettingsStore
+from app_context import AppContext
 from video_library_mixin import VideoLibraryMixin
 
 
-class _API(VideoLibraryMixin):
-    """Minimal stub — only what VideoLibraryMixin reads from self.*"""
-
-    def __init__(self, settings_file, download_folder, thumb_dir):
-        self._store = SettingsStore(settings_file)
-        self._store.load()
-        self.settings = self._store.data
-        self.settings['_library_migrated'] = True   # skip queue→library migration
-        self.download_folder = download_folder
-        self.thumbnail_cache_dir = thumb_dir
-
-    # Cross-mixin stubs
+class _StubImportSvc:
+    """No-op stand-in for ImportMixin — only the methods VideoLibraryMixin calls."""
     def _migrate_queue_done_to_library(self): pass
     def _has_pending_frame_extraction(self): return False
     def _start_frame_extraction_worker(self): pass
     def _needs_auto_frame_thumb(self, v): return False
+
+
+class _API(VideoLibraryMixin):
+    """Minimal test stub — real SettingsStore + AppContext, no-op cross-service deps."""
+
+    def __init__(self, settings_file, download_folder, thumb_dir):
+        store = SettingsStore(settings_file)
+        store.load()
+        store.data['_library_migrated'] = True   # skip queue→library migration
+        ctx = AppContext(store, download_folder, thumb_dir)
+        super().__init__(ctx)
+        self.wire(import_svc=_StubImportSvc())
 
 
 @pytest.fixture

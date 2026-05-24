@@ -1,8 +1,17 @@
 import os, re, time
 from ydl_utils import YoutubeDL
+from service_base import Service
 
 
-class ChannelMixin:
+class ChannelMixin(Service):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._streaming_svc = None  # wired: _get_ydl_opts
+        self._download_svc = None   # wired: _format_duration
+
+    def wire(self, *, streaming_svc, download_svc, **_):
+        self._streaming_svc = streaming_svc
+        self._download_svc = download_svc
     def _extract_channel_branding(self, probe):
         """Pull (avatar_url, banner_url) from a yt-dlp channel probe.
 
@@ -198,7 +207,7 @@ class ChannelMixin:
             # format probe). lazy_playlist=True turns probe['entries'] into a
             # generator so we can iterate page-by-page and report progress as
             # entries arrive, instead of blocking until yt-dlp finishes the walk.
-            opts = self._get_ydl_opts('browser', 'none')
+            opts = self._streaming_svc._get_ydl_opts('browser', 'none')
             opts.update({
                 'extract_flat': True,
                 'skip_download': True,
@@ -267,7 +276,7 @@ class ChannelMixin:
                 'title': e.get('title', 'Untitled'),
                 'uploader': e.get('uploader') or e.get('channel') or target.get('uploader', ''),
                 'thumbnail': thumb,
-                'duration_string': self._format_duration(e.get('duration')),
+                'duration_string': self._download_svc._format_duration(e.get('duration')),
             })
 
         removed_ids = sorted(local_ids - remote_ids)
@@ -288,7 +297,7 @@ class ChannelMixin:
             about_url = self._channel_about_url(url)
             if about_url:
                 try:
-                    about_opts = self._get_ydl_opts('browser', 'none')
+                    about_opts = self._streaming_svc._get_ydl_opts('browser', 'none')
                     about_opts.update({
                         'extract_flat': True,
                         'skip_download': True,
@@ -359,7 +368,7 @@ class ChannelMixin:
             return {'ok': False, 'error': 'Not found'}
 
         try:
-            opts = self._get_ydl_opts('browser', 'none')
+            opts = self._streaming_svc._get_ydl_opts('browser', 'none')
             opts.update({
                 'extract_flat': True,
                 'skip_download': True,

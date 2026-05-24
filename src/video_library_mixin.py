@@ -1,26 +1,24 @@
-import os, re, time, shutil
-from ydl_utils import _richness
+import os, time, shutil
+from service_base import Service
 
 
-class VideoLibraryMixin:
+class VideoLibraryMixin(Service):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._import_svc = None     # wired: _migrate_queue_done_to_library, frame extraction
+
+    def wire(self, *, import_svc, **_):
+        self._import_svc = import_svc
     def load_library(self):
         """Return the full library. Runs migration on first call if needed.
         Also kicks off a background pass that extracts frame thumbnails for
         any imported videos that lack one — covers pre-existing imports from
         before the auto-frame feature existed."""
         if not self.settings.get('_library_migrated'):
-            self._migrate_queue_done_to_library()
-        # Guarded: only kick the worker when there's actually something to do.
-        # Without this guard, the worker was being spawned on every load_library
-        # call — and load_library is called from ~30 frontend code paths,
-        # including post-event refreshes after every progress tick. That led
-        # to hundreds of "starting worker (pending=0)" entries per second in
-        # protube.log and saturated the bridge enough to make clicks/playback
-        # feel laggy. Now we scan pending once here and skip the kick entirely
-        # when there's no work.
+            self._import_svc._migrate_queue_done_to_library()
         try:
             if self._has_pending_frame_extraction():
-                self._start_frame_extraction_worker()
+                self._import_svc._start_frame_extraction_worker()
         except Exception:
             pass
         return self.settings.get('library', [])
@@ -34,9 +32,9 @@ class VideoLibraryMixin:
             for v in self.settings.get('library', []):
                 if v.get('type') == 'playlist':
                     for c in v.get('videos', []):
-                        if self._needs_auto_frame_thumb(c):
+                        if self._import_svc._needs_auto_frame_thumb(c):
                             return True
-                elif self._needs_auto_frame_thumb(v):
+                elif self._import_svc._needs_auto_frame_thumb(v):
                     return True
         except Exception:
             return False

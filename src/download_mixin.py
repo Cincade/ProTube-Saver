@@ -17,10 +17,26 @@ import traceback
 import requests
 
 from ydl_utils import YoutubeDL
+from service_base import Service
 
 
-class DownloadMixin:
+class DownloadMixin(Service):
     """URL fetching, video/playlist download workers, and queue management."""
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._streaming_svc = None  # wired: _get_ydl_opts, _is_bot_check_error
+        self._channel_svc = None    # wired: _classify_playlist_url, _extract_channel_metadata
+        self._settings_svc = None   # wired: _user_default_quality
+        self._repair_svc = None     # wired: _cache_thumbnail
+        self._library_svc = None    # wired: add_to_library
+
+    def wire(self, *, streaming_svc, channel_svc, settings_svc, repair_svc, library_svc, **_):
+        self._streaming_svc = streaming_svc
+        self._channel_svc = channel_svc
+        self._settings_svc = settings_svc
+        self._repair_svc = repair_svc
+        self._library_svc = library_svc
 
     def fetch_url_info(self, url, cookie_mode, cookie_value):
         # Dedupe ONLY the same URL — distinct URLs run concurrently, so
@@ -90,7 +106,7 @@ class DownloadMixin:
                 self._run_fetch(url, cookie_mode, cookie_value)
         except Exception as e:
             # Bot wall? Retry once through alternate player clients (no cookies).
-            if self._is_bot_check_error(str(e)):
+            if self._streaming_svc._is_bot_check_error(str(e)):
                 try:
                     with self._ytdlp_gate:
                         self._run_fetch(url, cookie_mode, cookie_value,
@@ -107,7 +123,7 @@ class DownloadMixin:
         """One fetch attempt — probe playlist-vs-video then dispatch. Split out
         of _fetch_worker so the bot-check path can re-run it with an alternate
         player-client set."""
-        base_opts = self._get_ydl_opts(cookie_mode, cookie_value, player_clients=player_clients)
+        base_opts = self._streaming_svc._get_ydl_opts(cookie_mode, cookie_value, player_clients=player_clients)
         probe_opts = {**base_opts, 'extract_flat': True, 'skip_download': True}
         with YoutubeDL(probe_opts) as ydl:
             probe = ydl.extract_info(url, download=False)
@@ -127,7 +143,7 @@ class DownloadMixin:
         # the queue card falls back to formats[0] (best). This makes the
         # Settings → Default quality preference take effect for new pastes
         # without showing a label that doesn't match any available format.
-        pref = self._user_default_quality()
+        pref = self._settings_svc._user_default_quality()
         selected = None
         if formats and any((f.get('label') == pref) for f in formats):
             selected = pref
@@ -189,13 +205,13 @@ class DownloadMixin:
             })
 
         source_url = probe.get('webpage_url') or probe.get('original_url')
-        subtype = self._classify_playlist_url(source_url)
+        subtype = self._channel_svc._classify_playlist_url(source_url)
         # For channels, pull the full header bundle (avatar + banner + subscriber
         # count + description) so the detail-view hero can render a YouTube-style
         # channel page instead of just a tile + name.
         channel_meta = {}
         if subtype == 'channel':
-            channel_meta = self._extract_channel_metadata(probe)
+            channel_meta = self._channel_svc._extract_channel_metadata(probe)
         playlist = {
             "type": "playlist",
             "id": probe.get('id') or f"pl_{int(time.time())}",
@@ -212,7 +228,7 @@ class DownloadMixin:
             # Honor the user's Settings → Default quality preference. Falls back
             # to 1080p when unset. _user_default_quality maps 'best'/'audio'
             # abstractions to picker-compatible resolutions.
-            "defaultQuality": self._user_default_quality(),
+            "defaultQuality": self._settings_svc._user_default_quality(),
             "thumbnails": [c.get('thumbnail') for c in children[:4] if c.get('thumbnail')],
             "channelAvatar": channel_meta.get('avatar', ''),
             "channelBanner": channel_meta.get('banner', ''),
@@ -273,7 +289,7 @@ class DownloadMixin:
                 if not (thumb.startswith('http://') or thumb.startswith('https://')):
                     continue  # not a remote URL
                 try:
-                    marker = self._cache_thumbnail(thumb, vid_id)
+                    marker = self._repair_svc._cache_thumbnail(thumb, vid_id)
                     if not (marker and marker.startswith('pt:thumb:')):
                         continue  # caching failed (offline?), leave as-is
 
@@ -351,11 +367,11 @@ class DownloadMixin:
         tripping YouTube rate limits on large playlists. Each resolution streams
         back to the UI as it completes.
         """
-        base_opts = self._get_ydl_opts(cookie_mode, cookie_value)
+        base_opts = self._streaming_svc._get_ydl_opts(cookie_mode, cookie_value)
         total = len(video_urls)
 
         def _extract(vid_url, clients=None):
-            opts = (self._get_ydl_opts(cookie_mode, cookie_value, player_clients=clients)
+            opts = (self._streaming_svc._get_ydl_opts(cookie_mode, cookie_value, player_clients=clients)
                     if clients else base_opts)
             with self._ytdlp_gate:
                 with YoutubeDL(opts) as ydl:
@@ -371,7 +387,7 @@ class DownloadMixin:
                     info = _extract(vid_url)
                 except Exception as e_first:
                     # No-cookies bot wall → retry this video via alternate clients.
-                    if self._is_bot_check_error(str(e_first)):
+                    if self._streaming_svc._is_bot_check_error(str(e_first)):
                         info = _extract(vid_url, clients=self._BOT_FALLBACK_CLIENTS)
                     else:
                         raise
@@ -477,7 +493,7 @@ class DownloadMixin:
             captured_filepath = {'path': None}
 
             try:
-                opts = self._get_ydl_opts(mode, val)
+                opts = self._streaming_svc._get_ydl_opts(mode, val)
                 quality = video_data.get('selectedQuality', '1080p')
                 opts.update({
                     'outtmpl': os.path.join(v_folder, f'{v_title}.%(ext)s'),
@@ -584,7 +600,7 @@ class DownloadMixin:
                     # No-cookies bot wall mid-download → retry once through the
                     # alternate player clients. Same opts, just a different
                     # client surface for the format/stream URLs.
-                    if self._is_bot_check_error(str(e_dl)) and video_id not in self.cancelled_ids and video_id not in self.paused_ids:
+                    if self._streaming_svc._is_bot_check_error(str(e_dl)) and video_id not in self.cancelled_ids and video_id not in self.paused_ids:
                         retry_opts = {**opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
                         with YoutubeDL(retry_opts) as ydl: ydl.download([video_data['url']])
                     else:
@@ -641,7 +657,7 @@ class DownloadMixin:
                 if v_folder and final_path:
                     base_name = os.path.splitext(os.path.basename(final_path))[0]
                     try:
-                        sub_opts = self._get_ydl_opts(mode, val)
+                        sub_opts = self._streaming_svc._get_ydl_opts(mode, val)
                         sub_opts.update({
                             'outtmpl': os.path.join(v_folder, f'{v_title}.%(ext)s'),
                             'skip_download': True,
@@ -680,9 +696,9 @@ class DownloadMixin:
                     # Cache thumbnail locally so library works offline immediately.
                     remote_thumb = video_data.get('thumbnail')
                     if remote_thumb and remote_thumb.startswith('http'):
-                        cached = self._cache_thumbnail(remote_thumb, video_id)
+                        cached = self._repair_svc._cache_thumbnail(remote_thumb, video_id)
                         video_data['thumbnail'] = cached
-                    self.add_to_library(video_data)
+                    self._library_svc.add_to_library(video_data)
 
                 self._send_to_js('updateItemStatus', video_id, 'Done', playlist_id, final_path, v_folder)
                 self.session_completed_ids.add(video_id)
@@ -742,7 +758,7 @@ class DownloadMixin:
         # player clients before this point, so reaching here means even those
         # were challenged. Tell the user to slow down rather than dumping the
         # raw yt-dlp "use --cookies" hint.
-        if self._is_bot_check_error(m):
+        if self._streaming_svc._is_bot_check_error(m):
             return ('rate_limit', "YouTube is bot-checking this IP. Wait a few minutes and retry — fewer at once helps.")
 
         # HTTP 416 — stale resume. The .part file is out of sync with what's on YouTube's side.

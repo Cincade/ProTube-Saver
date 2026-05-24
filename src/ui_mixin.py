@@ -1,7 +1,19 @@
 import os, sys, threading, subprocess, webview, importlib.metadata, json
+from service_base import Service
 
 
-class UiMixin:
+class UiMixin(Service):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._window_is_fullscreen = False
+        self._settings_svc = None   # wired: owns self.updater
+        # Register real implementations on ctx so every Service._send_to_js
+        # / _log_to_protube_log delegates here without knowing about webview.
+        ctx.send_to_js = self._send_to_js_impl
+        ctx.log_to_protube_log = self._log_to_protube_log_impl
+
+    def wire(self, *, settings_svc, **_):
+        self._settings_svc = settings_svc
     def open_folder(self, path=None):
         """Open a folder in the OS file manager. Defaults to the main download folder."""
         target = path or self.download_folder
@@ -259,12 +271,12 @@ class UiMixin:
         def on_complete(msg):
             self._send_to_js('showToast', msg, None, None)
         use_nightly = bool(self.settings.get('yt_dlp_use_nightly', False))
-        self.updater.update_in_background(callback=on_complete, include_nightly=use_nightly)
+        self._settings_svc.updater.update_in_background(callback=on_complete, include_nightly=use_nightly)
     
-    def _send_to_js(self, func, *args):
+    def _send_to_js_impl(self, func, *args):
         if webview.windows: webview.windows[0].evaluate_js(f"{func}({', '.join(json.dumps(a) for a in args)})")
 
-    def _log_to_protube_log(self, msg):
+    def _log_to_protube_log_impl(self, msg):
         """Append a line to data/protube.log so failures are visible after the
         fact. pythonw discards stdout, so plain print() vanishes; this is the
         same file main.py's _log_diag writes to. Best-effort, never raises."""

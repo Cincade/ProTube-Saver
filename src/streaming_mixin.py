@@ -16,9 +16,20 @@ import contextlib
 import traceback
 
 from ydl_utils import YoutubeDL
+from service_base import Service
 
 
-class StreamingMixin:
+class StreamingMixin(Service):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._video_server = None
+        self._video_server_port = None
+        self._settings_svc = None   # wired: _find_library_entry
+        self._import_svc = None     # wired: _find_ffprobe, _find_ffmpeg_exe
+
+    def wire(self, *, settings_svc, import_svc, **_):
+        self._settings_svc = settings_svc
+        self._import_svc = import_svc
     """Localhost video server, transcode pipeline, and stream-URL resolution."""
 
     def _start_video_server(self):
@@ -224,7 +235,7 @@ class StreamingMixin:
         only if ffprobe is genuinely absent — caller falls back to extension-
         based compat checks in that case."""
         try:
-            return self._find_ffprobe()
+            return self._import_svc._find_ffprobe()
         except Exception:
             return None
 
@@ -234,7 +245,7 @@ class StreamingMixin:
         modes. Without this, dev runs (no _MEIPASS, ffmpeg only on PATH) would
         always fail to transcode legacy library entries."""
         try:
-            return self._find_ffmpeg_exe()
+            return self._import_svc._find_ffmpeg_exe()
         except Exception:
             return None
 
@@ -672,7 +683,7 @@ class StreamingMixin:
                 pass
 
         # Find the entry
-        target = self._find_library_entry(video_id)
+        target = self._settings_svc._find_library_entry(video_id)
         if not target:
             return {'ok': False, 'error': 'not found'}
 
@@ -686,7 +697,7 @@ class StreamingMixin:
     def _mark_watched_to_end(self, video_id):
         """Stamp `watched_to_end=True` on the library entry. Used to suppress the
         NEW badge once a video has been completed. Persistent across position clears."""
-        target = self._find_library_entry(video_id)
+        target = self._settings_svc._find_library_entry(video_id)
         if not target:
             return
         target['watched_to_end'] = True
@@ -703,7 +714,7 @@ class StreamingMixin:
         return {'ok': True}
 
     def _clear_playback_position(self, video_id):
-        target = self._find_library_entry(video_id)
+        target = self._settings_svc._find_library_entry(video_id)
         if not target:
             return {'ok': False}
         target.pop('last_position_seconds', None)

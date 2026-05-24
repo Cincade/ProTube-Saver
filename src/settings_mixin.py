@@ -1,6 +1,7 @@
 import os, re, json, sys, time, threading, shutil, subprocess, requests, contextlib, webview
 from packaging.version import parse
 from ydl_utils import YoutubeDL
+from service_base import Service
 
 # Canonical version string — bump here when shipping a build.
 __version__ = '1.4.5'
@@ -10,7 +11,10 @@ LANDING_VERSION_URL_DEFAULT = 'https://protubesaver.netlify.app/version.json'
 GITHUB_RELEASES_URL_DEFAULT = 'https://api.github.com/repos/Cincade/ProTube-Saver/releases/latest'
 
 
-class SettingsMixin:
+class SettingsMixin(Service):
+    def __init__(self, ctx, updater):
+        super().__init__(ctx)
+        self.updater = updater
     def _load_settings(self):
         """Back-compat shim. Settings loading + corruption recovery now live in
         SettingsStore (the single locked door). Kept so any caller still works."""

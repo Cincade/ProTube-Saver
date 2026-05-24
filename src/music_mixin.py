@@ -2,7 +2,7 @@
 
 Consumed by logic.API via multiple inheritance.  All methods land on the same
 `self` as the rest of the API, so cross-domain calls like
-self._store.set()/self._send_to_js()/self._find_ffmpeg_exe() resolve normally.
+self._store.set()/self._send_to_js()/self._import_svc._find_ffmpeg_exe() resolve normally.
 """
 
 import os
@@ -16,10 +16,34 @@ import subprocess
 import requests
 
 from ydl_utils import YoutubeDL, _MusicDownloadCancelled
+from service_base import Service
 
 
-class MusicMixin:
+class MusicMixin(Service):
     """Music search, download queue, library, and album management."""
+
+    def __init__(self, ctx, max_concurrent_music_downloads=1):
+        super().__init__(ctx)
+        # Music queue own state (was in API.__init__)
+        self.max_concurrent_music_downloads = max(1, min(8, max_concurrent_music_downloads))
+        self._music_queue_lock = threading.Lock()
+        self._music_queue_event = threading.Event()
+        self._music_queue_active = 0
+        self._music_queue_cancelled_ids = set()
+        self._music_queue_last_pct = {}
+        # Cross-service refs
+        self._search_svc = None     # wired: _build_dedup_sets
+        self._repair_svc = None     # wired: _cache_thumbnail
+        self._download_svc = None   # wired: _format_duration
+        self._import_svc = None     # wired: _find_ffmpeg_exe
+        self._streaming_svc = None  # wired: _get_ydl_opts, _ydl_extract, _is_bot_check_error
+
+    def wire(self, *, search_svc, repair_svc, download_svc, import_svc, streaming_svc, **_):
+        self._search_svc = search_svc
+        self._repair_svc = repair_svc
+        self._download_svc = download_svc
+        self._import_svc = import_svc
+        self._streaming_svc = streaming_svc
 
     def _get_music_innertube_session(self):
         """Lazy persistent session for YT Music Innertube calls. Reuses connections."""
@@ -84,7 +108,7 @@ class MusicMixin:
             result['recent_searches'] = recents
 
             lib = list(self.settings.get('library', []) or [])
-            dedup = self._build_dedup_sets()
+            dedup = self._search_svc._build_dedup_sets()
             lib_ids = dedup.get('library_ids', set()) if isinstance(dedup, dict) else set()
 
             # Seeds: top library channels (by how many of their videos you've saved),
@@ -176,7 +200,7 @@ class MusicMixin:
         # itemSectionRenderer → contents → shelfRenderer → content →
         # expandedShelfContentsRenderer → items; recurse to keep it simple).
         items = []
-        dedup = self._build_dedup_sets()
+        dedup = self._search_svc._build_dedup_sets()
         def walk(node):
             if not isinstance(node, (dict, list)) or len(items) >= 6:
                 return
@@ -716,13 +740,13 @@ class MusicMixin:
         """
         try:
             self._send_to_js('showToast', f'Resolving {kind}…', None, None)
-            opts = self._get_ydl_opts('browser', 'none')
+            opts = self._streaming_svc._get_ydl_opts('browser', 'none')
             opts.update({
                 'quiet': True, 'no_warnings': True,
                 'skip_download': True,
                 'extract_flat': 'in_playlist',
             })
-            info = self._ydl_extract(url, opts)
+            info = self._streaming_svc._ydl_extract(url, opts)
             entries = info.get('entries') or []
             # Some YT Music browse responses wrap tracks under a "Songs" tab; flat-extract
             # exposes them as nested entries with 'entries' key in each parent. Flatten.
@@ -983,9 +1007,9 @@ class MusicMixin:
 
             # Phase 1: metadata probe (no download) so we know artist/album for
             # the final filename layout and library entry.
-            opts = self._get_ydl_opts('browser', 'none')
+            opts = self._streaming_svc._get_ydl_opts('browser', 'none')
             opts.update({'quiet': True, 'no_warnings': True, 'skip_download': True})
-            info = self._ydl_extract(url, opts)
+            info = self._streaming_svc._ydl_extract(url, opts)
 
             vid = info.get('id') or ''
             if not vid:
@@ -1023,7 +1047,7 @@ class MusicMixin:
             os.makedirs(target_dir, exist_ok=True)
 
             # Phase 2: actual download.
-            dl_opts = self._get_ydl_opts('browser', 'none')
+            dl_opts = self._streaming_svc._get_ydl_opts('browser', 'none')
             dl_opts.update({
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': os.path.join(target_dir, f'{safe_title}.%(ext)s'),
@@ -1094,7 +1118,7 @@ class MusicMixin:
                 with YoutubeDL(dl_opts) as ydl:
                     ydl.download([url])
             except Exception as e_dl:
-                if self._is_bot_check_error(str(e_dl)):
+                if self._streaming_svc._is_bot_check_error(str(e_dl)):
                     retry_dl = {**dl_opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
                     with YoutubeDL(retry_dl) as ydl:
                         ydl.download([url])
@@ -1133,7 +1157,7 @@ class MusicMixin:
             remote_thumb = info.get('thumbnail') or ''
             if not remote_thumb and vid:
                 remote_thumb = f'https://i.ytimg.com/vi/{vid}/hqdefault.jpg'
-            thumb = self._cache_thumbnail(remote_thumb, vid) if (remote_thumb and vid) else remote_thumb
+            thumb = self._repair_svc._cache_thumbnail(remote_thumb, vid) if (remote_thumb and vid) else remote_thumb
 
             # Build library entry.
             entry = {
@@ -1143,7 +1167,7 @@ class MusicMixin:
                 'artist': artist,
                 'album': album,
                 'year': str(release_year) if release_year else '',
-                'duration_string': self._format_duration(duration_s),
+                'duration_string': self._download_svc._format_duration(duration_s),
                 'duration_seconds': int(duration_s) if duration_s else 0,
                 'filepath': final_path,
                 'thumbnail': thumb,
@@ -1475,7 +1499,7 @@ class MusicMixin:
                 vid = t.get('id') or ''
                 if not vid or not tb or tb.startswith('pt:thumb:'):
                     continue
-                marker = self._cache_thumbnail(tb, vid)
+                marker = self._repair_svc._cache_thumbnail(tb, vid)
                 if marker.startswith('pt:thumb:'):
                     t['thumbnail'] = marker
                     changed = True
@@ -1492,7 +1516,7 @@ class MusicMixin:
         yt-dlp captures, so the remote URL can't be trusted as a thumbnail
         source. The embedded art always works (yt-dlp puts it there)."""
         try:
-            ffmpeg = self._find_ffmpeg_exe()
+            ffmpeg = self._import_svc._find_ffmpeg_exe()
             if not ffmpeg or not os.path.isfile(audio_path):
                 return False
             r = subprocess.run(

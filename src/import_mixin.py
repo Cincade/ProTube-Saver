@@ -1,7 +1,16 @@
 import os, re, sys, time, threading, subprocess, io
+from service_base import Service
 
 
-class ImportMixin:
+class ImportMixin(Service):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self._library_svc = None    # wired: _archive_key
+        self._repair_svc = None     # wired: _cache_thumbnail
+
+    def wire(self, *, library_svc, repair_svc, **_):
+        self._library_svc = library_svc
+        self._repair_svc = repair_svc
     # ============================================================
     # Import from folder — scans a disk folder and builds library entries
     # from video files found there. Used to rebuild library from files that
@@ -82,11 +91,11 @@ class ImportMixin:
         for v in library:
             if v.get('type') == 'playlist':
                 for c in v.get('videos', []):
-                    key = self._archive_key(c.get('filepath'))
+                    key = self._library_svc._archive_key(c.get('filepath'))
                     if key:
                         in_lib.add(key)
             else:
-                key = self._archive_key(v.get('filepath'))
+                key = self._library_svc._archive_key(v.get('filepath'))
                 if key:
                     in_lib.add(key)
         archive = self.settings.get('library_archive', {}) or {}
@@ -96,7 +105,7 @@ class ImportMixin:
                 size = os.path.getsize(path)
             except OSError:
                 size = 0
-            key = self._archive_key(path)
+            key = self._library_svc._archive_key(path)
             return {
                 'path': path,
                 'name': name,
@@ -183,14 +192,14 @@ class ImportMixin:
         if selected_paths is not None:
             selected_set = set()
             for p in selected_paths:
-                key = self._archive_key(p)
+                key = self._library_svc._archive_key(p)
                 if key:
                     selected_set.add(key)
 
         def _should_import(path):
             if selected_set is None:
                 return True
-            key = self._archive_key(path)
+            key = self._library_svc._archive_key(path)
             return bool(key) and key in selected_set
 
         # Build set of known filepaths so we don't duplicate entries on re-import
@@ -362,7 +371,7 @@ class ImportMixin:
                 return None
 
             archive = self.settings.get('library_archive', {})
-            arc_key = self._archive_key(filepath)
+            arc_key = self._library_svc._archive_key(filepath)
             archived = archive.get(arc_key) if arc_key else None
             if archived:
                 restored = dict(archived)
@@ -795,7 +804,7 @@ class ImportMixin:
             return
         if target.get('frame_thumbnail_forced'):
             return
-        cached = self._cache_thumbnail(remote_url, target.get('id'), force_refresh=force_refresh)
+        cached = self._repair_svc._cache_thumbnail(remote_url, target.get('id'), force_refresh=force_refresh)
         target['thumbnail'] = cached
         target.pop('frame_thumbnail_auto', None)
 
