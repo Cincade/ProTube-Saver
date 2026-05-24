@@ -1575,12 +1575,14 @@
         #music-player-view.panel-open .mp-panel { transform: translateX(0); }
 
         /* Floating glassy pill — same family as the old bottom handle.
-           Right-anchored, vertically centered. When the panel opens it slides
-           with the panel so it always sits just outside the panel's left edge. */
+           Right-anchored, vertically centered. When the panel opens, the pill
+           rides with it via translateX (NOT animating `right` — that's a
+           layout property and would cause reflow every frame, same family
+           of bug as the fullscreen-mode grid-template-columns transition).
+           Translate is GPU-accelerated and matches the panel's own slide. */
         .mp-panel-handle {
             position: absolute;
             top: 50%; right: 18px;
-            transform: translateY(-50%);
             z-index: 12;
             display: flex; align-items: center; justify-content: center;
             width: 38px; height: 38px;
@@ -1593,11 +1595,15 @@
             color: rgba(255, 255, 255, 0.75);
             cursor: pointer;
             box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+            /* Combine vertical centering with the open/close slide into one
+               transform so they don't fight each other. */
+            transform: translate(0, -50%);
+            will-change: transform;
             transition:
                 background 0.15s,
                 color 0.15s,
                 border-color 0.15s,
-                right 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+                transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .mp-panel-handle:hover {
             background: rgba(30, 30, 30, 0.92);
@@ -1610,9 +1616,12 @@
             transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
             flex-shrink: 0;
         }
-        /* When the panel is open, the pill rides with it (panel is 380px wide,
-           pill is 38px + 18px right margin → sit just outside panel edge). */
-        #music-player-view.panel-open .mp-panel-handle { right: 398px; }
+        /* Slide the pill with the panel using translateX. Panel is 380px wide;
+           pill needs to sit just outside the panel's left edge, so it
+           translates -380px in X. Y stays at -50% for vertical centering. */
+        #music-player-view.panel-open .mp-panel-handle {
+            transform: translate(-380px, -50%);
+        }
         #music-player-view.panel-open .mp-handle-chev { transform: rotate(90deg); /* points right (close me) */ }
         /* The "Up next: <title>" peek text only made sense for the bottom drawer;
            hide it in side mode — the Up Next tab itself shows the queue. */
