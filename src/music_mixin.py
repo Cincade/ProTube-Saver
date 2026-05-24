@@ -46,8 +46,11 @@ class MusicMixin(Service):
         self._streaming_svc = streaming_svc
 
     def _get_music_innertube_session(self):
-        """Lazy persistent session for YT Music Innertube calls. Reuses connections."""
-        if self._MUSIC_INNERTUBE_SESSION is None:
+        """Lazy persistent session for YT Music Innertube calls. Reuses connections.
+        The session lives on SearchMixin (where the URL/client constants are) so
+        all innertube callers share one pool."""
+        svc = self._search_svc
+        if svc._MUSIC_INNERTUBE_SESSION is None:
             s = requests.Session()
             s.headers.update({
                 'Content-Type': 'application/json',
@@ -55,8 +58,8 @@ class MusicMixin(Service):
                 'Origin': 'https://music.youtube.com',
                 'Referer': 'https://music.youtube.com/',
             })
-            self._MUSIC_INNERTUBE_SESSION = s
-        return self._MUSIC_INNERTUBE_SESSION
+            svc._MUSIC_INNERTUBE_SESSION = s
+        return svc._MUSIC_INNERTUBE_SESSION
 
     def record_music_search(self, query):
         """Append a query to the recent-searches list (most recent first, capped at 12)."""
@@ -180,7 +183,7 @@ class MusicMixin(Service):
         """Hit YouTube's trending feed (browseId=FEtrending) via Innertube
         and pluck 6 trending videos. Mirrors _fetch_yt_music_trending."""
         body = {
-            'context': {'client': dict(self._INNERTUBE_CLIENT)},
+            'context': {'client': dict(self._search_svc._INNERTUBE_CLIENT)},
             'browseId': 'FEtrending',
         }
         sess = self._get_innertube_session()
@@ -310,7 +313,7 @@ class MusicMixin(Service):
     def _fetch_yt_music_trending(self):
         """Hit YT Music's charts browse endpoint and pluck 6 trending songs."""
         body = {
-            'context': {'client': dict(self._MUSIC_INNERTUBE_CLIENT)},
+            'context': {'client': dict(self._search_svc._MUSIC_INNERTUBE_CLIENT)},
             'browseId': 'FEmusic_charts',
         }
         sess = self._get_music_innertube_session()
@@ -357,16 +360,16 @@ class MusicMixin(Service):
                 return {'results': [], 'kind': kind}
 
             body = {
-                'context': {'client': dict(self._MUSIC_INNERTUBE_CLIENT)},
+                'context': {'client': dict(self._search_svc._MUSIC_INNERTUBE_CLIENT)},
                 'query': q,
             }
-            if kind in self._MUSIC_INNERTUBE_FILTER_PARAMS:
-                body['params'] = self._MUSIC_INNERTUBE_FILTER_PARAMS[kind].replace('%3D', '=')
+            if kind in self._search_svc._MUSIC_INNERTUBE_FILTER_PARAMS:
+                body['params'] = self._search_svc._MUSIC_INNERTUBE_FILTER_PARAMS[kind].replace('%3D', '=')
 
             sess = self._get_music_innertube_session()
             try:
                 resp = sess.post(
-                    self._MUSIC_INNERTUBE_URL,
+                    self._search_svc._MUSIC_INNERTUBE_URL,
                     params={'prettyPrint': 'false'},
                     json=body,
                     timeout=15,
@@ -447,12 +450,12 @@ class MusicMixin(Service):
             if not tok:
                 return {'results': [], 'kind': kind, 'continuation': ''}
             body = {
-                'context': {'client': dict(self._MUSIC_INNERTUBE_CLIENT)},
+                'context': {'client': dict(self._search_svc._MUSIC_INNERTUBE_CLIENT)},
             }
             sess = self._get_music_innertube_session()
             try:
                 resp = sess.post(
-                    self._MUSIC_INNERTUBE_URL,
+                    self._search_svc._MUSIC_INNERTUBE_URL,
                     params={'prettyPrint': 'false', 'continuation': tok},
                     json=body,
                     timeout=15,
@@ -1119,7 +1122,7 @@ class MusicMixin(Service):
                     ydl.download([url])
             except Exception as e_dl:
                 if self._streaming_svc._is_bot_check_error(str(e_dl)):
-                    retry_dl = {**dl_opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
+                    retry_dl = {**dl_opts, 'extractor_args': {'youtube': {'player_client': list(self._streaming_svc._BOT_FALLBACK_CLIENTS)}}}
                     with YoutubeDL(retry_dl) as ydl:
                         ydl.download([url])
                 else:

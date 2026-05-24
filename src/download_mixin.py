@@ -110,7 +110,7 @@ class DownloadMixin(Service):
                 try:
                     with self._ytdlp_gate:
                         self._run_fetch(url, cookie_mode, cookie_value,
-                                        player_clients=self._BOT_FALLBACK_CLIENTS)
+                                        player_clients=self._streaming_svc._BOT_FALLBACK_CLIENTS)
                     return
                 except Exception as e2:
                     e = e2
@@ -388,7 +388,7 @@ class DownloadMixin(Service):
                 except Exception as e_first:
                     # No-cookies bot wall → retry this video via alternate clients.
                     if self._streaming_svc._is_bot_check_error(str(e_first)):
-                        info = _extract(vid_url, clients=self._BOT_FALLBACK_CLIENTS)
+                        info = _extract(vid_url, clients=self._streaming_svc._BOT_FALLBACK_CLIENTS)
                     else:
                         raise
                 formats, size_map = self._parse_formats(info)
@@ -601,7 +601,7 @@ class DownloadMixin(Service):
                     # alternate player clients. Same opts, just a different
                     # client surface for the format/stream URLs.
                     if self._streaming_svc._is_bot_check_error(str(e_dl)) and video_id not in self.cancelled_ids and video_id not in self.paused_ids:
-                        retry_opts = {**opts, 'extractor_args': {'youtube': {'player_client': list(self._BOT_FALLBACK_CLIENTS)}}}
+                        retry_opts = {**opts, 'extractor_args': {'youtube': {'player_client': list(self._streaming_svc._BOT_FALLBACK_CLIENTS)}}}
                         with YoutubeDL(retry_opts) as ydl: ydl.download([video_data['url']])
                     else:
                         raise
