@@ -2040,7 +2040,8 @@ class MusicMixin(Service):
         same `/v?p=<base64-path>` URL scheme — works for audio files too because
         the server just streams bytes with Range + CORS headers)."""
         try:
-            if not self._video_server_port:
+            port = self._streaming_svc._video_server_port
+            if not port:
                 return {'error': 'Stream server not running'}
             lib = self.settings.get('music_library', []) or []
             target = next((t for t in lib if t.get('id') == track_id), None)
@@ -2052,7 +2053,7 @@ class MusicMixin(Service):
             import base64 as _b64
             encoded = _b64.urlsafe_b64encode(fp.encode('utf-8')).decode('ascii')
             return {
-                'url': f'http://127.0.0.1:{self._video_server_port}/v?p={encoded}',
+                'url': f'http://127.0.0.1:{port}/v?p={encoded}',
                 'filepath': fp,
                 'title': target.get('title', ''),
                 'artist': target.get('artist', ''),
