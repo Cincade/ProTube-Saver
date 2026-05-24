@@ -3061,7 +3061,7 @@
                 if (isLast && _musicPlayer.repeat !== 'all' && !_musicPlayer.shuffle) return;
                 _musicGoAdjacent(1);
             });
-            audio.addEventListener('timeupdate', _paintAllProgress);
+            audio.addEventListener('timeupdate', () => { _paintAllProgress(); _paintLyricsProgress(); });
             audio.addEventListener('loadedmetadata', _paintAllProgress);
             audio.addEventListener('error', () => {
                 const e = audio.error;
@@ -3545,12 +3545,70 @@
             if (album) album.textContent = track.album || '';
             _setMusicArt(art, track.thumbnail);
             _setMusicBackdrop(backdrop, track.thumbnail);
+            // Reset lyrics state so the new track re-fetches
+            _mpLyricsState = { trackId: null, lines: [], plain: '' };
+            _lyricsActiveLine = -1;
             _paintMpPanel();
         }
 
         // Bottom panel state + render
         let _mpPanelTab = 'upnext';
         let _mpPanelOpen = false;
+
+        // Lyrics state (JS-side cache so we don't re-fetch on every panel repaint)
+        let _mpLyricsState = { trackId: null, lines: [], plain: '' };
+        let _lyricsActiveLine = -1;
+
+        function _parseLrc(lrc) {
+            const out = [];
+            for (const raw of (lrc || '').split('\n')) {
+                const m = raw.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+                if (!m) continue;
+                const secs = parseInt(m[1], 10) * 60 + parseFloat(m[2]);
+                const text = m[3].trim();
+                if (text) out.push({ time: secs, text });
+            }
+            return out.sort((a, b) => a.time - b.time);
+        }
+
+        function _paintLyricsProgress() {
+            if (_mpPanelTab !== 'lyrics') return;
+            const lines = _mpLyricsState.lines;
+            if (!lines.length) return;
+            const t = _musicPlayer.audio?.currentTime || 0;
+            let active = 0;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].time <= t) active = i; else break;
+            }
+            if (active === _lyricsActiveLine) return;
+            _lyricsActiveLine = active;
+            const els = document.querySelectorAll('#mp-tab-body .mp-lyric-line');
+            els.forEach((el, i) => {
+                el.classList.toggle('active', i === active);
+                el.classList.toggle('near', Math.abs(i - active) === 1);
+            });
+            if (els[active]) els[active].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function _renderLyrics(body, meta) {
+            const { lines, plain } = _mpLyricsState;
+            if (lines.length) {
+                // Synced
+                body.innerHTML = '<div class="mp-lyrics-scroll">' +
+                    lines.map(l => `<div class="mp-lyric-line">${l.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('') +
+                    '</div>';
+                if (meta) meta.textContent = 'synced';
+                _lyricsActiveLine = -1;
+                _paintLyricsProgress(); // immediately highlight the right line
+            } else if (plain) {
+                // Plain text fallback
+                body.innerHTML = `<div class="mp-lyrics-plain">${plain.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+                if (meta) meta.textContent = '';
+            } else {
+                body.innerHTML = '<div class="mp-lyrics-empty">No lyrics found for this track.</div>';
+                if (meta) meta.textContent = '';
+            }
+        }
 
         function _setMpPanelOpen(open, persist) {
             _mpPanelOpen = !!open;
@@ -3650,8 +3708,34 @@
                     });
                 });
             } else if (_mpPanelTab === 'lyrics') {
-                body.innerHTML = '<div class="mp-lyrics-empty">Lyrics aren\'t available yet — coming in a future update.</div>';
-                if (meta) meta.textContent = '';
+                const cur = _musicPlayer.currentTrack;
+                if (!cur) {
+                    body.innerHTML = '<div class="mp-lyrics-empty">Play a track to see lyrics.</div>';
+                    if (meta) meta.textContent = '';
+                } else if (_mpLyricsState.trackId === cur.id) {
+                    // Already loaded — just re-render (tab switch, etc.)
+                    _renderLyrics(body, meta);
+                } else {
+                    // Fetch from backend
+                    body.innerHTML = '<div class="mp-lyrics-loading">Loading lyrics…</div>';
+                    if (meta) meta.textContent = '';
+                    const fetchId = cur.id;
+                    pywebview.api.get_lyrics(fetchId).then(res => {
+                        // Guard: user may have switched track while we were fetching
+                        if (_musicPlayer.currentTrack?.id !== fetchId) return;
+                        _mpLyricsState = {
+                            trackId: fetchId,
+                            lines: res.synced ? _parseLrc(res.synced) : [],
+                            plain: res.plain || '',
+                        };
+                        _lyricsActiveLine = -1;
+                        if (_mpPanelTab === 'lyrics') _renderLyrics(body, meta);
+                    }).catch(() => {
+                        if (_mpPanelTab === 'lyrics' && _musicPlayer.currentTrack?.id === fetchId) {
+                            body.innerHTML = '<div class="mp-lyrics-empty">Couldn\'t load lyrics.</div>';
+                        }
+                    });
+                }
             } else if (_mpPanelTab === 'related') {
                 body.innerHTML = '<div class="mp-related-empty">Related tracks coming soon.</div>';
                 if (meta) meta.textContent = '';

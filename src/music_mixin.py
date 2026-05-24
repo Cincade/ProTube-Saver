@@ -1631,6 +1631,69 @@ class MusicMixin(Service):
         except Exception:
             pass
 
+    def get_lyrics(self, track_id):
+        """Fetch lyrics for a music library track from lrclib.net.
+
+        Returns cached result on repeat calls. Stores { synced, plain, fetched_at }
+        on the track entry so subsequent calls are instant.
+        """
+        if not track_id:
+            return {'ok': False, 'reason': 'no_id'}
+
+        lib = self.settings.get('music_library', []) or []
+        track = next((t for t in lib if t.get('id') == track_id), None)
+        if not track:
+            return {'ok': False, 'reason': 'not_in_library'}
+
+        # Return cached lyrics (fetched_at present → already tried)
+        if 'lyrics' in track:
+            cached = track['lyrics']
+            return {
+                'ok': bool(cached.get('plain') or cached.get('synced')),
+                'synced': cached.get('synced') or '',
+                'plain': cached.get('plain') or '',
+                'reason': 'not_found' if not (cached.get('plain') or cached.get('synced')) else '',
+            }
+
+        title = (track.get('title') or '').strip()
+        artist = (track.get('artist') or '').strip()
+        duration = track.get('duration') or 0
+
+        params = {'track_name': title}
+        if artist:
+            params['artist_name'] = artist
+        if duration:
+            params['duration'] = int(duration)
+
+        try:
+            resp = requests.get(
+                'https://lrclib.net/api/get',
+                params=params,
+                timeout=10,
+                headers={'User-Agent': 'ProTube Saver/1.0 (https://github.com/cincade/protube-saver)'},
+            )
+            if resp.status_code == 404:
+                cached = {'synced': '', 'plain': '', 'fetched_at': int(time.time())}
+                track['lyrics'] = cached
+                self._store.save()
+                return {'ok': False, 'reason': 'not_found', 'synced': '', 'plain': ''}
+            resp.raise_for_status()
+            data = resp.json()
+            synced = (data.get('syncedLyrics') or '').strip()
+            plain = (data.get('plainLyrics') or '').strip()
+            cached = {'synced': synced, 'plain': plain, 'fetched_at': int(time.time())}
+            track['lyrics'] = cached
+            self._store.save()
+            return {
+                'ok': bool(synced or plain),
+                'synced': synced,
+                'plain': plain,
+                'reason': 'not_found' if not (synced or plain) else '',
+            }
+        except Exception as e:
+            print(f'[ProTube/lyrics] fetch failed for {track_id}: {e}')
+            return {'ok': False, 'reason': 'error', 'synced': '', 'plain': ''}
+
     def add_to_music_library(self, track):
         """Append/replace a track in the music library. Dedup by id (latest wins)."""
         if not track or not track.get('id'):
