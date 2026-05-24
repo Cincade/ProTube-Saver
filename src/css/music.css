@@ -1381,7 +1381,9 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            transition: right 0.28s ease;
         }
+        #music-player-view.panel-open .mp-stage { right: 380px; }
         .mp-backdrop {
             position: absolute; inset: -40px;
             background-size: cover; background-position: center;
@@ -1538,58 +1540,59 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
 
-        /* Bottom panel — absolute-positioned overlay that slides up from below.
-           Stage stays full-viewport; panel covers the bottom ~240px when open. */
+        /* Right side panel — slides in from the right.
+           Closed: translated off-screen.  Open: stage shrinks left (right: 380px)
+           and panel translates back into view.  Width chosen so lyrics + up-next
+           mini-cards read comfortably without dominating album art. */
         .mp-panel {
-            position: absolute; bottom: 0; left: 0; right: 0;
-            /* Sized as % of viewport. Was 30vh (then 240px before that). User
-               feedback 2026-05-16: still too tall. 22vh → ~132px on 600px
-               viewport, ~176px on 800px, ~238px on 1080p. Tight enough to
-               leave the stage breathing room; deep enough to fit the tab
-               row + 5 mini-cards. */
-            height: 22vh;
+            position: absolute; top: 0; right: 0; bottom: 0; left: auto;
+            width: 380px;
             background: rgba(10, 10, 10, 0.92);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
-            padding: 14px 36px 16px;
+            padding: 18px 22px 20px;
             display: flex; flex-direction: column;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            transform: translateY(100%);
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            transform: translateX(100%);
             transition: transform 0.28s ease;
             z-index: 8;
         }
-        #music-player-view.panel-open .mp-panel { transform: translateY(0); }
+        #music-player-view.panel-open .mp-panel { transform: translateX(0); }
 
-        /* Handle pill — floating on z-axis, ALWAYS bottom-center, ALWAYS on top.
-           Does not move when the panel opens; pill sits over the panel via z-index. */
+        /* Right-edge toggle — vertical strip at the right edge of the stage.
+           Closed: at the viewport's right edge, chevron points left (open me).
+           Open: slides with the panel to sit at the panel's left edge,
+           chevron points right (close me). */
         .mp-panel-handle {
             position: absolute;
-            /* Lifted slightly (was 16px) so the pill sits roughly in the row
-               above the side-rail's settings button instead of being flush at
-               the very bottom of the viewport — user-requested nudge upward. */
-            bottom: 52px; left: 50%;
-            transform: translateX(-50%);
+            top: 50%; right: 0;
+            transform: translateY(-50%);
             z-index: 12;
-            display: flex; align-items: center; gap: 8px;
-            padding: 8px 16px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 14px 6px;
             background: rgba(20, 20, 20, 0.85);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 18px;
+            border-right: none;
+            border-radius: 10px 0 0 10px;
             color: #c0c0c0;
             cursor: pointer;
-            font-family: inherit; font-size: 12px; font-weight: 600;
-            max-width: 420px;
-            transition: background 0.12s, color 0.12s;
-            white-space: nowrap;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            transition: background 0.12s, color 0.12s, right 0.28s ease;
+            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
         }
         .mp-panel-handle:hover { background: rgba(30, 30, 30, 0.95); color: #fff; }
-        .mp-handle-chev { width: 13px; height: 13px; transition: transform 0.28s ease; flex-shrink: 0; }
-        .mp-handle-label { color: #8a8a8a; font-weight: 500; }
-        .mp-handle-next { overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
-        #music-player-view.panel-open .mp-handle-chev { transform: rotate(180deg); }
+        .mp-handle-chev {
+            width: 14px; height: 14px;
+            transform: rotate(-90deg); /* points left when closed (open me) */
+            transition: transform 0.28s ease;
+            flex-shrink: 0;
+        }
+        #music-player-view.panel-open .mp-panel-handle { right: 380px; }
+        #music-player-view.panel-open .mp-handle-chev { transform: rotate(90deg); /* points right (close me) */ }
+        /* The "Up next: <title>" peek text only made sense for the bottom drawer;
+           hide it in side mode — the Up Next tab itself shows the queue. */
+        .mp-handle-label, .mp-handle-next { display: none; }
         .mp-tabs {
             display: flex; align-items: baseline; gap: 24px;
             margin-bottom: 14px;
@@ -1605,12 +1608,13 @@
         .mp-tab:hover { color: #ccc; }
         .mp-tab.on { color: #fff; border-bottom-color: #3b82f6; }
         .mp-tab-meta { margin-left: auto; font-size: 12px; color: #6e6e6e; }
-        .mp-tab-body { flex: 1; min-height: 0; overflow: hidden; }
+        .mp-tab-body { flex: 1; min-height: 0; overflow-y: auto; }
 
-        /* Up Next row of mini-cards */
+        /* Up Next — vertical stack in the side panel (was 5-col horizontal grid
+           for the old bottom drawer) */
         .mp-upnext {
-            display: grid; grid-template-columns: repeat(5, 1fr);
-            gap: 12px;
+            display: flex; flex-direction: column;
+            gap: 8px;
         }
         .mp-mini-card {
             display: flex; align-items: center; gap: 11px;
