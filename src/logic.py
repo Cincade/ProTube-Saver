@@ -122,8 +122,23 @@ class API:
             self._downloads, self._music,
         ]
 
+        # pywebview enumerates the api object via inspect.getmembers() to expose
+        # methods to JS.  __getattr__ alone is invisible to that introspection
+        # (it's only invoked on miss, not on enumeration), so every JS call
+        # silently returns undefined.  Bind each service's public methods onto
+        # self so dir(api) + inspect see them as real attributes.  First-owner
+        # wins, matching __getattr__'s precedence.
+        for svc in self._all_services:
+            for name in dir(svc):
+                if name.startswith('_') or name in self.__dict__:
+                    continue
+                attr = getattr(svc, name)
+                if callable(attr):
+                    setattr(self, name, attr)
+
     def __getattr__(self, name):
-        """Delegate any unknown attribute lookup to the first service that owns it."""
+        """Fallback for any attribute not bound during __init__ (e.g. methods
+        added to a service after construction).  Walks _all_services in order."""
         for svc in self.__dict__.get('_all_services', []):
             try:
                 return getattr(svc, name)
