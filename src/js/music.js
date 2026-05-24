@@ -28,6 +28,10 @@
             shuffle: false,
             repeat: 'off',           // 'off' | 'all' | 'one'
             shuffleOrder: [],        // shuffled queue of library IDs (consumed front-to-back)
+            // Section loop. `a` and `b` are seconds; both null = no loop.
+            // `armedA` is the temporary "first point chosen, waiting for end"
+            // state — chip shows "↻ 0:24 → set end…".
+            loop: { a: null, b: null, armedA: null },
         };
 
         function _audioVolumeFromSlider(s) {
@@ -3061,8 +3065,8 @@
                 if (isLast && _musicPlayer.repeat !== 'all' && !_musicPlayer.shuffle) return;
                 _musicGoAdjacent(1);
             });
-            audio.addEventListener('timeupdate', () => { _paintAllProgress(); _paintLyricsProgress(); });
-            audio.addEventListener('loadedmetadata', _paintAllProgress);
+            audio.addEventListener('timeupdate', () => { _enforceLoop(); _paintAllProgress(); _paintLyricsProgress(); });
+            audio.addEventListener('loadedmetadata', () => { _paintAllProgress(); _renderLoopSeekTicks(); });
             audio.addEventListener('error', () => {
                 const e = audio.error;
                 const codes = { 1: 'aborted', 2: 'network', 3: 'decode', 4: 'src not supported' };
@@ -3288,6 +3292,17 @@
                     _musicPlayer.repeat = order[(order.indexOf(_musicPlayer.repeat) + 1) % 3];
                     _paintModeButtons(); _paintMpPanel();
                     try { pywebview.api.set_setting('music_repeat', _musicPlayer.repeat); } catch (_) {}
+                    return;
+                }
+                // Section loop — L marks A then B (toggle), Esc clears.
+                if ((k === 'l' || k === 'L') && !ctrl && !shift) {
+                    e.preventDefault();
+                    _loopMark(null);
+                    return;
+                }
+                if (k === 'Escape' && (_musicPlayer.loop.a !== null || _musicPlayer.loop.armedA !== null)) {
+                    e.preventDefault();
+                    _clearLoop();
                     return;
                 }
                 // Escape — exit fullscreen if in fullscreen, otherwise let other handlers (modals) win.
@@ -3548,6 +3563,14 @@
             // Reset lyrics state so the new track re-fetches
             _mpLyricsState = { trackId: null, lines: [], plain: '' };
             _lyricsActiveLine = -1;
+            // Load loop from the track (if any saved)
+            const loop = track.loop_section;
+            if (loop && typeof loop.a === 'number' && typeof loop.b === 'number') {
+                _musicPlayer.loop = { a: loop.a, b: loop.b, armedA: null };
+            } else {
+                _musicPlayer.loop = { a: null, b: null, armedA: null };
+            }
+            _renderLoopChip();
             _paintMpPanel();
         }
 
@@ -3629,15 +3652,20 @@
                 // side effect — but only fire on simple clicks (no drag).
                 body.querySelectorAll('.mp-lyric-line').forEach(el => {
                     el.addEventListener('click', (e) => {
-                        // If the user is selecting text, don't seek
+                        // If the user is selecting text, don't act
                         const sel = window.getSelection?.();
                         if (sel && sel.toString().length > 0) return;
                         const t = parseFloat(el.getAttribute('data-mp-lyric-time'));
                         if (isNaN(t) || !_musicPlayer.audio) return;
-                        // Subtract the lead so when the line is sung the
-                        // highlight matches; the user clicked the line they
-                        // wanted to *hear*, not the line they wanted to read
-                        // ahead of
+                        // Shift+click marks a loop bound at this line instead
+                        // of seeking. First Shift+click = start; second =
+                        // end; third (after a complete loop) restarts.
+                        if (e.shiftKey) {
+                            _loopMark(t);
+                            return;
+                        }
+                        // Plain click — seek. Subtract lead + per-track offset
+                        // so the line plays from the start of being sung.
                         const trackOffset = _musicPlayer.currentTrack?.lyrics_offset || 0;
                         _musicPlayer.audio.currentTime = Math.max(0, t - LYRICS_LEAD_SECONDS - trackOffset);
                         if (_musicPlayer.audio.paused) _musicPlayer.audio.play().catch(() => {});
@@ -3645,7 +3673,8 @@
                 });
                 if (meta) _renderLyricsSyncMeta(meta);
                 _lyricsActiveLine = -1;
-                _paintLyricsProgress(); // immediately highlight the right line
+                _applyLoopBandToLyrics();    // paint any active loop band
+                _paintLyricsProgress();      // immediately highlight the right line
             } else if (plain) {
                 // Plain text fallback
                 body.innerHTML = `<div class="mp-lyrics-plain">${plain.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
@@ -3727,6 +3756,9 @@
             });
             const handle = document.getElementById('mp-panel-handle');
             if (handle) handle.addEventListener('click', () => _setMpPanelOpen(!_mpPanelOpen, true));
+            // Loop-chip ✕ — clear the active loop
+            const loopClear = document.getElementById('mp-loop-clear');
+            if (loopClear) loopClear.addEventListener('click', () => _clearLoop());
             // Restore prior open/closed preference. Default: collapsed.
             try {
                 pywebview.api.get_setting('music_panel_open').then(v => {
@@ -3734,6 +3766,113 @@
                 }).catch(() => _setMpPanelOpen(false, false));
             } catch (_) { _setMpPanelOpen(false, false); }
             _paintMpPanel();
+        }
+
+        // ─── Section loop ───────────────────────────────────────────────────
+        function _fmtTime(s) {
+            s = Math.max(0, Math.floor(s || 0));
+            return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+        }
+
+        function _renderLoopChip() {
+            const chip = document.getElementById('mp-loop-chip');
+            const text = document.getElementById('mp-loop-text');
+            if (!chip || !text) return;
+            const { a, b, armedA } = _musicPlayer.loop;
+            if (a !== null && b !== null) {
+                text.textContent = `${_fmtTime(a)} → ${_fmtTime(b)}`;
+                chip.hidden = false;
+            } else if (armedA !== null) {
+                text.textContent = `${_fmtTime(armedA)} → set end…`;
+                chip.hidden = false;
+            } else {
+                chip.hidden = true;
+            }
+            _renderLoopSeekTicks();
+            _applyLoopBandToLyrics();
+        }
+
+        function _renderLoopSeekTicks() {
+            const seek = document.getElementById('mp-seek');
+            if (!seek) return;
+            // Wipe old ticks
+            seek.querySelectorAll('.mp-seek-tick').forEach(el => el.remove());
+            const { a, b } = _musicPlayer.loop;
+            const dur = _musicPlayer.audio?.duration || _musicPlayer.currentTrack?.duration_seconds || 0;
+            if (a === null || b === null || !dur) return;
+            for (const t of [a, b]) {
+                const pct = Math.max(0, Math.min(100, (t / dur) * 100));
+                const tick = document.createElement('div');
+                tick.className = 'mp-seek-tick';
+                tick.style.left = pct + '%';
+                seek.appendChild(tick);
+            }
+        }
+
+        function _applyLoopBandToLyrics() {
+            const { a, b } = _musicPlayer.loop;
+            const els = document.querySelectorAll('#mp-tab-body .mp-lyric-line');
+            els.forEach(el => {
+                const t = parseFloat(el.getAttribute('data-mp-lyric-time'));
+                const inLoop = (a !== null && b !== null && !isNaN(t) && t >= a && t < b);
+                el.classList.toggle('in-loop', inLoop);
+            });
+        }
+
+        // Stamp a loop bound — `which` is 'auto' (figure out from state) or
+        // explicitly 'a' / 'b'. Pass null `at` to use audio.currentTime.
+        function _loopMark(at) {
+            const time = (at !== null && at !== undefined)
+                ? at
+                : (_musicPlayer.audio?.currentTime || 0);
+            const loop = _musicPlayer.loop;
+            if (loop.a !== null && loop.b !== null) {
+                // Already have a complete loop — replace, start over at A
+                loop.a = null; loop.b = null;
+                loop.armedA = time;
+            } else if (loop.armedA === null) {
+                // No A yet — set it
+                loop.armedA = time;
+            } else {
+                // A is armed — this is B. Commit, auto-swap if needed.
+                let a = loop.armedA, b = time;
+                if (a > b) [a, b] = [b, a];
+                if (Math.abs(b - a) < 0.4) {
+                    // Reject super-tight loops (likely accidental double-click)
+                    return;
+                }
+                loop.a = a; loop.b = b; loop.armedA = null;
+                _persistLoop();
+            }
+            _renderLoopChip();
+        }
+
+        function _clearLoop() {
+            _musicPlayer.loop = { a: null, b: null, armedA: null };
+            _renderLoopChip();
+            _persistLoop();
+        }
+
+        function _persistLoop() {
+            const cur = _musicPlayer.currentTrack;
+            if (!cur) return;
+            const { a, b } = _musicPlayer.loop;
+            // Mirror onto track + library entries so it survives a player reload
+            cur.loop_section = (a !== null && b !== null) ? { a, b } : undefined;
+            const lib = _musicState.library || [];
+            const t = lib.find(x => x.id === cur.id);
+            if (t) t.loop_section = cur.loop_section;
+            try { pywebview.api.set_loop_section(cur.id, a, b); } catch (_) {}
+        }
+
+        // Called from the audio timeupdate listener. Enforces the loop.
+        function _enforceLoop() {
+            const { a, b } = _musicPlayer.loop;
+            const audio = _musicPlayer.audio;
+            if (a === null || b === null || !audio) return;
+            if (audio.currentTime >= b) {
+                audio.currentTime = a;
+            }
         }
 
         // Predict the next N tracks that will actually play, honoring the

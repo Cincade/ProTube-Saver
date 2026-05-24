@@ -640,6 +640,18 @@
                         <div class="mp-title" id="mp-title">No track playing</div>
                         <div class="mp-artist" id="mp-artist"></div>
                         <div class="mp-album" id="mp-album"></div>
+                        <!-- Section-loop chip — only visible when a loop is set
+                             (or armed waiting for B). Click ✕ to clear. -->
+                        <div class="mp-loop-chip" id="mp-loop-chip" hidden>
+                            <svg class="mp-loop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="17 1 21 5 17 9"/>
+                                <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                                <polyline points="7 23 3 19 7 15"/>
+                                <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                            </svg>
+                            <span class="mp-loop-text" id="mp-loop-text">—</span>
+                            <button class="mp-loop-clear" id="mp-loop-clear" type="button" title="Clear loop (Esc)" aria-label="Clear loop">✕</button>
+                        </div>
                         <div class="mp-progress-row">
                             <span class="mp-time" id="mp-cur">0:00</span>
                             <div class="mp-seek" id="mp-seek">

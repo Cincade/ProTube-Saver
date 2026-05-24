@@ -7,10 +7,10 @@ self._store.set()/self._send_to_js()/self._import_svc._find_ffmpeg_exe() resolve
 
 import os
 import re
-import json
-import shutil
+import sys
 import threading
 import time
+import traceback
 import subprocess
 
 import requests
@@ -1806,6 +1806,30 @@ class MusicMixin(Service):
             'plain': plain,
             'reason': '' if (synced or plain) else 'not_found',
         }
+
+    def set_loop_section(self, track_id, a_seconds, b_seconds):
+        """Persist a per-track A→B loop. Pass None/0 for both to clear.
+        Auto-swaps if a > b so the stored values always have a < b."""
+        if not track_id:
+            return {'ok': False}
+        try:
+            a = float(a_seconds) if a_seconds is not None else None
+            b = float(b_seconds) if b_seconds is not None else None
+        except (TypeError, ValueError):
+            a = b = None
+        lib = self.settings.get('music_library', []) or []
+        for t in lib:
+            if t.get('id') == track_id:
+                if a is None or b is None or (a == 0 and b == 0):
+                    t.pop('loop_section', None)
+                    self._store.save()
+                    return {'ok': True, 'a': None, 'b': None}
+                if a > b:
+                    a, b = b, a
+                t['loop_section'] = {'a': a, 'b': b}
+                self._store.save()
+                return {'ok': True, 'a': a, 'b': b}
+        return {'ok': False}
 
     def set_lyrics_offset(self, track_id, offset_seconds):
         """Persist a per-track lyrics sync offset in seconds.
