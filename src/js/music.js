@@ -3571,11 +3571,20 @@
             return out.sort((a, b) => a.time - b.time);
         }
 
+        // Lookahead so the active line lights up slightly before it's sung —
+        // matches Apple Music / Spotify behavior. lrclib's timestamps mark when
+        // a line STARTS being sung; without a lead, the highlight feels late
+        // because the user is just starting to focus on the line as the vocal
+        // is already mid-syllable. 0.35s is the sweet spot in testing — early
+        // enough to read into the line, late enough that it's not "ahead" of
+        // the song.
+        const LYRICS_LEAD_SECONDS = 0.35;
+
         function _paintLyricsProgress() {
             if (_mpPanelTab !== 'lyrics') return;
             const lines = _mpLyricsState.lines;
             if (!lines.length) return;
-            const t = _musicPlayer.audio?.currentTime || 0;
+            const t = (_musicPlayer.audio?.currentTime || 0) + LYRICS_LEAD_SECONDS;
             let active = 0;
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].time <= t) active = i; else break;

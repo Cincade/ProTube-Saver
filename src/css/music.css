@@ -1418,6 +1418,17 @@
             display: flex; flex-direction: column; align-items: center;
             padding: 18px 32px;
             max-width: 880px; width: 100%;
+            /* Slide left when panel opens so the hero composition stays visually
+               centered in the remaining (non-panel) area. Transform-only (no
+               margin/width changes) so it's GPU-accelerated and matches the
+               panel's slide curve — same fix family as the fullscreen rule
+               about not animating layout properties. */
+            transform: translateX(0);
+            transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: transform;
+        }
+        #music-player-view.panel-open .mp-col {
+            transform: translateX(-190px); /* half the 380px panel width */
         }
         /* Art scales with viewport height — was a fixed 240px which left huge
            empty space on tall windows. clamp(240, 34vh, 380) gives 240px floor
