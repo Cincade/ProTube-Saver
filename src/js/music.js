@@ -3591,12 +3591,23 @@
             }
             if (active === _lyricsActiveLine) return;
             _lyricsActiveLine = active;
-            const els = document.querySelectorAll('#mp-tab-body .mp-lyric-line');
+            const body = document.getElementById('mp-tab-body');
+            const els = body ? body.querySelectorAll('.mp-lyric-line') : [];
             els.forEach((el, i) => {
                 el.classList.toggle('active', i === active);
                 el.classList.toggle('near', Math.abs(i - active) === 1);
             });
-            if (els[active]) els[active].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Manual scroll on the panel's container directly — was using
+            // scrollIntoView, but that walks up the DOM to find the "nearest
+            // scrollable ancestor" and its smooth-scroll animation could
+            // propagate into the cockpit grid, shifting the hero composition
+            // every time a line changed. scrollTo on the known container is
+            // unambiguous: it scrolls THIS box, period.
+            const target = els[active];
+            if (body && target) {
+                const offset = target.offsetTop - body.clientHeight / 2 + target.offsetHeight / 2;
+                body.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+            }
         }
 
         function _renderLyrics(body, meta) {
