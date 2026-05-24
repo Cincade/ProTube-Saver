@@ -1438,8 +1438,16 @@
         .mp-art img[src=""] { display: none; }
         .mp-title {
             font-size: 32px; font-weight: 700; letter-spacing: -0.02em;
-            color: #fff; line-height: 1.1; text-align: center;
-            max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            color: #fff; line-height: 1.15; text-align: center;
+            max-width: 100%;
+            /* Wrap to up to 2 lines instead of cutting with "..." which read
+               as a content-rendering failure on long titles like
+               "UNRAVEL (FULL version - Tokyo Ghoul OP) - English opening...". */
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-top: 4px;
         }
         .mp-artist { font-size: 16px; color: #e0e0e0; margin-top: 6px; font-weight: 500; }
         .mp-album { font-size: 12.5px; color: #8a8a8a; margin-top: 4px; }
@@ -1540,52 +1548,60 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
 
-        /* Right side panel — slides in from the right.
-           Closed: translated off-screen.  Open: stage shrinks left (right: 380px)
-           and panel translates back into view.  Width chosen so lyrics + up-next
-           mini-cards read comfortably without dominating album art. */
+        /* Right side panel — glassy translucent strip on the right.
+           The album-art backdrop (.mp-backdrop) lives at player-view level and
+           extends behind the panel; heavy blur + low-opacity bg here lets it
+           bleed through for visual continuity with the stage. */
         .mp-panel {
             position: absolute; top: 0; right: 0; bottom: 0; left: auto;
             width: 380px;
-            background: rgba(10, 10, 10, 0.92);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            padding: 18px 22px 20px;
+            background: linear-gradient(90deg,
+                rgba(10, 10, 10, 0.50) 0%,
+                rgba(10, 10, 10, 0.78) 50%,
+                rgba(10, 10, 10, 0.88) 100%);
+            backdrop-filter: blur(40px) saturate(1.6);
+            -webkit-backdrop-filter: blur(40px) saturate(1.6);
+            padding: 26px 26px 24px;
             display: flex; flex-direction: column;
-            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            /* No hard border — a soft inset highlight + outer shadow does the
+               separation more elegantly */
+            box-shadow:
+                inset 1px 0 0 rgba(255, 255, 255, 0.04),
+                -24px 0 60px rgba(0, 0, 0, 0.5);
             transform: translateX(100%);
-            transition: transform 0.28s ease;
+            transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 8;
         }
         #music-player-view.panel-open .mp-panel { transform: translateX(0); }
+        /* Match the panel slide with a matching ease curve on the stage shrink */
+        .mp-stage { transition: right 0.36s cubic-bezier(0.16, 1, 0.3, 1); }
 
-        /* Right-edge toggle — vertical strip at the right edge of the stage.
-           Closed: at the viewport's right edge, chevron points left (open me).
-           Open: slides with the panel to sit at the panel's left edge,
-           chevron points right (close me). */
+        /* Right-edge toggle — minimal vertical hint, fades in on hover.
+           Visible-but-subtle when closed; sits at the panel seam when open. */
         .mp-panel-handle {
             position: absolute;
             top: 50%; right: 0;
             transform: translateY(-50%);
             z-index: 12;
             display: flex; align-items: center; justify-content: center;
-            padding: 14px 6px;
-            background: rgba(20, 20, 20, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-right: none;
-            border-radius: 10px 0 0 10px;
-            color: #c0c0c0;
+            width: 22px; height: 64px;
+            padding: 0;
+            background: rgba(255, 255, 255, 0.04);
+            border: none;
+            border-radius: 8px 0 0 8px;
+            color: rgba(255, 255, 255, 0.55);
             cursor: pointer;
-            transition: background 0.12s, color 0.12s, right 0.28s ease;
-            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
+            transition: background 0.18s, color 0.18s, right 0.36s cubic-bezier(0.16, 1, 0.3, 1), width 0.18s;
         }
-        .mp-panel-handle:hover { background: rgba(30, 30, 30, 0.95); color: #fff; }
+        .mp-panel-handle:hover {
+            background: rgba(255, 255, 255, 0.10);
+            color: #fff;
+            width: 28px;
+        }
         .mp-handle-chev {
-            width: 14px; height: 14px;
+            width: 16px; height: 16px;
             transform: rotate(-90deg); /* points left when closed (open me) */
-            transition: transform 0.28s ease;
+            transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
             flex-shrink: 0;
         }
         #music-player-view.panel-open .mp-panel-handle { right: 380px; }
@@ -1594,20 +1610,29 @@
            hide it in side mode — the Up Next tab itself shows the queue. */
         .mp-handle-label, .mp-handle-next { display: none; }
         .mp-tabs {
-            display: flex; align-items: baseline; gap: 24px;
-            margin-bottom: 14px;
+            display: flex; align-items: center; gap: 4px;
+            margin-bottom: 18px;
             flex-shrink: 0;
         }
         .mp-tab {
-            background: transparent; border: none; padding: 6px 0;
-            font-family: inherit; font-size: 13px; font-weight: 600;
-            color: #8a8a8a; cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: color 0.12s, border-color 0.12s;
+            background: transparent; border: none;
+            padding: 7px 14px;
+            font-family: inherit; font-size: 12.5px; font-weight: 600;
+            color: rgba(255, 255, 255, 0.55); cursor: pointer;
+            border-radius: 999px;
+            transition: color 0.15s, background 0.15s;
         }
-        .mp-tab:hover { color: #ccc; }
-        .mp-tab.on { color: #fff; border-bottom-color: #3b82f6; }
-        .mp-tab-meta { margin-left: auto; font-size: 12px; color: #6e6e6e; }
+        .mp-tab:hover { color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.04); }
+        .mp-tab.on {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.10);
+        }
+        .mp-tab-meta {
+            margin-left: auto;
+            font-size: 10.5px; font-weight: 600;
+            color: rgba(255, 255, 255, 0.45);
+            text-transform: uppercase; letter-spacing: 0.08em;
+        }
         .mp-tab-body { flex: 1; min-height: 0; overflow-y: auto; }
 
         /* Up Next — vertical stack in the side panel (was 5-col horizontal grid
@@ -1637,30 +1662,47 @@
             padding: 28px 0; text-align: center; color: #6e6e6e; font-size: 13px;
         }
 
-        /* Lyrics panel */
-        .mp-lyrics-loading { padding: 28px 0; text-align: center; color: #6e6e6e; font-size: 13px; }
+        /* Lyrics panel — Apple-Music-ish dramatic active line + hidden scrollbar */
+        .mp-lyrics-loading {
+            padding: 36px 0; text-align: center;
+            color: rgba(255, 255, 255, 0.45); font-size: 13px;
+        }
         .mp-lyrics-scroll {
-            height: 100%; overflow-y: auto; padding: 12px 0 40px;
-            scrollbar-width: thin; scrollbar-color: #333 transparent;
+            height: 100%; overflow-y: auto;
+            padding: 8px 0 60px;
+            scrollbar-width: none;
+            mask-image: linear-gradient(to bottom,
+                transparent 0%, black 6%, black 92%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom,
+                transparent 0%, black 6%, black 92%, transparent 100%);
         }
-        .mp-lyrics-scroll::-webkit-scrollbar { width: 4px; }
-        .mp-lyrics-scroll::-webkit-scrollbar-track { background: transparent; }
-        .mp-lyrics-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .mp-lyrics-scroll::-webkit-scrollbar { display: none; }
         .mp-lyric-line {
-            padding: 5px 16px; font-size: 14px; line-height: 1.6;
-            color: #5a5a5a; cursor: default; transition: color 0.25s, font-size 0.25s;
+            padding: 9px 4px;
+            font-size: 18px; line-height: 1.35;
+            font-weight: 700; letter-spacing: -0.01em;
+            color: rgba(255, 255, 255, 0.28);
+            cursor: default;
+            transition: color 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s;
             white-space: pre-wrap; word-break: break-word;
+            transform-origin: left center;
         }
+        .mp-lyric-line.near { color: rgba(255, 255, 255, 0.50); }
         .mp-lyric-line.active {
-            color: #f0f0f0; font-size: 15.5px; font-weight: 600;
-        }
-        .mp-lyric-line.near {
-            color: #aaa;
+            color: #fff;
+            transform: scale(1.06);
+            text-shadow: 0 0 24px rgba(255, 255, 255, 0.18);
         }
         .mp-lyrics-plain {
-            padding: 8px 16px 40px; font-size: 13.5px; line-height: 1.9;
-            color: #bbb; white-space: pre-wrap; word-break: break-word;
+            padding: 8px 4px 40px;
+            font-size: 15px; line-height: 1.85;
+            color: rgba(255, 255, 255, 0.72);
+            white-space: pre-wrap; word-break: break-word;
         }
+        /* Hide scrollbars on the Up Next / Related tab bodies too — they
+           shouldn't be a visible UI element in the side panel */
+        .mp-tab-body { scrollbar-width: none; }
+        .mp-tab-body::-webkit-scrollbar { display: none; }
 
         /* ================================================== */
         /* MUSIC DOCK — persistent mini-player                  */

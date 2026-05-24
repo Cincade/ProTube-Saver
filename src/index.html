@@ -622,9 +622,14 @@
                  with inline right-aligned volume) on top, flat bottom panel with
                  Up Next / Lyrics / Related tabs. -->
             <div id="music-player-view" class="view-pane">
+                <!-- Album-art blurred backdrop — lives at the player-view level
+                     so it extends behind the side panel too (was clipped inside
+                     .mp-stage which has overflow:hidden). The panel's glassy
+                     translucent background lets it bleed through for visual
+                     continuity. -->
+                <div class="mp-backdrop" id="mp-backdrop"></div>
+                <div class="mp-scrim"></div>
                 <div class="mp-stage">
-                    <div class="mp-backdrop" id="mp-backdrop"></div>
-                    <div class="mp-scrim"></div>
                     <button class="mp-back" id="mp-back" title="Close player" aria-label="Close player">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
