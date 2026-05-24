@@ -1634,11 +1634,87 @@ class MusicMixin(Service):
         except Exception:
             pass
 
+    # Patterns used to strip YouTube cruft from titles before lrclib lookup.
+    # lrclib indexes clean titles ("Unravel"), not the full YouTube form
+    # ("UNRAVEL (FULL version - Tokyo Ghoul OP) - English opening cover by ...").
+    _LYRICS_CRUFT_WORDS = (
+        r'official|video|audio|lyric|lyrics|hd|hq|4k|mv|m/v|'
+        r'live|remix|cover|version|ver\.?|full|ost|opening|ending|'
+        r'english|japanese|korean|spanish|french|extended|edit|radio'
+    )
+
+    def _clean_title_for_lyrics(self, title):
+        if not title:
+            return ''
+        t = title
+        cruft = self._LYRICS_CRUFT_WORDS
+        t = re.sub(rf'\s*[\(\[][^)\]]*\b({cruft})\b[^)\]]*[\)\]]', '', t, flags=re.IGNORECASE)
+        t = re.sub(r'\s*\b(feat|ft|featuring)\.?\s+.+$', '', t, flags=re.IGNORECASE)
+        t = re.sub(
+            r'\s*-\s*(english|japanese|korean|spanish|french)\s+(cover|version|opening|ending|dub|sub)\b.*$',
+            '', t, flags=re.IGNORECASE,
+        )
+        t = re.sub(r'\s*-\s*cover by\b.*$', '', t, flags=re.IGNORECASE)
+        t = re.sub(r'\s+', ' ', t).strip(' -|.').strip()
+        return t or title
+
+    def _lrclib_lookup(self, title, artist, duration):
+        """3-strategy lyrics lookup. Returns (synced, plain) or ('', '')."""
+        headers = {'User-Agent': 'ProTube Saver/1.0'}
+
+        def _try_get(track_name, artist_name, dur):
+            try:
+                params = {'track_name': track_name}
+                if artist_name:
+                    params['artist_name'] = artist_name
+                if dur:
+                    params['duration'] = int(dur)
+                r = requests.get('https://lrclib.net/api/get', params=params,
+                                 headers=headers, timeout=10)
+                if r.ok:
+                    d = r.json()
+                    return (d.get('syncedLyrics') or '').strip(), (d.get('plainLyrics') or '').strip()
+            except Exception as e:
+                print(f'[ProTube/lyrics] GET error: {e}')
+            return '', ''
+
+        # 1. Raw title (lrclib is often forgiving)
+        s, p = _try_get(title, artist, duration)
+        if s or p:
+            return s, p
+
+        # 2. Cleaned title
+        clean = self._clean_title_for_lyrics(title)
+        if clean and clean.lower() != (title or '').lower():
+            s, p = _try_get(clean, artist, duration)
+            if s or p:
+                return s, p
+
+        # 3. Fuzzy search, pick by smallest duration delta
+        try:
+            q = f'{clean} {artist}'.strip() if clean else (title or '')
+            if q:
+                r = requests.get('https://lrclib.net/api/search',
+                                 params={'q': q}, headers=headers, timeout=10)
+                if r.ok:
+                    results = r.json() or []
+                    results.sort(key=lambda e: abs((e.get('duration') or 0) - (duration or 0)))
+                    for entry in results[:5]:
+                        s = (entry.get('syncedLyrics') or '').strip()
+                        p = (entry.get('plainLyrics') or '').strip()
+                        if s or p:
+                            return s, p
+        except Exception as e:
+            print(f'[ProTube/lyrics] SEARCH error: {e}')
+
+        return '', ''
+
     def get_lyrics(self, track_id):
         """Fetch lyrics for a music library track from lrclib.net.
 
-        Returns cached result on repeat calls. Stores { synced, plain, fetched_at }
-        on the track entry so subsequent calls are instant.
+        Caches {synced, plain, fetched_at} on the track entry. Empty cached
+        results auto-retry after 5 minutes — covers tracks looked up before
+        the title-cleaning + search-fallback existed.
         """
         if not track_id:
             return {'ok': False, 'reason': 'no_id'}
@@ -1648,54 +1724,34 @@ class MusicMixin(Service):
         if not track:
             return {'ok': False, 'reason': 'not_in_library'}
 
-        # Return cached lyrics (fetched_at present → already tried)
         if 'lyrics' in track:
             cached = track['lyrics']
-            return {
-                'ok': bool(cached.get('plain') or cached.get('synced')),
-                'synced': cached.get('synced') or '',
-                'plain': cached.get('plain') or '',
-                'reason': 'not_found' if not (cached.get('plain') or cached.get('synced')) else '',
-            }
+            has_content = bool(cached.get('plain') or cached.get('synced'))
+            if has_content:
+                return {
+                    'ok': True,
+                    'synced': cached.get('synced') or '',
+                    'plain': cached.get('plain') or '',
+                    'reason': '',
+                }
+            stale_seconds = time.time() - (cached.get('fetched_at') or 0)
+            if stale_seconds < 300:
+                return {'ok': False, 'reason': 'not_found', 'synced': '', 'plain': ''}
+            # Old empty cache — fall through and retry with the new strategies
 
         title = (track.get('title') or '').strip()
         artist = (track.get('artist') or '').strip()
-        duration = track.get('duration') or 0
+        duration = track.get('duration') or track.get('duration_seconds') or 0
 
-        params = {'track_name': title}
-        if artist:
-            params['artist_name'] = artist
-        if duration:
-            params['duration'] = int(duration)
-
-        try:
-            resp = requests.get(
-                'https://lrclib.net/api/get',
-                params=params,
-                timeout=10,
-                headers={'User-Agent': 'ProTube Saver/1.0 (https://github.com/cincade/protube-saver)'},
-            )
-            if resp.status_code == 404:
-                cached = {'synced': '', 'plain': '', 'fetched_at': int(time.time())}
-                track['lyrics'] = cached
-                self._store.save()
-                return {'ok': False, 'reason': 'not_found', 'synced': '', 'plain': ''}
-            resp.raise_for_status()
-            data = resp.json()
-            synced = (data.get('syncedLyrics') or '').strip()
-            plain = (data.get('plainLyrics') or '').strip()
-            cached = {'synced': synced, 'plain': plain, 'fetched_at': int(time.time())}
-            track['lyrics'] = cached
-            self._store.save()
-            return {
-                'ok': bool(synced or plain),
-                'synced': synced,
-                'plain': plain,
-                'reason': 'not_found' if not (synced or plain) else '',
-            }
-        except Exception as e:
-            print(f'[ProTube/lyrics] fetch failed for {track_id}: {e}')
-            return {'ok': False, 'reason': 'error', 'synced': '', 'plain': ''}
+        synced, plain = self._lrclib_lookup(title, artist, duration)
+        track['lyrics'] = {'synced': synced, 'plain': plain, 'fetched_at': int(time.time())}
+        self._store.save()
+        return {
+            'ok': bool(synced or plain),
+            'synced': synced,
+            'plain': plain,
+            'reason': '' if (synced or plain) else 'not_found',
+        }
 
     def set_lyrics_offset(self, track_id, offset_seconds):
         """Persist a per-track lyrics sync offset in seconds.

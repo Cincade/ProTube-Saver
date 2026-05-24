@@ -3717,6 +3717,51 @@
             _paintMpPanel();
         }
 
+        // Predict the next N tracks that will actually play, honoring the
+        // current shuffle + repeat state. Used by the Up Next tab so the
+        // preview matches what _musicGoAdjacent(1) will end up playing.
+        // Important: this is a PREDICTION — it doesn't mutate shuffleOrder.
+        function _computeUpNext(count) {
+            const cur = _musicPlayer.currentTrack;
+            const lib = _musicState.library || [];
+            if (!cur || !lib.length) return [];
+            if (_musicPlayer.repeat === 'one') return [];  // caller handles this case
+
+            if (_musicPlayer.shuffle) {
+                // Honor whatever's left in the rolling bag; if it's running
+                // low, append a deterministic library-order tail so the user
+                // sees something past the bag boundary. (Actual refill will
+                // re-shuffle when it happens; this is just a preview.)
+                let bag = _musicPlayer.shuffleOrder.slice();
+                if (bag.length < count) {
+                    const inBag = new Set(bag);
+                    inBag.add(cur.id);
+                    for (const t of lib) {
+                        if (!inBag.has(t.id)) bag.push(t.id);
+                        if (bag.length >= count) break;
+                    }
+                }
+                return bag.slice(0, count)
+                    .map(id => lib.find(t => t.id === id))
+                    .filter(Boolean);
+            }
+
+            // Linear order
+            const i = lib.findIndex(t => t.id === cur.id);
+            if (i < 0) return [];
+            const queue = [];
+            for (let k = 1; k <= count; k++) {
+                const raw = i + k;
+                if (raw >= lib.length) {
+                    if (_musicPlayer.repeat !== 'all') break;
+                    queue.push(lib[raw % lib.length]);
+                } else {
+                    queue.push(lib[raw]);
+                }
+            }
+            return queue;
+        }
+
         // Compute + write the "Up next: <title>" peek shown on the handle pill.
         function _paintMpHandleText() {
             const el = document.getElementById('mp-handle-next');
@@ -3748,15 +3793,17 @@
                     if (meta) meta.textContent = '';
                     return;
                 }
-                let queue = [];
-                if (_musicPlayer.shuffle && _musicPlayer.shuffleOrder.length) {
-                    queue = _musicPlayer.shuffleOrder.slice(0, 5).map(id => lib.find(t => t.id === id)).filter(Boolean);
-                } else {
-                    const i = lib.findIndex(t => t.id === cur.id);
-                    for (let k = 1; k <= 5; k++) {
-                        const t = lib[(i + k) % lib.length];
-                        if (t && t.id !== cur.id) queue.push(t);
-                    }
+                // Repeat-one: same track keeps playing, no queue to show.
+                if (_musicPlayer.repeat === 'one') {
+                    body.innerHTML = '<div class="mp-upnext-empty">Repeating this song.</div>';
+                    if (meta) meta.textContent = 'REPEAT ONE';
+                    return;
+                }
+                const queue = _computeUpNext(8);
+                if (!queue.length) {
+                    body.innerHTML = '<div class="mp-upnext-empty">End of library — turn on repeat to keep going.</div>';
+                    if (meta) meta.textContent = '';
+                    return;
                 }
                 body.innerHTML = '<div class="mp-upnext">' + queue.map(t => {
                     const tAttrs = _musicThumbAttrs(t.thumbnail);
@@ -3776,7 +3823,12 @@
                     </div>`;
                 }).join('') + '</div>';
                 _resolveMusicThumbMarkers();
-                if (meta) meta.textContent = `${queue.length} up next${_musicPlayer.shuffle ? ' · shuffle' : ''}${_musicPlayer.repeat !== 'off' ? ' · repeat ' + _musicPlayer.repeat : ''}`;
+                if (meta) {
+                    const tags = [];
+                    if (_musicPlayer.shuffle) tags.push('SHUFFLE');
+                    if (_musicPlayer.repeat === 'all') tags.push('REPEAT');
+                    meta.textContent = tags.join(' · ');
+                }
                 body.querySelectorAll('.mp-mini-card').forEach(card => {
                     card.addEventListener('click', () => {
                         const id = card.getAttribute('data-mp-next-id');
