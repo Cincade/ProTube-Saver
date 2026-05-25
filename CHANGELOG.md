@@ -18,6 +18,15 @@ Release cadence: ~monthly, plus same-day hotfixes for crashes / data loss /
 
 ---
 
+## v1.5.0 — 2026-05-25
+
+- Adds: **Lyrics for your music.** Open the Lyrics tab in the music player to see synced, line-by-line lyrics that highlight as the song plays (with a plain-text fallback when timed lyrics aren't available). Lyrics are fetched automatically the first time you open a track and cached after that, so they work offline. Click any line to jump straight to that point in the song.
+- Adds: **Loop a section of any song.** Hit the new A-B button in the player to mark a start and end point, then drag the two handles on the progress bar to fine-tune — the section repeats until you clear it. Perfect for practising an instrument, learning lyrics, or studying a language. Loops are saved per song, so they're still there next time you play.
+- Adds: **Per-song lyrics sync nudge.** If the highlight runs a little ahead or behind on a particular track, use the − / + control to nudge the timing; the adjustment is remembered for that song.
+- Changes: **The Up Next / Lyrics panel now lives on the right side** of the music player instead of the bottom, with the album art tinting through the glass. Up Next is also more accurate now — it correctly reflects shuffle, repeat, and the end of your library.
+
+---
+
 ## v1.4.5 — 2026-05-21
 
 - Adds: **Browse a creator's channel from search without saving it.** Click a creator's name or avatar on any search result to open a read-only preview of their channel — banner, video grid, view counts and publish dates — so you can judge whether it's worth following. Download individual videos straight from the preview, or hit "Subscribe to save" to keep the channel in your queue.

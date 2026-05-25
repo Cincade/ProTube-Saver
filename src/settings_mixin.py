@@ -4,7 +4,7 @@ from ydl_utils import YoutubeDL
 from service_base import Service
 
 # Canonical version string — bump here when shipping a build.
-__version__ = '1.4.5'
+__version__ = '1.5.0'
 
 # Update manifest URLs — where check_for_updates() looks for new releases.
 LANDING_VERSION_URL_DEFAULT = 'https://protubesaver.netlify.app/version.json'

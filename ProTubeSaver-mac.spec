@@ -99,8 +99,8 @@ app = BUNDLE(
     icon='assets/icon.icns',
     bundle_identifier='com.cincade.protubesaver',
     info_plist={
-        'CFBundleShortVersionString': '1.4.5',
-        'CFBundleVersion': '1.4.5',
+        'CFBundleShortVersionString': '1.5.0',
+        'CFBundleVersion': '1.5.0',
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '11.0',
         'NSHumanReadableCopyright': 'Copyright (c) Cincade',
