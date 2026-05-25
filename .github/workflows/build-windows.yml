@@ -16,6 +16,11 @@ on:
     tags:
       - 'v*'
 
+# The default GITHUB_TOKEN is read-only for contents; creating/attaching to a
+# Release needs write. Without this the "Attach to GitHub Release" step 403s.
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
