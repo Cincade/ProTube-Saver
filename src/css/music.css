@@ -1515,6 +1515,42 @@
             pointer-events: none;
             box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
         }
+
+        /* Loop region overlay on the seek bar — a shaded band between A and B
+           with two draggable handles. left/width set inline by JS. */
+        .mp-loop-region {
+            position: absolute;
+            top: 50%; transform: translateY(-50%);
+            height: 7px;
+            background: rgba(59, 130, 246, 0.35);
+            border-radius: 2px;
+            pointer-events: none;   /* band itself doesn't grab; handles do */
+            z-index: 2;
+        }
+        .mp-loop-region[hidden] { display: none; }
+        .mp-loop-handle {
+            position: absolute;
+            top: 50%;
+            width: 12px; height: 18px;
+            background: #fff;
+            border: 2px solid #3b82f6;
+            border-radius: 4px;
+            cursor: ew-resize;
+            pointer-events: auto;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            touch-action: none;
+            z-index: 3;
+        }
+        .mp-loop-handle.a { transform: translate(-50%, -50%); left: 0; }
+        .mp-loop-handle.b { transform: translate(-50%, -50%); left: 100%; }
+        .mp-loop-handle:hover,
+        .mp-loop-handle.dragging { background: #3b82f6; }
+        /* Active loop button — blue like shuffle/repeat active */
+        #mp-loop-toggle.mp-mode-active { color: #3b82f6; position: relative; }
+        #mp-loop-toggle.mp-mode-active::after {
+            content: ""; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 4px; border-radius: 50%; background: #3b82f6;
+        }
         .mp-progress-row { display: flex; align-items: center; gap: 12px; width: 580px; max-width: 100%; margin-top: 18px; }
         .mp-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0a0; min-width: 38px; text-align: center; }
         /* Hit area is bigger than the visible bar so it's easy to grab */

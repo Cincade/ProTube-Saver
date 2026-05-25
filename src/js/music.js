@@ -3066,7 +3066,7 @@
                 _musicGoAdjacent(1);
             });
             audio.addEventListener('timeupdate', () => { _enforceLoop(); _paintAllProgress(); _paintLyricsProgress(); });
-            audio.addEventListener('loadedmetadata', () => { _paintAllProgress(); _renderLoopSeekTicks(); });
+            audio.addEventListener('loadedmetadata', () => { _paintAllProgress(); _renderLoopRegion(); });
             audio.addEventListener('error', () => {
                 const e = audio.error;
                 const codes = { 1: 'aborted', 2: 'network', 3: 'decode', 4: 'src not supported' };
@@ -3765,6 +3765,12 @@
             // Loop-chip ✕ — clear the active loop
             const loopClear = document.getElementById('mp-loop-clear');
             if (loopClear) loopClear.addEventListener('click', () => _clearLoop());
+            // Loop toggle button — create/clear a default loop region
+            const loopToggle = document.getElementById('mp-loop-toggle');
+            if (loopToggle) loopToggle.addEventListener('click', () => _toggleLoop());
+            // Draggable A / B handles on the seek bar
+            _bindLoopHandle('mp-loop-handle-a', 'a');
+            _bindLoopHandle('mp-loop-handle-b', 'b');
             // Restore prior open/closed preference. Default: collapsed.
             try {
                 pywebview.api.get_setting('music_panel_open').then(v => {
@@ -3780,39 +3786,73 @@
             return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
         }
 
+        function _loopDuration() {
+            return _musicPlayer.audio?.duration || _musicPlayer.currentTrack?.duration_seconds || 0;
+        }
+
         function _renderLoopChip() {
             const chip = document.getElementById('mp-loop-chip');
             const text = document.getElementById('mp-loop-text');
-            if (!chip || !text) return;
-            const { a, b, armedA } = _musicPlayer.loop;
-            if (a !== null && b !== null) {
-                text.textContent = `${_fmtTime(a)} → ${_fmtTime(b)}`;
-                chip.hidden = false;
-            } else if (armedA !== null) {
-                text.textContent = `${_fmtTime(armedA)} → set end…`;
-                chip.hidden = false;
-            } else {
-                chip.hidden = true;
+            if (chip && text) {
+                const { a, b, armedA } = _musicPlayer.loop;
+                if (a !== null && b !== null) {
+                    text.textContent = `${_fmtTime(a)} → ${_fmtTime(b)}`;
+                    chip.hidden = false;
+                } else if (armedA !== null) {
+                    text.textContent = `${_fmtTime(armedA)} → set end…`;
+                    chip.hidden = false;
+                } else {
+                    chip.hidden = true;
+                }
             }
-            _renderLoopSeekTicks();
+            _renderLoopRegion();
             _applyLoopBandToLyrics();
+            _paintLoopButton();
         }
 
-        function _renderLoopSeekTicks() {
-            const seek = document.getElementById('mp-seek');
-            if (!seek) return;
-            // Wipe old ticks
-            seek.querySelectorAll('.mp-seek-tick').forEach(el => el.remove());
+        // The blue band + draggable handles on the seek bar.
+        function _renderLoopRegion() {
+            const region = document.getElementById('mp-loop-region');
+            if (!region) return;
             const { a, b } = _musicPlayer.loop;
-            const dur = _musicPlayer.audio?.duration || _musicPlayer.currentTrack?.duration_seconds || 0;
-            if (a === null || b === null || !dur) return;
-            for (const t of [a, b]) {
-                const pct = Math.max(0, Math.min(100, (t / dur) * 100));
-                const tick = document.createElement('div');
-                tick.className = 'mp-seek-tick';
-                tick.style.left = pct + '%';
-                seek.appendChild(tick);
+            const dur = _loopDuration();
+            if (a === null || b === null || !dur) {
+                region.hidden = true;
+                return;
             }
+            const aPct = Math.max(0, Math.min(100, (a / dur) * 100));
+            const bPct = Math.max(0, Math.min(100, (b / dur) * 100));
+            region.hidden = false;
+            region.style.left = aPct + '%';
+            region.style.width = (bPct - aPct) + '%';
+        }
+
+        function _paintLoopButton() {
+            const btn = document.getElementById('mp-loop-toggle');
+            if (!btn) return;
+            const active = _musicPlayer.loop.a !== null && _musicPlayer.loop.b !== null;
+            btn.classList.toggle('mp-mode-active', active);
+        }
+
+        // Toggle button: no loop -> create a default region (current pos -> +15s,
+        // clamped); has loop -> clear. The default gives the user something to
+        // drag immediately rather than a blank bar.
+        function _toggleLoop() {
+            const loop = _musicPlayer.loop;
+            if (loop.a !== null && loop.b !== null) {
+                _clearLoop();
+                return;
+            }
+            const dur = _loopDuration();
+            if (!dur) return;
+            const cur = _musicPlayer.audio?.currentTime || 0;
+            let a = cur;
+            let b = Math.min(dur, cur + 15);
+            // If we're near the end, back the window up so it's visible
+            if (b - a < 5) { a = Math.max(0, dur - 15); b = dur; }
+            loop.a = a; loop.b = b; loop.armedA = null;
+            _renderLoopChip();
+            _persistLoop();
         }
 
         function _applyLoopBandToLyrics() {
@@ -3857,6 +3897,64 @@
             _musicPlayer.loop = { a: null, b: null, armedA: null };
             _renderLoopChip();
             _persistLoop();
+        }
+
+        // Drag one of the seek-bar loop handles. `which` is 'a' or 'b'.
+        // Dragging updates the bound live; the band + lyric highlight follow.
+        function _bindLoopHandle(elId, which) {
+            const el = document.getElementById(elId);
+            const seek = document.getElementById('mp-seek');
+            if (!el || !seek) return;
+            let activePointer = null;
+
+            const move = (clientX) => {
+                const dur = _loopDuration();
+                if (!dur) return;
+                const rect = seek.getBoundingClientRect();
+                const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                let t = pct * dur;
+                const loop = _musicPlayer.loop;
+                // Keep a < b with a small min gap; clamp against the other handle.
+                const MIN_GAP = 0.5;
+                if (which === 'a') {
+                    t = Math.min(t, (loop.b ?? dur) - MIN_GAP);
+                    loop.a = Math.max(0, t);
+                } else {
+                    t = Math.max(t, (loop.a ?? 0) + MIN_GAP);
+                    loop.b = Math.min(dur, t);
+                }
+                _renderLoopRegion();
+                _applyLoopBandToLyrics();
+                // Update the chip text live too
+                const text = document.getElementById('mp-loop-text');
+                if (text && loop.a !== null && loop.b !== null) {
+                    text.textContent = `${_fmtTime(loop.a)} → ${_fmtTime(loop.b)}`;
+                }
+            };
+
+            el.addEventListener('pointerdown', (e) => {
+                if (e.button !== undefined && e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();   // don't trigger a seek on the bar
+                activePointer = e.pointerId;
+                el.classList.add('dragging');
+                try { el.setPointerCapture(e.pointerId); } catch (_) {}
+            });
+            el.addEventListener('pointermove', (e) => {
+                if (activePointer !== e.pointerId) return;
+                e.stopPropagation();
+                move(e.clientX);
+            });
+            const release = (e) => {
+                if (activePointer !== e.pointerId) return;
+                activePointer = null;
+                el.classList.remove('dragging');
+                try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+                _persistLoop();   // commit on release
+            };
+            el.addEventListener('pointerup', release);
+            el.addEventListener('pointercancel', release);
+            el.addEventListener('click', (e) => e.stopPropagation());
         }
 
         function _persistLoop() {
