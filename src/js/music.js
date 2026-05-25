@@ -3294,8 +3294,10 @@
                     try { pywebview.api.set_setting('music_repeat', _musicPlayer.repeat); } catch (_) {}
                     return;
                 }
-                // Section loop — L marks A then B (toggle), Esc clears.
-                if ((k === 'l' || k === 'L') && !ctrl && !shift) {
+                // Section loop — Shift+L marks A then B (toggle), Esc clears.
+                // Plain L is already taken by seek-forward-10s above, so the
+                // loop shortcut is Shift+L.
+                if (shift && (k === 'l' || k === 'L')) {
                     e.preventDefault();
                     _loopMark(null);
                     return;
@@ -3652,20 +3654,24 @@
                 // side effect — but only fire on simple clicks (no drag).
                 body.querySelectorAll('.mp-lyric-line').forEach(el => {
                     el.addEventListener('click', (e) => {
-                        // If the user is selecting text, don't act
-                        const sel = window.getSelection?.();
-                        if (sel && sel.toString().length > 0) return;
                         const t = parseFloat(el.getAttribute('data-mp-lyric-time'));
                         if (isNaN(t) || !_musicPlayer.audio) return;
-                        // Shift+click marks a loop bound at this line instead
-                        // of seeking. First Shift+click = start; second =
-                        // end; third (after a complete loop) restarts.
+                        // Shift+click marks a loop bound. MUST be checked before
+                        // the text-selection guard below: shift+click extends
+                        // the lyric text selection, so the guard would early-
+                        // return and the loop would never get marked. Clear the
+                        // stray selection so it doesn't linger highlighted.
                         if (e.shiftKey) {
+                            e.preventDefault();
+                            window.getSelection?.()?.removeAllRanges();
                             _loopMark(t);
                             return;
                         }
-                        // Plain click — seek. Subtract lead + per-track offset
-                        // so the line plays from the start of being sung.
+                        // Plain click — but skip if the user is drag-selecting text
+                        const sel = window.getSelection?.();
+                        if (sel && sel.toString().length > 0) return;
+                        // Seek. Subtract lead + per-track offset so the line
+                        // plays from the start of being sung.
                         const trackOffset = _musicPlayer.currentTrack?.lyrics_offset || 0;
                         _musicPlayer.audio.currentTime = Math.max(0, t - LYRICS_LEAD_SECONDS - trackOffset);
                         if (_musicPlayer.audio.paused) _musicPlayer.audio.play().catch(() => {});
