@@ -600,11 +600,20 @@
             titleEl.textContent = 'Update available';
             versionEl.textContent = `v${info.current} → v${info.latest}`;
 
-            // Release notes — preserve formatting (newlines, bullets) via
-            // CSS white-space:pre-wrap. textContent is XSS-safe by definition.
-            notesEl.textContent = (info.releaseNotes && info.releaseNotes.trim())
-                ? info.releaseNotes
-                : 'No release notes provided.';
+            // Release notes — render a tiny, XSS-safe markdown subset so
+            // **bold** and "- " bullets show formatted instead of as literal
+            // asterisks/dashes. We escape all HTML first, THEN inject only our
+            // own <strong> tags, so notes content can't smuggle markup in.
+            // Newlines are preserved by the container's white-space:pre-wrap.
+            if (info.releaseNotes && info.releaseNotes.trim()) {
+                const esc = info.releaseNotes
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                notesEl.innerHTML = esc
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')  // **bold**
+                    .replace(/^[ \t]*[-*]\s+/gm, '• ');           // "- " / "* " -> bullet
+            } else {
+                notesEl.textContent = 'No release notes provided.';
+            }
 
             // Meta row — size + date if known. Hidden via :empty CSS otherwise.
             const metaParts = [];
