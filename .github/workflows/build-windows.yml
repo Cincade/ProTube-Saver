@@ -1,0 +1,65 @@
+name: Build Windows
+
+# Builds the Windows .exe on a Windows runner (PyInstaller can't cross-compile
+# from macOS). Trigger it two ways:
+#   - Manually from the Actions tab ("Run workflow") — for testing.
+#   - Automatically when a version tag like v1.5.0 is pushed — the build is
+#     then attached to the GitHub Release for that tag.
+#
+# ffmpeg.exe + ffprobe.exe are NOT in the repo (they exceed GitHub's 100 MB
+# per-file limit), so this workflow downloads fresh static builds from gyan.dev
+# into assets/ before building — mirroring the manual local step.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # pywebview's Windows (EdgeChromium / WebView2) backend needs pythonnet.
+          pip install pythonnet
+
+      - name: Download ffmpeg + ffprobe (Windows static builds)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_tmp -Force
+          $ffmpeg  = Get-ChildItem -Path ffmpeg_tmp -Recurse -Filter "ffmpeg.exe"  | Select-Object -First 1
+          $ffprobe = Get-ChildItem -Path ffmpeg_tmp -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+          Copy-Item $ffmpeg.FullName  -Destination "assets/ffmpeg.exe"  -Force
+          Copy-Item $ffprobe.FullName -Destination "assets/ffprobe.exe" -Force
+          Write-Host "Bundled ffmpeg + ffprobe:"
+          Get-ChildItem assets/*.exe | Format-Table Name, Length
+
+      - name: Build with PyInstaller
+        run: pyinstaller --noconfirm ProTubeSaver.spec
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProTube-Saver-Windows
+          path: dist/ProTube Saver.exe
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tagged builds only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ProTube Saver.exe
